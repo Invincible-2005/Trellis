@@ -25,6 +25,9 @@ A complete, locked frontend architecture document: every route, layout boundary,
 
 ## Decisions so far
 
+- [Admin Console Component Architecture](.scratch/frontend-scaffold/issues/06-admin-console-architecture.md): Dedicated sub-routes under /admin/* with shared tab layout; React Flow hierarchy viewer with Sheet/Dialog modal editors; two-step Uploadthing modal tagging docs strictly to Role OR Team.
+- [Authenticated Shell Layout Design](.scratch/frontend-scaffold/issues/05-authenticated-shell-layout.md): Collapsible icon sidebar with top <OrganizationSwitcher /> and bottom <UserButton />; header with breadcrumbs, role badge, and Cmd+K palette; strict route-level _components/ colocation per feature.
+- [Route URL Tree and Page Inventory](.scratch/frontend-scaffold/issues/01-route-url-tree.md): Clean session-based URLs (/dashboard, /tasks, /chat, /admin/*); /org-selection standalone route; tasks split between /dashboard summary and /tasks detail; user strikes on dashboard and review on /admin/strikes.
 - [Clerk Middleware Pattern for Route Groups](.scratch/frontend-scaffold/issues/02-clerk-middleware-pattern.md): Use clerkMiddleware() (v6, public-by-default); wait auth() everywhere; /org-selection lives outside (authenticated) layout; admin gated via uth.protect((has) => has({ role/permission })).
 - [openapi-fetch Server-Only Client Pattern](.scratch/frontend-scaffold/issues/03-openapi-fetch-server-pattern.md): Singleton pi client in lib/api/client.ts with Clerk JWT injected via onRequest middleware; parseAs: 'stream' for SSE proxy Route Handlers; cache() wraps query functions (not the client); import 'server-only' guards the module.
 
@@ -39,4 +42,7 @@ A complete, locked frontend architecture document: every route, layout boundary,
 ## Out of scope
 
 <!-- nothing ruled out yet -->
+
+
+
 

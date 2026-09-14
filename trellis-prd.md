@@ -191,6 +191,9 @@ tasks(id, team_id, title, description, assigned_to_user_id, created_by_user_id,
 -- Task deliverables (like Google Classroom submissions — separate from policy docs)
 task_submissions(id, task_id, submitted_by_user_id, file_url, notes, submitted_at)
 
+-- Task contextual comment threads (team task discussions)
+task_comments(id, task_id, user_id, content, created_at)
+
 -- Strike system
 strikes(id, org_id, team_id, given_by_user_id, given_to_user_id,
         reason, policy_chunk_ids[], agent_evaluation,
@@ -236,6 +239,7 @@ CREATE INDEX ON document_chunks (org_id, scope_type, team_id);
 CREATE INDEX ON roles (org_id, parent_role_id);
 CREATE INDEX ON team_members (user_id);
 CREATE INDEX ON tasks (team_id, deadline, status);
+CREATE INDEX ON task_comments (task_id, created_at);
 CREATE INDEX ON audit_log (org_id, created_at DESC);
 ```
 
