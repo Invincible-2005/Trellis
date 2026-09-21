@@ -1,7 +1,7 @@
 # 04 - Agentic RAG Graph Architecture (LangGraph)
 
 - **Type**: `prototype`
-- **Status**: `needs-triage`
+- **Status**: `resolved`
 - **Assignee**: Agentic Lead
 - **Blocked by**: 03
 
@@ -12,3 +12,153 @@ How should the LangGraph agent state machine be structured to enforce structural
 2. **Tool Execution Node**: Bind tools (`search_documents`, `get_tasks`, `get_team_summary`). Crucially: the tool receives the server-validated `AccessScope` directly from FastAPI context, NOT from LLM parameters.
 3. **Relevancy & Groundedness Nodes**: Grade retrieved chunks and verify final generated answers strictly cite authorized chunks.
 4. **Zero-Result & Refusal Handling**: Clear and safe responses when queries target out-of-scope data without leaking existence of unauthorized files.
+
+---
+
+## Answer
+
+### Graph Pattern: ReAct (Agentic) with Structural Guardrails
+
+The LangGraph graph runs as a **ReAct agentic loop** — the LLM reasons and calls tools iteratively until it can synthesize a complete answer. This is the primary architectural commitment: agentic, not hardcoded. The guardrail layer constrains the loop without removing its agency.
+
+```
+FastAPI /api/v1/chat/stream
+    │
+    ▼
+[Intent Classifier Node]
+    │
+    ├── conversational/meta ──────────────────────────────► [Synthesis Node] → SSE stream
+    │
+    └── workspace query / action
+            │
+            ▼
+    [ReAct Agent Node]  ◄──────────────────────────────────┐
+    (tool-bound LLM)                                        │
+            │                                               │
+            ├─ tool calls (typed, scope-injected) ──► [Tool Executor Node]
+            │                                               │
+            │   Tools available:                            │
+            │   • search_documents(query)                   │
+            │   • get_tasks(filters)                        │
+            │   • get_team_summary()                        │
+            │   • create_task(...)                          │
+            │   • give_strike(to_user_id, reason)           │
+            │   • give_commendation(to_user_id, reason)     │
+            │                                               │
+            │◄──── tool results ────────────────────────────┘
+            │
+            ├── [still needs tools + budget remaining] ─────► loop back
+            │
+            └── [ready to answer OR budget exhausted]
+                        │
+                        ▼
+            [Relevancy Grader Node]
+            Grade retrieved chunks against the query.
+                        │
+                        ├── grade: relevant ──────────────────► [Groundedness Check Node]
+                        │
+                        └── grade: irrelevant
+                                    │
+                                    ├── rewrites < 2 ──────────► [Query Rewrite Node] ─► loop back to ReAct
+                                    │
+                                    └── rewrites == 2 ──────────► [Synthesis Node] (answer with what we have)
+                                                                        │
+                                                                        ▼
+                                                            [Groundedness Check Node]
+                                                            Verify every claim traces to an authorized chunk.
+                                                                        │
+                                                                        ▼
+                                                            [SSE Stream Node]
+                                                            Emit typed events → Next.js BFF proxy
+```
+
+---
+
+### Guardrails Inside the ReAct Loop
+
+| Risk | Guardrail |
+|---|---|
+| Infinite tool loops | Hard step budget: max **8 tool calls** per query. Graph terminates to Synthesis when exhausted. |
+| Tool hallucination (wrong tool name / args) | Strict Pydantic `args_schema` per tool. LangGraph rejects malformed calls before execution. |
+| Prompt injection widening scope | `AccessScope` is server-injected via FastAPI `Depends(get_current_user)`. LLM parameter list **never contains scope**. Injection cannot widen it. |
+| Redundant tool calls | Loop detection: same tool + same args twice in one session → short-circuit to Synthesis. |
+| Hallucinated answer | Groundedness check: every claim validated against `retrieved_chunk_ids`. Ungrounded claims cut or qualified. |
+| Out-of-scope data leakage | SQL-layer filtering (ticket 02). Zero-result path: agent states "I couldn't find authorized documents" — never infers from absence. |
+
+---
+
+### Agent State Shape
+
+```python
+from typing import Annotated, TypedDict
+from langgraph.graph.message import add_messages
+
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]  # full conversation + tool messages
+    scope: AccessScope                        # server-injected, immutable
+    rewrite_count: int                        # caps query rewrites at 2
+    step_count: int                           # caps total tool calls at 8
+    retrieved_chunk_ids: list[str]            # all chunks used (groundedness + audit)
+    audit_id: str                             # audit_log row ID, written at start, updated at end
+```
+
+---
+
+### Tool Definitions (abbreviated)
+
+All tools receive `scope: AccessScope` injected by the tool executor node — **never from LLM arguments**.
+
+```python
+async def search_documents(query: str, scope: AccessScope) -> list[ChunkResult]: ...
+async def get_tasks(filters: TaskFilters, scope: AccessScope) -> list[TaskResult]: ...
+async def get_team_summary(scope: AccessScope) -> TeamSummary: ...
+async def create_task(title: str, description: str, team_id: str,
+                      assigned_to_user_id: str, deadline: str,
+                      scope: AccessScope) -> TaskResult: ...
+async def give_strike(to_user_id: str, reason: str, scope: AccessScope) -> StrikeResult: ...
+async def give_commendation(to_user_id: str, reason: str, scope: AccessScope) -> CommendationResult: ...
+```
+
+---
+
+### SSE Event Schema (FastAPI → Next.js BFF → Browser)
+
+| Event type | Payload | Purpose |
+|---|---|---|
+| `status` | `{"step": "classifying_intent" \| "searching_documents" \| "grading_relevance" \| "rewriting_query" \| "synthesizing"}` | Feeds `thinking-stepper.tsx` |
+| `tool_call` | `{"tool": "search_documents", "status": "start" \| "end"}` | Shows active tool |
+| `token` | `{"content": "..."}` | Incremental answer tokens |
+| `citations` | `[{"doc_id": "...", "title": "...", "chunk_index": 1}]` | Feeds `citation-badge.tsx` |
+| `error` | `{"message": "..."}` | Graceful error display |
+| `done` | `{"audit_id": "..."}` | Stream end + audit trace ID |
+
+Schema is extensible — additional `status` step values can be added without breaking the frontend contract.
+
+---
+
+### Memory: SQLite Checkpointer (Dev/MVP)
+
+```python
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+# Composite thread_id for strict org-level isolation
+thread_id = f"{org_id}:{user_id}:{session_id}"
+
+async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
+    graph = build_agent_graph(checkpointer=checkpointer)
+    result = await graph.ainvoke(state, config={"configurable": {"thread_id": thread_id}})
+```
+
+**Session model**: Multiple named threads per user per org. Users create, name, and switch between conversations. Sessions are scoped to `user_id` — users see only their own threads. Migration path to `AsyncPostgresSaver` (NeonDB) is a one-line swap — same interface.
+
+---
+
+### `request_access` Escalation Tool — Deferred
+
+Kept in the map's **Not yet specified**. Zero-result refusal ("I couldn't find authorized documents") is the safe MVP behavior. The full escalation workflow (notification loop, approval UI, temporary scope grant) is stretch/v2.
+
+---
+
+## Context pointer (for map.md)
+
+Resolves into new tickets **08** (SQLite checkpointer & chat session management) and **09** (SSE streaming implementation — FastAPI emitter + Next.js BFF contract). Unblocks tickets **05** and **07**.
