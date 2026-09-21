@@ -341,26 +341,53 @@ CREATE INDEX idx_audit_org_time ON audit_log (org_id, created_at DESC);
 
 ### Scoped vector search query (the core guardrail)
 
+> **⚠️ CORRECTION (2026-09-21):** The original CTE below was walking in the wrong
+> direction. It used `r.id = a.parent_role_id` which climbs **upward** to ancestor
+> roles. The access rule requires the opposite: a logged-in user at Role U can see
+> documents tagged to U **and all roles beneath U** (descendants). The corrected CTE
+> walks **downward** using `r.parent_role_id = vr.id`. See explanation below.
+
+**Why descendants, not ancestors:**
+```
+Tree:  Admin → HR → Manager → Employee
+Access rule: doc tagged to Employee is visible to Employee, Manager, HR, Admin.
+```
+So if I am logged in as HR, I can see docs tagged to: HR, Manager, Employee.
+Those are **descendants** of my role — not ancestors.
+The recursive query must start at my role and walk **down** to children, then grandchildren.
+
 ```sql
--- Resolve ancestor role IDs (recursive CTE)
-WITH RECURSIVE ancestors AS (
+-- CORRECT: walk DOWN the role tree (find descendants of user's roles)
+WITH RECURSIVE visible_roles AS (
+    -- Seed: the user's own role(s) in this org
     SELECT id FROM roles WHERE id = ANY(:user_role_ids)
     UNION ALL
+    -- Recursive step: find children of every role already in the set
     SELECT r.id FROM roles r
-    INNER JOIN ancestors a ON r.id = a.parent_role_id
+    INNER JOIN visible_roles vr ON r.parent_role_id = vr.id  -- ← walks DOWN to children
     WHERE r.org_id = :org_id
 )
 SELECT id, content, embedding <=> :query_vec AS distance
 FROM document_chunks
 WHERE org_id = :org_id
   AND (
-    (scope_type = 'role' AND role_id IN (SELECT id FROM ancestors))
+    (scope_type = 'role'  AND role_id IN (SELECT id FROM visible_roles))
     OR
-    (scope_type = 'team' AND team_id = ANY(:allowed_team_ids))
+    (scope_type = 'team'  AND team_id = ANY(:allowed_team_ids))
   )
 ORDER BY embedding <=> :query_vec
 LIMIT 5;
 ```
+
+**Critical join condition diff:**
+
+| Version | Join condition | Effect |
+|---|---|---|
+| Old (wrong) | `r.id = a.parent_role_id` | Finds r whose ID is the parent of a → climbs UP |
+| New (correct) | `r.parent_role_id = vr.id` | Finds r whose parent is vr → walks DOWN |
+
+This same descendant traversal must be used in `resolve_scope()` (Ticket 03) to build
+the `visible_role_ids` list that gets cached and injected into every request.
 
 ## Context pointer (for map.md)
 
