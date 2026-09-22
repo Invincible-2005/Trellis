@@ -22,6 +22,8 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [Database migrations]: **Alembic** manages schema migrations for NeonDB. Direct URL for migrations, pooled URL for FastAPI async runtime.
 - [04-agentic-rag-graph-design](./issues/04-agentic-rag-graph-design.md): **ReAct agentic loop** (not a hardcoded deterministic graph) with structural guardrails: 8-call step budget, Pydantic tool schema enforcement, server-injected `AccessScope` (LLM never sees or manipulates scope), loop detection, query rewrite capped at 2, groundedness check before synthesis. Tools: `search_documents`, `get_tasks`, `get_team_summary`, `create_task`, `give_strike`, `give_commendation`. SSE event schema locked: `status`, `tool_call`, `token`, `citations`, `error`, `done`. Memory via `AsyncSqliteSaver` keyed by `{org_id}:{user_id}:{session_id}` — multiple named threads per user, visible to that user only. Migration to `AsyncPostgresSaver` (NeonDB) is a one-line swap.
 - [10-langgraph-graph-code-structure](./issues/10-langgraph-graph-code-structure.md): Node contracts & execution topology locked. Pre-graph Guardrails AI filter; 3-way Router (`conversational`, `retrieve`, `write`); "Retrieve inside Write" for compound queries; pgvector HNSW (`<=>`) & typed relational tools (`get_tasks`, `get_team_summary`); 2x rewrite budget with Plain LLM refusal escape hatch; `@mention` entity disambiguation; HITL Pattern A (Conversational confirmation) for strikes.
+- [11-document-ingestion-pipeline](./issues/11-document-ingestion-pipeline.md): **scope_type ENUM extended to `org` | `role` | `team`** — org-scoped docs visible to all org members via `WHERE scope_type='org' AND org_id=:org_id`. Documents schema gains `file_url`, `file_type`, `status` (processing/ready/failed), `chunk_count`. Ingestion: async FastAPI BackgroundTask, 202 Accepted immediately, frontend polls status. Extractors: `pymupdf` (pdf), `python-docx` (docx), `python-pptx` (pptx, text per slide), native string (txt/md). Chunking: RecursiveCharacterTextSplitter (1000 chars / 200 overlap for docs; 500 chars / 100 overlap for pptx). Embeddings: HuggingFace Inference API batch 16–32, `mxbai-embed-large-v1`. Chunks denormalized with org_id, scope_type, role_id, team_id for zero-JOIN vector search.
+- [08-chat-session-management](./issues/08-chat-session-management.md): **Chat sessions architecture resolved.** NeonDB `chat_sessions` table (`id`, `org_id`, `user_id`, `title`, timestamps) stores session metadata; LangGraph checkpoints live separately in `checkpoints.db` (SQLite) keyed by `{org_id}:{user_id}:{session_id}` for strict org isolation. 5 CRUD endpoints (`/api/v1/chat/sessions`). Auto-title from first 60 chars of first message (editable via PATCH). Hard delete purges both Postgres row and SQLite checkpoint blobs. FastAPI `lifespan` pattern manages checkpointer startup/shutdown cleanly.
 - [Permission actions decided]: `create_role`, `create_team`, `add_member`, `upload_document`, `assign_task`, `give_strike`, `view_aggregate`, `review_strike`.
 - [Strike system]: Strike highlights to direct manager (role immediately above in team). Threshold (3 strikes) escalates to next level up. Commendation system (`give_commendation`) included in MVP as positive counterpart — same hierarchy check, no RAG validation needed.
 
@@ -30,12 +32,12 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - **Dynamic Access Escalation**: `request_access(topic, reason)` workflow — user requests access to out-of-scope document, triggers notification to manager/admin for approval. Deferred from MVP (zero-result refusal is the safe v1 behavior); kept here for v2 graduation.
 - **Scoring & Evaluation Suite**: Red-teaming benchmark and automated prompt injection defense testing.
 - **Real-time vs. polling**: WebSocket vs. SSE vs. short-polling for live task/notification updates (chat streaming is SSE; this is about dashboard/task status refresh).
-- **Document versioning**: What happens to vector chunks when an SOP document is updated?
+- **Document versioning**: What happens to vector chunks when an SOP document is updated? v1 default: re-upload creates a new document record; Admin deletes old one manually (cascade deletes chunks).
 - **Strike appeal flow**: Employee disputes a strike → flagged to HR / `review_strike`-permissioned role.
 
 ## Open tickets (frontier)
 
-- [08-chat-session-management](./issues/08-chat-session-management.md): Session metadata schema, CRUD endpoints, SQLite checkpointer lifecycle, org-isolation invariant. **Unblocked.**
+- [11-document-ingestion-pipeline](./issues/11-document-ingestion-pipeline.md): Alembic migration (scope_type enum + new columns) + ingestion service module (extractor → splitter → embed → bulk insert). **Unblocked.**
 - [09-sse-streaming-implementation](./issues/09-sse-streaming-implementation.md): FastAPI SSE emitter from LangGraph nodes + Next.js BFF proxy contract + frontend consumption. **Blocked by 05.**
 - [05-api-contract-and-type-gen](./issues/05-api-contract-and-type-gen.md): FastAPI OpenAPI contract + Next.js `openapi-typescript` codegen. **Unblocked.**
 - [06-admin-role-hierarchy-ui](./issues/06-admin-role-hierarchy-ui.md): Admin console React Flow hierarchy tree + team/doc management UI. **Blocked by 05.**
@@ -46,13 +48,9 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 1. **API Endpoints Contract & Pydantic Schemas ([Ticket 05](./issues/05-api-contract-and-type-gen.md))**:
    - Exact request/response DTOs for `/auth/me`, `/organizations`, `/teams`, `/roles`, `/tasks`, `/documents`, `/strikes`, `/dashboard`.
    - Needs discussion to unblock both backend and frontend development.
-2. **Document Ingestion & Chunking Pipeline**:
-   - Chunk size, overlap, and tokenizer strategy (to be resolved in agentic sessions).
-   - Sync vs. Async background chunking (FastAPI `BackgroundTasks` vs queue).
-   - Ingestion trigger flow: after UploadThing uploads file to CDN, backend fetches text → chunks → calls HuggingFace API for embeddings → writes to `document_chunks`.
-3. **Task & Strike Event Escalation / Notifications**:
+2. **Task & Strike Event Escalation / Notifications**:
    - How does a manager or employee get alerted (in-app notification table vs email vs polling)?
-4. **Strike Appeal Flow Details**:
+3. **Strike Appeal Flow Details**:
    - UI and endpoint workflow for reviewing and dismissing strikes.
 
 ## Out of scope
