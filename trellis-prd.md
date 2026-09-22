@@ -176,13 +176,14 @@ roles(id, org_id, name, description, parent_role_id, permissions[], created_by_u
 teams(id, org_id, name, created_by_user_id, created_at)
 team_members(id, team_id, user_id, role_id, joined_at)        -- role is per-team membership
 
--- Policy/SOP documents (for RAG) — tagged to EITHER a role OR a team
-documents(id, org_id, title, scope_type ENUM('role','team'), role_id?, team_id?,
-          uploaded_by_user_id, created_at, updated_at)
+-- Policy/SOP documents (for RAG) — tagged to Org, Role, or Team
+documents(id, org_id, title, description?, file_url, file_type ENUM('pdf','docx','pptx','txt','md'),
+          scope_type ENUM('org','role','team'), role_id?, team_id?,
+          uploaded_by_user_id, status ENUM('processing','ready','failed'), chunk_count?, created_at, updated_at)
 
 -- Vector chunks — scope columns DENORMALIZED for fast WHERE filtering
 document_chunks(id, document_id, content, embedding VECTOR(1024),
-                chunk_index, org_id, scope_type, role_id?, team_id?)
+                chunk_index, org_id, scope_type ENUM('org','role','team'), role_id?, team_id?)
 
 -- Task work items with dependency DAG
 tasks(id, team_id, title, description, assigned_to_user_id, created_by_user_id,
@@ -193,6 +194,9 @@ task_submissions(id, task_id, submitted_by_user_id, file_url, notes, submitted_a
 
 -- Task contextual comment threads (team task discussions)
 task_comments(id, task_id, user_id, content, created_at)
+
+-- User chat session metadata (message checkpoint blobs stored in SQLite checkpoints.db)
+chat_sessions(id, org_id, user_id, title?, created_at, last_active_at)
 
 -- Strike system
 strikes(id, org_id, team_id, given_by_user_id, given_to_user_id,
@@ -211,21 +215,23 @@ audit_log(id, org_id, user_id, role_ids_at_time[], query, tools_called[],
 **Retrieval + permission filtering as one operation:**
 
 ```sql
--- Resolve ancestor role IDs (recursive CTE)
-WITH RECURSIVE ancestors AS (
+-- Resolve visible role IDs (walk DOWN the tree to find descendants / governed roles)
+WITH RECURSIVE visible_roles AS (
     SELECT id FROM roles WHERE id = ANY(:user_role_ids_in_this_org)
     UNION ALL
     SELECT r.id FROM roles r
-    INNER JOIN ancestors a ON r.id = a.parent_role_id
+    INNER JOIN visible_roles vr ON r.parent_role_id = vr.id
     WHERE r.org_id = :org_id
 )
 SELECT id, content, embedding <=> :query_vec AS distance
 FROM document_chunks
 WHERE org_id = :org_id
   AND (
-    (scope_type = 'role' AND role_id IN (SELECT id FROM ancestors))
+    (scope_type = 'org'   AND org_id = :org_id)
     OR
-    (scope_type = 'team' AND team_id = ANY(:allowed_team_ids))
+    (scope_type = 'role'  AND role_id IN (SELECT id FROM visible_roles))
+    OR
+    (scope_type = 'team'  AND team_id = ANY(:allowed_team_ids))
   )
 ORDER BY embedding <=> :query_vec
 LIMIT 5;
@@ -234,12 +240,14 @@ LIMIT 5;
 **Required indexes:**
 ```sql
 CREATE INDEX ON document_chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON document_chunks (org_id, scope_type);
 CREATE INDEX ON document_chunks (org_id, scope_type, role_id);
 CREATE INDEX ON document_chunks (org_id, scope_type, team_id);
 CREATE INDEX ON roles (org_id, parent_role_id);
 CREATE INDEX ON team_members (user_id);
 CREATE INDEX ON tasks (team_id, deadline, status);
 CREATE INDEX ON task_comments (task_id, created_at);
+CREATE INDEX ON chat_sessions (user_id, org_id, last_active_at DESC);
 CREATE INDEX ON audit_log (org_id, created_at DESC);
 ```
 

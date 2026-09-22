@@ -153,10 +153,11 @@ class TeamMember(Base):
 
 class Document(Base):
     """
-    Governance/SOP document. Tagged to EITHER a role OR a team (not both).
-    - scope_type='role': visible to role_id + all ancestor roles.
+    Governance/SOP document. Tagged to an Org, Role, or Team:
+    - scope_type='org': org-wide policy, visible to ALL members of the organization.
+    - scope_type='role': visible to role_id + all descendant roles (roles governed by that role).
     - scope_type='team': visible to all team_members + roles above the team.
-    Uploaded by roles with 'upload_document' permission for their role scope.
+    Uploaded by roles with 'upload_document' permission for their role/team scope.
     """
     __tablename__ = "documents"
 
@@ -164,10 +165,23 @@ class Document(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    scope_type: Mapped[str] = mapped_column(Enum("role", "team", name="doc_scope_type"), nullable=False)
+    file_url: Mapped[str] = mapped_column(String, nullable=False)  # UploadThing CDN URL
+    file_type: Mapped[str] = mapped_column(
+        Enum("pdf", "docx", "pptx", "txt", "md", name="doc_file_type"),
+        nullable=False
+    )
+    scope_type: Mapped[str] = mapped_column(
+        Enum("org", "role", "team", name="doc_scope_type"),
+        nullable=False
+    )
     role_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("roles.id"), nullable=True)
     team_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("teams.id"), nullable=True)
     uploaded_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum("processing", "ready", "failed", name="doc_ingestion_status"),
+        default="processing"
+    )
+    chunk_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -188,7 +202,7 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     # Denormalized for fast scope filtering in vector search
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
-    scope_type: Mapped[str] = mapped_column(Enum("role", "team", name="doc_scope_type"), nullable=False)
+    scope_type: Mapped[str] = mapped_column(Enum("org", "role", "team", name="doc_scope_type"), nullable=False)
     role_id: Mapped[Optional[uuid.UUID]] = mapped_column(nullable=True)
     team_id: Mapped[Optional[uuid.UUID]] = mapped_column(nullable=True)
 
@@ -306,6 +320,27 @@ class AuditLog(Base):
     chunks_denied_count: Mapped[int] = mapped_column(Integer, default=0)
     answer_summary: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ─────────────────────────────────────────────
+# CHAT SESSIONS
+# ─────────────────────────────────────────────
+
+class ChatSession(Base):
+    """
+    User-facing chat session metadata.
+    LangGraph checkpointer state (message history blobs) lives in checkpoints.db (SQLite),
+    while metadata (title, timestamps) lives here in Postgres for fast sidebar listing.
+    """
+    __tablename__ = "chat_sessions"
+    __table_args__ = (UniqueConstraint("org_id", "user_id", "id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # Auto-titled from first message
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_active_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 ```
 
 ---
@@ -317,6 +352,7 @@ class AuditLog(Base):
 CREATE INDEX ON document_chunks USING hnsw (embedding vector_cosine_ops);
 
 -- Scope filtering indexes (always applied before vector search)
+CREATE INDEX idx_chunks_org_scope_org ON document_chunks (org_id, scope_type);
 CREATE INDEX idx_chunks_org_scope_role ON document_chunks (org_id, scope_type, role_id);
 CREATE INDEX idx_chunks_org_scope_team ON document_chunks (org_id, scope_type, team_id);
 
@@ -332,6 +368,9 @@ CREATE INDEX idx_tasks_team_deadline ON tasks (team_id, deadline, status);
 
 -- Task comment threads query
 CREATE INDEX idx_task_comments_task ON task_comments (task_id, created_at);
+
+-- Chat sessions query
+CREATE INDEX idx_chat_sessions_user_org ON chat_sessions (user_id, org_id, last_active_at DESC);
 
 -- Audit log time-series
 CREATE INDEX idx_audit_org_time ON audit_log (org_id, created_at DESC);
@@ -371,6 +410,8 @@ SELECT id, content, embedding <=> :query_vec AS distance
 FROM document_chunks
 WHERE org_id = :org_id
   AND (
+    (scope_type = 'org'   AND org_id = :org_id)
+    OR
     (scope_type = 'role'  AND role_id IN (SELECT id FROM visible_roles))
     OR
     (scope_type = 'team'  AND team_id = ANY(:allowed_team_ids))
