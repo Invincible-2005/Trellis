@@ -18,3 +18,12 @@ tavily-python
 ipykernel
 langchain
 deepeval
+sqlalchemy[asyncio]>=2.0.0
+asyncpg
+psycopg2-binary
+alembic
+pydantic-settings
+pyjwt[crypto]
+cachetools
+httpx
+pgvector
