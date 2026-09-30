@@ -27,3 +27,5 @@ pyjwt[crypto]
 cachetools
 httpx
 pgvector
+python-docx 
+python-pptx

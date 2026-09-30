@@ -7,6 +7,7 @@ from app.models.document import Document, DocumentChunk
 from app.models.strike import Strike
 from app.models.audit import AuditLog
 from app.models.chat import ChatSession
+from app.models.invitation import Invitation
 
 __all__ = [
     "User",
@@ -23,4 +24,5 @@ __all__ = [
     "Strike",
     "AuditLog",
     "ChatSession",
+    "Invitation",
 ]

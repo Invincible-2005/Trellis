@@ -24,6 +24,7 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [10-langgraph-graph-code-structure](./issues/10-langgraph-graph-code-structure.md): Node contracts & execution topology locked. Pre-graph Guardrails AI filter; 3-way Router (`conversational`, `retrieve`, `write`); "Retrieve inside Write" for compound queries; pgvector HNSW (`<=>`) & typed relational tools (`get_tasks`, `get_team_summary`); 2x rewrite budget with Plain LLM refusal escape hatch; `@mention` entity disambiguation; HITL Pattern A (Conversational confirmation) for strikes.
 - [11-document-ingestion-pipeline](./issues/11-document-ingestion-pipeline.md): **scope_type ENUM extended to `org` | `role` | `team`** — org-scoped docs visible to all org members via `WHERE scope_type='org' AND org_id=:org_id`. Documents schema gains `file_url`, `file_type`, `status` (processing/ready/failed), `chunk_count`. Ingestion: async FastAPI BackgroundTask, 202 Accepted immediately, frontend polls status. Extractors: `pymupdf` (pdf), `python-docx` (docx), `python-pptx` (pptx, text per slide), native string (txt/md). Chunking: RecursiveCharacterTextSplitter (1000 chars / 200 overlap for docs; 500 chars / 100 overlap for pptx). Embeddings: HuggingFace Inference API batch 16–32, `mxbai-embed-large-v1`. Chunks denormalized with org_id, scope_type, role_id, team_id for zero-JOIN vector search.
 - [08-chat-session-management](./issues/08-chat-session-management.md): **Chat sessions architecture resolved.** NeonDB `chat_sessions` table (`id`, `org_id`, `user_id`, `title`, timestamps) stores session metadata; LangGraph checkpoints live separately in `checkpoints.db` (SQLite) keyed by `{org_id}:{user_id}:{session_id}` for strict org isolation. 5 CRUD endpoints (`/api/v1/chat/sessions`). Auto-title from first 60 chars of first message (editable via PATCH). Hard delete purges both Postgres row and SQLite checkpoint blobs. FastAPI `lifespan` pattern manages checkpointer startup/shutdown cleanly.
+- [05-api-contract-and-type-gen](./issues/05-api-contract-and-type-gen.md): **FastAPI OpenAPI contract & Next.js codegen locked.** Full Pydantic schemas defined in `schemas.py` for auth (`/auth/me`, `/auth/context`), org onboarding, role hierarchy (flat list with depth, standalone permissions, re-parenting via `PATCH /admin/roles/{id}`), team membership & invitations (`invitations` table tracking pending invites + Clerk invite integration), documents, tasks & submissions, strikes & commendations, and polymorphic dashboard metrics. Next.js runs `npm run codegen` via `openapi-typescript` for 100% type safety.
 - [Permission actions decided]: `create_role`, `create_team`, `add_member`, `upload_document`, `assign_task`, `give_strike`, `view_aggregate`, `review_strike`.
 - [Strike system]: Strike highlights to direct manager (role immediately above in team). Threshold (3 strikes) escalates to next level up. Commendation system (`give_commendation`) included in MVP as positive counterpart — same hierarchy check, no RAG validation needed.
 
@@ -38,19 +39,15 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 ## Open tickets (frontier)
 
 - [11-document-ingestion-pipeline](./issues/11-document-ingestion-pipeline.md): Alembic migration (scope_type enum + new columns) + ingestion service module (extractor → splitter → embed → bulk insert). **Unblocked.**
-- [09-sse-streaming-implementation](./issues/09-sse-streaming-implementation.md): FastAPI SSE emitter from LangGraph nodes + Next.js BFF proxy contract + frontend consumption. **Blocked by 05.**
-- [05-api-contract-and-type-gen](./issues/05-api-contract-and-type-gen.md): FastAPI OpenAPI contract + Next.js `openapi-typescript` codegen. **Unblocked.**
-- [06-admin-role-hierarchy-ui](./issues/06-admin-role-hierarchy-ui.md): Admin console React Flow hierarchy tree + team/doc management UI. **Blocked by 05.**
-- [07-role-scoped-chat-and-dashboard-ui](./issues/07-role-scoped-chat-and-dashboard-ui.md): Chat UI (streaming, citations, thinking-stepper) + Recharts dashboard widgets. **Blocked by 04, 05.**
+- [09-sse-streaming-implementation](./issues/09-sse-streaming-implementation.md): FastAPI SSE emitter from LangGraph nodes + Next.js BFF proxy contract + frontend consumption. **Unblocked.**
+- [06-admin-role-hierarchy-ui](./issues/06-admin-role-hierarchy-ui.md): Admin console React Flow hierarchy tree + team/doc management UI. **Unblocked.**
+- [07-role-scoped-chat-and-dashboard-ui](./issues/07-role-scoped-chat-and-dashboard-ui.md): Chat UI (streaming, citations, thinking-stepper) + Recharts dashboard widgets. **Unblocked.**
 
 ## Open backend decisions (undecided)
 
-1. **API Endpoints Contract & Pydantic Schemas ([Ticket 05](./issues/05-api-contract-and-type-gen.md))**:
-   - Exact request/response DTOs for `/auth/me`, `/organizations`, `/teams`, `/roles`, `/tasks`, `/documents`, `/strikes`, `/dashboard`.
-   - Needs discussion to unblock both backend and frontend development.
-2. **Task & Strike Event Escalation / Notifications**:
+1. **Task & Strike Event Escalation / Notifications**:
    - How does a manager or employee get alerted (in-app notification table vs email vs polling)?
-3. **Strike Appeal Flow Details**:
+2. **Strike Appeal Flow Details**:
    - UI and endpoint workflow for reviewing and dismissing strikes.
 
 ## Out of scope
