@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
+    # Clerk — Auth
+    # CLERK_SECRET_KEY  : Clerk Dashboard → API Keys → Secret Key (sk_live_... / sk_test_...)
+    # CLERK_ISSUER      : Clerk Dashboard → API Keys → Frontend API URL
+    #                     e.g. https://your-instance.clerk.accounts.dev
+    CLERK_SECRET_KEY: str = ""
+    CLERK_ISSUER: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
