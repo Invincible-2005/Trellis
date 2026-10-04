@@ -1,9 +1,9 @@
 # 03 - Scope Resolution Engine (`resolve_scope`)
 
 - **Type**: `task`
-- **Status**: `ready-for-human`
-- **Assignee**: Backend Dev & Agentic Lead
-- **Blocked by**: 02
+- **Status**: `resolved`
+- **Assignee**: Backend Dev
+- **Blocked by**: 02 (resolved)
 
 ## Question
 

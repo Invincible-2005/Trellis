@@ -11,6 +11,7 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - **Tracker**: Local Markdown (`.scratch/trellis/issues/`)
 - **Key Skills to Consult**: `domain-modeling`, `grilling`
 - **Core Architectural Invariant**: Never trust the LLM or frontend for security. Access scope resolution (`resolve_scope()`) happens strictly in the database/backend layer. The LLM calls typed tools with server-injected `AccessScope` — it never receives or manipulates the scope itself.
+- **Backend Dev lane**: Owns Clerk JWT middleware (`app/core/auth.py`), `get_scope` dep (`app/core/deps.py`), scope resolver (`app/scope/resolver.py`), all FastAPI routers, Pydantic schema contract, and the `openapi-typescript` codegen pipeline. Coordinates with Frontend Dev on the typed client and with Agentic Lead on the `AccessScope` interface injected into LangGraph tools.
 
 ## Decisions so far
 
@@ -27,6 +28,8 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [05-api-contract-and-type-gen](./issues/05-api-contract-and-type-gen.md): **FastAPI OpenAPI contract & Next.js codegen locked.** Full Pydantic schemas defined in `schemas.py` for auth (`/auth/me`, `/auth/context`), org onboarding, role hierarchy (flat list with depth, standalone permissions, re-parenting via `PATCH /admin/roles/{id}`), team membership & invitations (`invitations` table tracking pending invites + Clerk invite integration), documents, tasks & submissions, strikes & commendations, and polymorphic dashboard metrics. Next.js runs `npm run codegen` via `openapi-typescript` for 100% type safety.
 - [Permission actions decided]: `create_role`, `create_team`, `add_member`, `upload_document`, `assign_task`, `give_strike`, `view_aggregate`, `review_strike`.
 - [Strike system]: Strike highlights to direct manager (role immediately above in team). Threshold (3 strikes) escalates to next level up. Commendation system (`give_commendation`) included in MVP as positive counterpart — same hierarchy check, no RAG validation needed.
+- [Org provisioning flow — decided 2026-09-28]: **Clerk is source of truth (Option A).** User creates org via Clerk on the frontend → Clerk issues `clerk_org_id` → backend mirrors it into `organizations` table on first JWT hit for that org. Backend does NOT auto-create org rows — creation is always user-initiated via Clerk. Only the org creator (admin) can add/remove members and assign roles.
+- [User auth redirect flow — decided 2026-09-28]: Returning user → redirected to last active org workspace (org switcher available on that page). New user with no org → redirected to "Create Organization" page. New user who has been invited by an admin (TeamMember row exists) → redirected directly to their org workspace. Frontend drives all redirect logic based on the `org_id` presence in the Clerk JWT and the user's `AccessScope`.
 
 ## Not yet specified
 
