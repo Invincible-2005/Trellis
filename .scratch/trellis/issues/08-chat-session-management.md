@@ -75,7 +75,7 @@ All endpoints are scoped strictly to the authenticated user's `user_id` + `org_i
 | `GET` | `/api/v1/chat/sessions` | List sessions for this user in this org (ordered by `last_active_at DESC`) |
 | `PATCH` | `/api/v1/chat/sessions/{session_id}` | Rename session (update `title`) |
 | `DELETE` | `/api/v1/chat/sessions/{session_id}` | Hard delete — NeonDB row + SQLite checkpoint blob |
-| `POST` | `/api/v1/chat/sessions/{session_id}/message` | Send a message (invokes LangGraph graph) |
+| `POST` | `/api/v1/chat/sessions/{session_id}/message` | Send a message → invokes LangGraph graph, responds with **SSE stream** (`text/event-stream`). **The single chat endpoint** (ticket 12 D2) |
 
 ---
 
@@ -104,6 +104,11 @@ async def delete_session(session_id: uuid.UUID, user: ScopedUser, db: AsyncSessi
 ```
 
 No soft delete. Once gone, the full conversation is purged.
+
+> ⚠️ **Audit note (2026-10-08):** `checkpoint_blobs` / `checkpoint_writes` are *Postgres*-saver table names;
+> the SQLite saver uses different tables. Prefer the checkpointer's own thread-delete method
+> (verify exact name in the installed `langgraph` version, e.g. `adelete_thread(thread_id)`) so the
+> same code works for SQLite and Postgres and the "one-line swap" stays true.
 
 ---
 

@@ -35,17 +35,19 @@ frontend/
 │   │   ├── layout.tsx
 │   │   ├── sign-in/[[...sign-in]]/page.tsx       # Clerk <SignIn /> component
 │   │   ├── sign-up/[[...sign-up]]/page.tsx       # Clerk <SignUp /> component
-│   │   └── org-selection/                        # Multi-org entry point (outside authenticated shell)
-│   │       ├── page.tsx                          # Renders Clerk <OrganizationList />
-│   │       └── _components/
-│   │           └── org-selection-card.tsx
+│   │   ├── org-selection/                        # Multi-org entry point (outside authenticated shell)
+│   │   │   ├── page.tsx                          # <OrganizationList hidePersonal afterCreateOrganizationUrl="/onboarding" />
+│   │   │   └── _components/
+│   │   │       └── org-selection-card.tsx
+│   │   └── onboarding/                           # New-org setup (trellis ticket 12 D10)
+│   │       └── page.tsx                          # Server Component: POST /api/v1/orgs/provision → redirect('/dashboard')
 │   │
 │   ├── (dashboard)/                              # Authenticated application shell
 │   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check
 │   │   ├── _components/                          # Shell-level private components
 │   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar with <OrganizationSwitcher />
 │   │   │   ├── app-header.tsx                    # Breadcrumbs, Active Role badge, Command search trigger
-│   │   │   ├── nav-items.tsx                     # Dynamic role-filtered navigation items
+│   │   │   ├── nav-items.tsx                     # Nav items filtered by auth/context permissions
 │   │   │   ├── user-nav.tsx                      # Clerk <UserButton /> + Theme toggle
 │   │   │   └── command-menu.tsx                  # Cmd+K quick search modal
 │   │   │
@@ -77,8 +79,8 @@ frontend/
 │   │   │       ├── document-grid.tsx             # Card grid of accessible docs
 │   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for policy docs
 │   │   │
-│   │   └── admin/                                # Route: /admin/* (Restricted to roles with admin perms)
-│   │       ├── layout.tsx                        # Admin sub-navigation tabs (Roles, Teams, Docs, Strikes)
+│   │   └── admin/                                # Route: /admin/* (create_role OR add_member org-wide; per-tab perms)
+│   │       ├── layout.tsx                        # Tabs + gate: redirect unless auth/context.active_org.can_open_admin (D4)
 │   │       ├── page.tsx                          # Redirects to /admin/roles or shows admin overview
 │   │       ├── roles/                            # Route: /admin/roles
 │   │       │   ├── page.tsx                      # Visual Role Hierarchy builder
@@ -96,7 +98,7 @@ frontend/
 │   │       │   ├── page.tsx                      # Upload & Tag Policy/SOP documents
 │   │       │   └── _components/
 │   │       │       ├── doc-upload-dropzone.tsx   # Uploadthing file dropzone
-│   │       │       └── tag-scope-select.tsx      # Modal to choose Role OR Team scope tag
+│   │       │       └── tag-scope-select.tsx      # Modal to choose Org / Role / Team scope tag
 │   │       └── strikes/                          # Route: /admin/strikes
 │   │           ├── page.tsx                      # Strike appeal review & policy validation audit
 │   │           └── _components/
@@ -105,8 +107,10 @@ frontend/
 │   │
 │   └── api/
 │       └── chat/
-│           └── stream/
-│               └── route.ts                      # Route Handler: BFF SSE proxy to FastAPI /chat/stream
+│           └── sessions/
+│               └── [sessionId]/
+│                   └── message/
+│                       └── route.ts              # BFF SSE proxy → FastAPI POST /api/v1/chat/sessions/{session_id}/message
 │
 ├── components/
 │   ├── ui/                                       # shadcn/ui primitives (button, dialog, sheet, sidebar)
@@ -119,5 +123,5 @@ frontend/
 │   │   └── queries/                              # cache()-wrapped Server Component data fetchers
 │   └── utils.ts                                  # cn() and shared formatting utilities
 │
-└── middleware.ts                                 # Clerk route protection & active-org redirect logic
+└── proxy.ts                                      # Next.js 16 name for middleware: Clerk route protection & active-org redirect
 ```

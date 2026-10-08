@@ -17,12 +17,18 @@ How should the LangGraph agent state machine be structured to enforce structural
 
 ## Answer
 
+> ⚠️ **Partly superseded (2026-10-08):** The graph topology below is replaced by **ticket 10**
+> (pre/post guardrails, 3-way Router `conversational`/`retrieve`/`write`, separate Retrieve and
+> Write nodes, plain-LLM refusal after 2 rewrites instead of "answer with what we have").
+> Still valid from this ticket: the guardrails table, tool list, SSE event *types*, step budget (8),
+> rewrite cap (2), and the checkpointer/thread_id design. Scope now travels via runtime context, not state (ticket 12 D1).
+
 ### Graph Pattern: ReAct (Agentic) with Structural Guardrails
 
 The LangGraph graph runs as a **ReAct agentic loop** — the LLM reasons and calls tools iteratively until it can synthesize a complete answer. This is the primary architectural commitment: agentic, not hardcoded. The guardrail layer constrains the loop without removing its agency.
 
 ```
-FastAPI /api/v1/chat/stream
+FastAPI POST /api/v1/chat/sessions/{session_id}/message  (SSE)
     │
     ▼
 [Intent Classifier Node]
@@ -80,7 +86,7 @@ FastAPI /api/v1/chat/stream
 |---|---|
 | Infinite tool loops | Hard step budget: max **8 tool calls** per query. Graph terminates to Synthesis when exhausted. |
 | Tool hallucination (wrong tool name / args) | Strict Pydantic `args_schema` per tool. LangGraph rejects malformed calls before execution. |
-| Prompt injection widening scope | `AccessScope` is server-injected via FastAPI `Depends(get_current_user)`. LLM parameter list **never contains scope**. Injection cannot widen it. |
+| Prompt injection widening scope | `AccessScope` is resolved by FastAPI `Depends(get_scope)` and handed to the graph via **runtime context** (ticket 03 §6). It is frozen, never checkpointed, and the LLM-visible tool schemas **never contain scope**. Injection cannot widen it. |
 | Redundant tool calls | Loop detection: same tool + same args twice in one session → short-circuit to Synthesis. |
 | Hallucinated answer | Groundedness check: every claim validated against `retrieved_chunk_ids`. Ungrounded claims cut or qualified. |
 | Out-of-scope data leakage | SQL-layer filtering (ticket 02). Zero-result path: agent states "I couldn't find authorized documents" — never infers from absence. |
@@ -89,35 +95,51 @@ FastAPI /api/v1/chat/stream
 
 ### Agent State Shape
 
+> **Updated 2026-10-08 (ticket 12 D1):** `scope` and `audit_id` moved OUT of `AgentState` into the
+> runtime context (`AgentContext`, see ticket 03 §6). `AgentState` is checkpointed to SQLite, so it holds
+> only conversation + loop bookkeeping — never authorization data. Shape below matches `backend/app/agent/state.py`.
+
 ```python
-from typing import Annotated, TypedDict
+from typing import Annotated, Optional
+from typing_extensions import TypedDict
 from langgraph.graph.message import add_messages
 
-class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]  # full conversation + tool messages
-    scope: AccessScope                        # server-injected, immutable
-    rewrite_count: int                        # caps query rewrites at 2
-    step_count: int                           # caps total tool calls at 8
-    retrieved_chunk_ids: list[str]            # all chunks used (groundedness + audit)
-    audit_id: str                             # audit_log row ID, written at start, updated at end
+class AgentState(TypedDict):                       # checkpointed per thread
+    messages: Annotated[list, add_messages]        # full conversation + tool messages
+    intent: Optional[str]                          # "conversational" | "retrieve" | "write" (ticket 10 router)
+    retrieved_chunks: list[str]                    # chunk text for grader / synthesis
+    retrieved_chunk_ids: list[str]                 # groundedness + audit
+    rewrite_count: int                             # caps query rewrites at 2
+    step_count: int                                # caps total tool calls at 8
+    groundedness_passed: Optional[bool]
+
+@dataclass(frozen=True)
+class AgentContext:                                # per request, NEVER checkpointed
+    scope: AccessScope
+    audit_id: UUID
 ```
 
 ---
 
 ### Tool Definitions (abbreviated)
 
-All tools receive `scope: AccessScope` injected by the tool executor node — **never from LLM arguments**.
+The LLM-visible schema of every tool contains **only business arguments**. Tools obtain the scope from
+the LangGraph runtime (`runtime.context.scope`) and pass it to the shared data-access functions
+(ticket 03 §1a) — the same functions REST endpoints use.
 
 ```python
-async def search_documents(query: str, scope: AccessScope) -> list[ChunkResult]: ...
-async def get_tasks(filters: TaskFilters, scope: AccessScope) -> list[TaskResult]: ...
-async def get_team_summary(scope: AccessScope) -> TeamSummary: ...
-async def create_task(title: str, description: str, team_id: str,
-                      assigned_to_user_id: str, deadline: str,
-                      scope: AccessScope) -> TaskResult: ...
-async def give_strike(to_user_id: str, reason: str, scope: AccessScope) -> StrikeResult: ...
-async def give_commendation(to_user_id: str, reason: str, scope: AccessScope) -> CommendationResult: ...
+# What the LLM sees                          # What the tool does internally
+search_documents(query)                      # search_chunks(db, ctx.scope, embed(query))
+get_tasks(filters)                           # list_tasks(db, ctx.scope, filters)
+get_team_summary()                           # team_summary(db, ctx.scope)
+create_task(title, description, team_id,     # require ctx.scope.can("assign_task", team_id)
+            assigned_to_user_id, deadline)
+give_strike(to_user_id, reason)              # require can("give_strike", team) + hierarchy DB check
+give_commendation(to_user_id, reason)        # hierarchy DB check
 ```
+
+Exact injection mechanism (`ToolRuntime` parameter vs `get_runtime()`) to be confirmed against the
+installed LangGraph 1.2.11 at implementation time.
 
 ---
 
@@ -133,6 +155,9 @@ async def give_commendation(to_user_id: str, reason: str, scope: AccessScope) ->
 | `done` | `{"audit_id": "..."}` | Stream end + audit trace ID |
 
 Schema is extensible — additional `status` step values can be added without breaking the frontend contract.
+
+> Note (2026-10-08): ticket 10 adds nodes with no `status` step yet (input guardrail, router,
+> write action, refusal, groundedness, output guardrail). Define their step names in ticket 09.
 
 ---
 

@@ -15,3 +15,10 @@ Decisions to lock:
 - Recharts: which specific chart types per role? (task completion trend, deadline countdown, team aggregate bar chart?)
 - What is the polling strategy for task updates? (TanStack Query `refetchInterval`? How often?)
 - Are dashboard metrics a dedicated FastAPI endpoint, or assembled from existing task/team endpoints?
+
+
+## Already answered elsewhere (audit 2026-10-08)
+
+- Single route, conditional rendering: one `/dashboard` (ticket 01 here).
+- Dedicated endpoint: yes. Polymorphic `GET /api/v1/dashboard` returning `my_tasks`, `managed_teams?` (if managing any team), `org_overview?` (if `view_aggregate`) (trellis/05).
+- Still open: server vs client fetching split, polling interval (map lists real-time vs polling as unspecified), Recharts chart types per view.

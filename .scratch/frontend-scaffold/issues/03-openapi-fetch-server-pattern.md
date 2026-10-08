@@ -38,13 +38,13 @@ const authMiddleware: Middleware = {
     if (request.headers.has('Authorization')) return request;
 
     try {
-      const { getToken, orgId, userId, orgRole } = await auth();
+      const { getToken } = await auth();
       const token = await getToken();
       if (token) {
+        // ONLY the token. The active org, user and org role are all inside it, and FastAPI
+        // derives identity from the verified token alone (trellis ticket 12 D8).
+        // Do NOT add X-Org-Id / X-User-Id / X-Org-Role headers.
         request.headers.set('Authorization', `Bearer ${token}`);
-        if (orgId) request.headers.set('X-Org-Id', orgId);
-        if (userId) request.headers.set('X-User-Id', userId);
-        if (orgRole) request.headers.set('X-Org-Role', orgRole);
       }
     } catch {
       // No active request context (static gen, public edge)
@@ -88,7 +88,7 @@ export const getDocuments = cache(async () => {
 Use `parseAs: 'stream'` to skip buffering and pipe `ReadableStream` directly to the browser:
 
 ```typescript
-// app/api/chat/stream/route.ts
+// app/api/chat/sessions/[sessionId]/message/route.ts   (path updated 2026-10-08, trellis/12 D2)
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { api } from '@/lib/api/client';
@@ -96,10 +96,15 @@ import { api } from '@/lib/api/client';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> },
+) {
+  const { sessionId } = await params;
   const body = await req.json();
 
-  const { response, error } = await api.POST('/api/v1/chat/stream', {
+  const { response, error } = await api.POST('/api/v1/chat/sessions/{session_id}/message', {
+    params: { path: { session_id: sessionId } },
     body,
     parseAs: 'stream',
   });
