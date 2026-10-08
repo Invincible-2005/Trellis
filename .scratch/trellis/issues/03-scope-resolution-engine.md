@@ -1,9 +1,9 @@
 # 03 - Scope Resolution Engine (`resolve_scope`)
 
 - **Type**: `task`
-- **Status**: `resolved` (design locked; implementation pending)
-- **Assignee**: Backend Dev & Agentic Lead
-- **Blocked by**: 02
+- **Status**: `resolved`
+- **Assignee**: Backend Dev
+- **Blocked by**: 02 (resolved)
 
 ## Question
 
