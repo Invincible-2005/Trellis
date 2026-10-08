@@ -225,6 +225,6 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - ~~`backend/app/services/ingestion.py`: no retry, no failure reason, reuses the request's session.~~ **Fixed 2026-10-08.** The rework also covers the SSRF guard, the atomic commit, extraction off the event loop, and the stale-job sweep (see ticket 11 §7a). ⚠️ Migration `c3f1a9d27e54` must be applied.
 - Scope cache: no invalidation on re-parenting yet (nothing is implemented yet).
 - Repo hygiene:
-  - `backend/**/__pycache__/*.pyc` files are tracked in git.
+  - ~~`backend/**/__pycache__/*.pyc` files are tracked in git.~~ Fixed 2026-10-08: they are untracked, and `backend/.gitignore` is corrected (its paths were prefixed with `backend/`, so nothing matched).
   - The frontend has both `package-lock.json` and `pnpm-lock.yaml`; `packageManager` is pnpm.
 - The PRD still says the scope cache is "Redis, TTL ~60s". Ticket 03 replaced that with an in-process `TTLCache` with a 5-minute TTL.
