@@ -68,6 +68,11 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
      - `no_active_org` (400)
      - `org_not_provisioned` (409)
      - `forbidden` (403)
+   - **As built 2026-10-08:**
+     - `GET /api/v1/auth/me` and `/auth/context` are live (`app/api/v1/auth.py`, schemas in `app/schemas/auth.py`).
+     - The error body is published in OpenAPI as `ErrorResponse` via `responses=`, so the generated frontend types include it.
+     - `/auth/context` never returns 400/409 for the org. `active_org` is `null` when there's no active org or it isn't set up.
+     - `/auth/context` also records the caller's org membership just-in-time, the same as data routes.
    - **Role endpoints** (`POST /admin/roles`, `PATCH /admin/roles/{id}`, `DELETE /admin/roles/{id}`) enforce:
      - **No privilege escalation:** the new or edited role must sit below the caller's role, and the caller may only grant permissions they hold.
      - **The system role is protected:** `is_system` can't be deleted, re-parented, or lose permissions.
@@ -138,6 +143,8 @@ class ActiveOrgPermissions(BaseModel):
     org_role_name: Optional[str] = None
     org_permissions: List[str] = Field(default_factory=list)
     permissions_by_team: dict[UUID, List[str]] = Field(default_factory=dict)
+    member_team_ids: List[UUID] = Field(default_factory=list)     # added 2026-10-08 (D13)
+    viewable_team_ids: List[UUID] = Field(default_factory=list)   # members + governed teams (D13)
     can_open_admin: bool        # can_org("create_role") or can_org("add_member")
 
 

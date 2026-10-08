@@ -79,13 +79,20 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - **Done 2026-10-08:** migration `d4e8b2a61f07` (revises `c3f1a9d27e54`). It also adds `idx_roles_org_parent` for the role-tree walk. `idx_team_members_team` is skipped because the `UNIQUE (team_id, user_id)` constraint already serves it. The FK `org_members.role_id` uses the default ON DELETE (restrict), so a role that someone holds cannot be deleted. **Not yet applied to Neon:** run `uv run alembic current`, then `uv run alembic upgrade head`.
 
 ### 3. Auth package (suggested: `backend/app/auth/`)
-- [ ] `claims.py`: `verify_clerk_jwt`. Check RS256, `iss`, `azp`, `exp`, `nbf` and `sub`, with leeway ≤ 5 s. Parse the v2 org claim with a v1 fallback. Return 401 on any failure.
-- [ ] `identity.py`: `get_identity`, a just-in-time upsert of `users` by `clerk_user_id`.
-- [ ] `org_context.py`: `get_org_context`.
+> **Done 2026-10-08 (org context step), in the existing files rather than a new package:**
+> - `app/core/auth.py`: token verification.
+> - `app/core/deps.py`: `get_current_user` = identity, then `get_org_context` + `lookup_org_id` + `ensure_org_member`, then `get_scope`. The sentinel empty scope and `require_org_scope` are removed.
+> - `app/scope/resolver.py`: `AccessScope` with `member_team_ids`, `governed_team_ids`, `viewable_team_ids`, `can_view_team`, `org_permissions` and `can_org`; `build_scope` is pure Python and tested offline; `invalidate_scope` / `invalidate_org`.
+> - Routes: `app/api/v1/auth.py`, schemas in `app/schemas/auth.py`.
+> - Tests: `tests/test_scope.py`, `test_org_context.py` and `test_auth_routes.py`. `test_scope_db.py` runs the real SQL when `TEST_DATABASE_URL` is set.
+> - `guards.py` is still open (needed by the role and member endpoints).
+- [x] `claims.py`: `verify_clerk_jwt`. Check RS256, `iss`, `azp`, `exp`, `nbf` and `sub`, with leeway ≤ 5 s. Parse the v2 org claim with a v1 fallback. Return 401 on any failure.
+- [x] `identity.py`: `get_identity`, a just-in-time upsert of `users` by `clerk_user_id`.
+- [x] `org_context.py`: `get_org_context`.
   - Map the Clerk org ID to `organizations.id` (cached); return 400 `no_active_org` or 409 `org_not_provisioned` as appropriate.
   - Create the `org_members` row just-in-time.
-  - Apply pending invitations, then `invalidate_scope`.
-- [ ] `scope.py`: `AccessScope` (frozen, with `org_permissions`, `in_team`, `can`, `can_org`), `resolve_scope` (queries A, B and C via `asyncio.gather`), the `TTLCache`, and `invalidate_scope` / `invalidate_org`.
+  - Apply pending invitations, then `invalidate_scope`. *(Not yet: marked `TODO(invitations)` in `ensure_org_member`; it belongs with the invitation endpoints.)*
+- [x] `scope.py`: `AccessScope` (frozen, with `org_permissions`, `in_team`, `can`, `can_org`), `resolve_scope` (queries A, B and C via `asyncio.gather`), the `TTLCache`, and `invalidate_scope` / `invalidate_org`.
   - **D13 resolved 2026-10-08:** build `member_team_ids` + `governed_team_ids` (every member strictly below one of my roles) and `can_view_team()`; see ticket 03 §gaps.
 - [ ] `guards.py`: the hierarchy helpers.
   - `highest_role(scope)`.
@@ -102,7 +109,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - [ ] Decide between the official `clerk-backend-api` Python SDK and raw `httpx`. Raw `httpx` is enough for 4 calls and avoids another dependency.
 
 ### 5. Endpoints (all under `/api/v1`)
-- [ ] `GET /auth/me` and `GET /auth/context` (identity-only). `context.active_org` holds the effective permissions and `can_open_admin`.
+- [x] `GET /auth/me` and `GET /auth/context` (identity-only). `context.active_org` holds the effective permissions and `can_open_admin`.
 - [ ] `POST /orgs/provision`: idempotent; requires Clerk `org:admin`; one transaction creates the org, the root `Admin` role (`is_system`, 8 permissions) and the creator's `org_members` row with that role.
 - [ ] `POST /admin/teams/{team_id}/members`:
   - Already an org member → add to the team directly.

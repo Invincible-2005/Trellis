@@ -199,6 +199,14 @@ No conflicts with FastAPI, SQLAlchemy, LangGraph, or Pydantic v2.
 
 ### 3. `resolve_scope(user_id, org_id)` implementation
 
+> **As built 2026-10-08 (`app/scope/resolver.py`):** the SQL below is superseded by four plain queries, run sequentially because an `AsyncSession` can't run concurrent queries:
+> 1. the org's role tree (`id`, `parent_role_id`);
+> 2. my team roles with their permissions;
+> 3. my org role with its permissions;
+> 4. the distinct `(team_id, role_id)` pairs in the org.
+>
+> The tree walk happens in a pure function, `build_scope()`, which also computes `governed_team_ids` (D13) and is cycle-safe. That keeps the rules in one function that is unit-tested without a database. Behavior is the same as the CTE. The cache key is a `(user_id, org_id)` tuple, and `invalidate_org(org_id)` exists.
+
 Two DB queries (run concurrently with `asyncio.gather`):
 
 **Query A — descendant role IDs** (corrected downward CTE — see Ticket 02 correction):
