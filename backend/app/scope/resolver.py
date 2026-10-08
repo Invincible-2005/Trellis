@@ -6,19 +6,22 @@ a user is allowed to see and do. It is always called server-side and its
 result is injected into every protected route and every LangGraph tool.
 The LLM never receives or manipulates the AccessScope object.
 
-Two DB queries run concurrently (asyncio.gather):
+Two DB queries, run SEQUENTIALLY on the request's AsyncSession:
   A. Recursive CTE walking DOWN the role tree → visible_role_ids
   B. Team membership + permissions lookup   → allowed_team_ids, permissions_by_team
+(An AsyncSession cannot run concurrent operations, so no asyncio.gather here.
+Both queries are index lookups, so the extra round trip only happens on a cache miss.)
 
-Result is cached in-process (TTLCache, 5-min TTL).
+Result is cached in-process (TTLCache, 5-min TTL) and shared across requests,
+which is why AccessScope is immutable (Ticket 12 D1).
 Call invalidate_scope() from any admin route that changes roles or membership.
 """
 from __future__ import annotations
 
-import asyncio
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional
+from types import MappingProxyType
+from typing import Mapping
 
 from cachetools import TTLCache
 from sqlalchemy import text
@@ -27,12 +30,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # ── AccessScope ───────────────────────────────────────────────────────────────
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class AccessScope:
     """
     The fully-resolved permission set for one user inside one org.
     Passed as a FastAPI dependency to every protected route and to
     LangGraph tool nodes (never through LLM parameters).
+
+    Immutable: the same cached instance is served to every request for up to
+    5 minutes, so no caller may be able to widen it. For SQL `= ANY(:ids)`
+    parameters, pass `list(scope.allowed_team_ids)`.
 
     Fields
     ------
@@ -54,18 +61,24 @@ class AccessScope:
     """
     user_id: uuid.UUID
     org_id: uuid.UUID
-    visible_role_ids: list[uuid.UUID] = field(default_factory=list)
-    allowed_team_ids: list[uuid.UUID] = field(default_factory=list)
-    permissions_by_team: dict[uuid.UUID, set[str]] = field(default_factory=dict)
+    visible_role_ids: frozenset[uuid.UUID] = frozenset()
+    allowed_team_ids: frozenset[uuid.UUID] = frozenset()
+    permissions_by_team: Mapping[uuid.UUID, frozenset[str]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     @property
     def is_empty(self) -> bool:
         """True when the user has no team memberships — authenticated but not provisioned."""
         return not self.allowed_team_ids
 
+    def in_team(self, team_id: uuid.UUID) -> bool:
+        """Check whether this user is a member of a specific team."""
+        return team_id in self.allowed_team_ids
+
     def can(self, permission: str, team_id: uuid.UUID) -> bool:
         """Check whether this user has a specific permission in a specific team."""
-        return permission in self.permissions_by_team.get(team_id, set())
+        return permission in self.permissions_by_team.get(team_id, frozenset())
 
 
 # ── In-process TTL cache ──────────────────────────────────────────────────────
@@ -99,7 +112,7 @@ async def resolve_scope(
     Compute (or return cached) AccessScope for a user inside an org.
 
     Cache hit  → returns instantly with no DB queries.
-    Cache miss → runs two concurrent SQL queries, caches result, returns scope.
+    Cache miss → runs two SQL queries (sequentially), caches result, returns scope.
     """
     cache_key = f"{user_id}:{org_id}"
 
@@ -107,14 +120,9 @@ async def resolve_scope(
     if cache_key in _scope_cache:
         return _scope_cache[cache_key]
 
-    # ── Cache miss: run both queries concurrently ─────────────────────────
-    visible_roles_future, team_perms_future = await asyncio.gather(
-        _query_visible_role_ids(user_id, org_id, db),
-        _query_team_permissions(user_id, org_id, db),
-    )
-
-    visible_role_ids = visible_roles_future
-    allowed_team_ids, permissions_by_team = team_perms_future
+    # ── Cache miss: one session → one query at a time ─────────────────────
+    visible_role_ids = await _query_visible_role_ids(user_id, org_id, db)
+    allowed_team_ids, permissions_by_team = await _query_team_permissions(user_id, org_id, db)
 
     scope = AccessScope(
         user_id=user_id,
@@ -134,9 +142,12 @@ async def _query_visible_role_ids(
     user_id: uuid.UUID,
     org_id: uuid.UUID,
     db: AsyncSession,
-) -> list[uuid.UUID]:
+) -> frozenset[uuid.UUID]:
     """
     Query A — Recursive CTE walking DOWN the role tree.
+
+    UNION (not UNION ALL) deduplicates overlapping subtrees and guarantees
+    termination even if a bad re-parent ever creates a cycle in roles.
 
     Starts from the user's own role(s) in this org, then walks to children,
     grandchildren, etc. The result is every role ID at or below the user's
@@ -158,7 +169,7 @@ async def _query_visible_role_ids(
                       WHERE t.id = tm.team_id AND t.org_id = :org_id
                   )
 
-                UNION ALL
+                UNION
 
                 -- Walk DOWN: children of every role already in the set
                 SELECT r.id
@@ -170,20 +181,20 @@ async def _query_visible_role_ids(
         """),
         {"user_id": str(user_id), "org_id": str(org_id)},
     )
-    return [uuid.UUID(str(row.id)) for row in result]
+    return frozenset(uuid.UUID(str(row.id)) for row in result)
 
 
 async def _query_team_permissions(
     user_id: uuid.UUID,
     org_id: uuid.UUID,
     db: AsyncSession,
-) -> tuple[list[uuid.UUID], dict[uuid.UUID, set[str]]]:
+) -> tuple[frozenset[uuid.UUID], Mapping[uuid.UUID, frozenset[str]]]:
     """
     Query B — Team membership + permissions per team.
 
     Returns:
-        allowed_team_ids    : list of team UUIDs the user belongs to
-        permissions_by_team : team_id → set of permission strings
+        allowed_team_ids    : team UUIDs the user belongs to
+        permissions_by_team : read-only team_id → permission strings
     """
     result = await db.execute(
         text("""
@@ -196,13 +207,11 @@ async def _query_team_permissions(
         {"user_id": str(user_id), "org_id": str(org_id)},
     )
 
-    allowed_team_ids: list[uuid.UUID] = []
-    permissions_by_team: dict[uuid.UUID, set[str]] = {}
+    permissions_by_team: dict[uuid.UUID, frozenset[str]] = {}
 
     for row in result:
         team_id = uuid.UUID(str(row.team_id))
-        allowed_team_ids.append(team_id)
         # row.permissions is a Postgres ARRAY(String) — already a Python list
-        permissions_by_team[team_id] = set(row.permissions or [])
+        permissions_by_team[team_id] = frozenset(row.permissions or [])
 
-    return allowed_team_ids, permissions_by_team
+    return frozenset(permissions_by_team), MappingProxyType(permissions_by_team)
