@@ -3,7 +3,7 @@
 - **Type**: `task`
 - **Status**: `ready-for-agent`
 - **Assignee**: Backend Dev (backend) + Frontend Dev (onboarding page, admin gate)
-- **Blocked by**: 12 (D4, D8, D9, D10 resolved; **D13 team visibility still open**, see the note in step 3)
+- **Blocked by**: none (D4, D8, D9, D10, D13, D15 resolved)
 
 ## Goal
 
@@ -86,7 +86,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
   - Create the `org_members` row just-in-time.
   - Apply pending invitations, then `invalidate_scope`.
 - [ ] `scope.py`: `AccessScope` (frozen, with `org_permissions`, `in_team`, `can`, `can_org`), `resolve_scope` (queries A, B and C via `asyncio.gather`), the `TTLCache`, and `invalidate_scope` / `invalidate_org`.
-  - **Before writing `allowed_team_ids`, check ticket 12 D13.** If it's still open, implement membership-only teams and leave a `TODO(D13)`.
+  - **D13 resolved 2026-10-08:** build `member_team_ids` + `governed_team_ids` (every member strictly below one of my roles) and `can_view_team()`; see ticket 03 §gaps.
 - [ ] `guards.py`: the hierarchy helpers.
   - `highest_role(scope)`.
   - `is_strictly_below(role_id, caller_roles)`, using the role tree.
@@ -141,5 +141,5 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 
 ## Out of scope here
 - Clerk webhooks (v2 drift repair, ticket 12 D10).
-- D13 team visibility (decide first).
+- ~~D13 team visibility (decide first).~~ Resolved; now part of step 3.
 - D4 follow-up: widening console entry to any admin-tab permission.

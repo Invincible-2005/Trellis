@@ -170,6 +170,18 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - An org-level root Admin then governs every team that has members.
   - **Edge case:** a team with zero members is visible only to `can_org("create_team")` holders, through the admin console.
 - **To decide:** whether "above the team" means "above at least one member" (the proposal) or something else, such as a team's own `owner_role_id`.
+- ✅ **RESOLVED 2026-10-08 (Piyush): "above the team" means "above *every* member".** The "at least one member" wording above is superseded. Under it, a manager would govern a peer manager's team just because that team has employees.
+  - `governed_team_ids` = teams that have at least one member, where **every** member's team role is **strictly below** at least one of the user's roles (team roles and the org-level role are both seeds; "strictly below" excludes the seed role itself).
+  - `member_team_ids` = teams the user is on.
+  - **Read access** (team tasks, team-scoped docs, team dashboards) = members plus governed teams, through `can_view_team(team_id)`. The RAG filter for `scope_type='team'` uses that union too.
+  - **Write actions** are unchanged: `can(p, team)` (org role OR the user's team role in that team), plus the no-escalation guards.
+  - **Examples:**
+    - Org Admin → every team with members.
+    - HR → every team led by managers or below.
+    - A manager → their own team only, not a peer manager's team.
+  - An empty team is visible only to `can_org("create_team")` holders (admin console).
+  - Role-scoped docs are unaffected: they stay visible to the role and its ancestors.
+  - **Written into:** ticket 03 (fields and §gaps), ticket 13 step 3, and the map.
 
 ### D14. Embedding provider and cost (added 2026-10-08, found during the ingestion smoke test)
 - **Gap:** Ticket 11 assumed the HuggingFace Inference API is a free tier. A live call with the team's token returned **`402 "You have no remaining credits. Purchase pre-paid credits … or subscribe to PRO"`**. HF Inference Providers now bill against small monthly credits, so **document ingestion cannot embed anything right now.**

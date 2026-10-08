@@ -345,7 +345,11 @@ await graph.astream(
 - ~~Clerk org → internal org mapping~~ → **resolved** (D8): `get_org_context` in §2.
 - ~~Do not trust BFF headers~~ → **resolved** (D8): identity comes only from the verified token; the BFF no longer sends `X-*` identity headers.
 - ~~Users with no team~~ → **resolved** (D9): org-level role `org_members.role_id`, used by Query A seed 2 and Query C.
-- **Still open, ticket 12 D13:** `allowed_team_ids` contains only teams the user is a **member** of. An org-level Admin, or a role above a team, can't see that team's tasks or team-scoped documents. That contradicts the access rule "team docs are visible to members **and all roles hierarchically above the team**" (ticket 02).
+- ~~**Still open, ticket 12 D13:** `allowed_team_ids` contains only teams the user is a **member** of.~~ → **resolved 2026-10-08** (D13): `allowed_team_ids` is split into:
+  - `member_team_ids` (teams I'm on);
+  - `governed_team_ids` (teams with ≥1 member where **every** member's team role is strictly below one of my roles).
+  
+  Reads use `can_view_team(team_id)` = member OR governed. Writes keep `can(p, team)`. A manager does **not** see a peer manager's team. This supersedes the `allowed_team_ids` field and the "teams does this user belong to" row in §1, which become `member_team_ids` plus `governed_team_ids`.
 
 ## Open questions for the backend dev (not blockers — decide during implementation)
 
