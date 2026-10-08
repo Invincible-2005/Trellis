@@ -54,7 +54,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 **Verification:** test RS256 keys + a fake JWKS. Cover: valid token; wrong `azp`; expired; wrong `iss`; bad signature; v1 and v2 org claims; JWKS down → 503; two concurrent first logins → one row. No calls to Clerk or Neon.
 
 **Deliberately NOT in this fix:**
-- An unknown org currently returns an empty scope with a sentinel `org_id = UUID(int=0)` instead of 409 `org_not_provisioned`. The right behavior depends on **ticket 12 D15**.
+- An unknown org currently returns an empty scope with a sentinel `org_id = UUID(int=0)` instead of 409 `org_not_provisioned`. **D15 resolved 2026-10-08 (D10/D4 kept):** step C replaces it with 409.
 - Org-level role, `can_org`, and creating `org_members` just-in-time (needs this ticket's migration, D9 and D10).
 - Kept: PR #8 fetches email and name from the Clerk Backend API once per user instead of D8's custom claims. That's equivalent, so no change.
 

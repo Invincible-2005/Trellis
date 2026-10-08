@@ -180,7 +180,15 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - (c) **Another hosted provider** offering 1024-dim output. This changes the model, so the query prefix and any already-stored vectors change too.
 - **Code impact is small either way:** `EMBEDDING_API_URL`, `EMBEDDING_MODEL` and `EMBEDDING_DIM` are settings. The query side (`search_documents`) must use the **same** provider and model as ingestion.
 
-### D15. Map conflict: "Org provisioning flow — decided 2026-09-28" (PR #8) vs D10 and D4 (added 2026-10-08)
+### D15. Map conflict: "Org provisioning flow — decided 2026-09-28" (PR #8) vs D10 and D4 (added 2026-10-08) — ✅ RESOLVED 2026-10-08
+- **Decision (Piyush): keep D10 and D4.**
+  - An org is created explicitly by `POST /api/v1/orgs/provision`, called from `/onboarding` right after Clerk org creation. That page is a brief pass-through on the way to `/dashboard`.
+  - Members and roles are managed by anyone holding `add_member` or `create_role` org-wide, with no privilege escalation, not "only the creator".
+  - The 2026-09-28 map entry is marked superseded.
+  - Reasons:
+    - The PR #8 text contradicts itself ("mirror on first JWT hit" vs "does NOT auto-create").
+    - Creating the org implicitly can't seed the protected Admin role in one transaction.
+    - "Only the creator" breaks when the creator leaves or hands off.
 - **Conflict:** PR #8 (`resolved-scope`) added two decisions to the map, dated 2026-09-28 but merged after D4 and D10:
   1. **Provisioning:** "backend mirrors [the Clerk org] into `organizations` on first JWT hit", yet also "Backend does NOT auto-create org rows". The text contradicts itself. D10 decided an explicit, idempotent `POST /api/v1/orgs/provision` called from `/onboarding`, with the root Admin role seeded in the same transaction.
   2. **Member management:** "Only the org creator (admin) can add/remove members and assign roles." D4 and D9 decided that any holder of `add_member` or `create_role` (org-level, no privilege escalation) may do so.
