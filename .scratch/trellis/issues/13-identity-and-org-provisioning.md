@@ -27,7 +27,15 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 
 - **Already fixed** (branch `fix/config-restore-and-resolver`): the resolver runs its queries sequentially (an `AsyncSession` can't run concurrent queries), `AccessScope` is frozen, `in_team()` exists, and the CTE uses `UNION`. The settings the merge dropped are restored in `config.py`.
 
-## ✅ Ready to fix: `auth.py` / `deps.py` (approved 2026-10-08, independent of D15 and the D9 migration)
+## ✅ Done 2026-10-08 (branch `fix/auth-hardening`): `auth.py` / `deps.py` (approved 2026-10-08, independent of D15 and the D9 migration)
+
+> **Outcome:** A1–A6 and B1–B4 are implemented, with errors in the D16 shape (`app/core/errors.py`). Tests live in `backend/tests/` (`uv run pytest`); the real two-logins race test runs only when `TEST_DATABASE_URL` points at a migrated Neon branch.
+> **Deviations and additions:**
+> - A1: a token *without* `azp` is accepted (same rule as Clerk's SDKs); a present-but-unknown `azp` → 401.
+> - A4: an unknown `kid` stays a 401; only an unreachable JWKS endpoint → 503.
+> - B1: an email that already belongs to a different Clerk user → 409 `email_in_use`.
+> - A missing `Authorization` header → 401 `invalid_token` in the D16 shape.
+> - A2 still needs one real token to confirm the claim format (frontend slice E).
 
 **`auth.py`**
 - **A1** `azp` check against a new `CLERK_AUTHORIZED_PARTIES: list[str]` setting (default `["http://localhost:3000"]`; set the production origin in `.env`).

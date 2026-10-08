@@ -187,6 +187,23 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Code today (`app/core/deps.py`) implements neither.** An unknown org returns an empty scope (sentinel `org_id = UUID(int=0)`) instead of mirroring the org or returning 409 `org_not_provisioned`.
 - **To decide (the team, including the PR #8 author):** keep D10/D4 and mark the 2026-09-28 lines superseded, or reopen D10/D4. Until then, ticket 13 follows D10/D4.
 
+### D16. Error response shape for machine-readable codes (added 2026-10-08, found while starting ticket 13 step A) — ✅ RESOLVED 2026-10-08
+- **Decision:** the proposal below, plus Piyush's rule for the UI: **failures are shown to the user as a sonner toast with `detail.message`**. The exceptions are redirect codes (`invalid_token` → sign-in, `no_active_org` → `/org-selection`, `org_not_provisioned` → `/onboarding`), which redirect instead of toasting. Step A added `email_in_use` (409), for an email already linked to a different Clerk user.
+- **Written into:** ticket 05 (endpoint errors), `backend/app/core/errors.py`, and the map.
+
+- **Gap:** Tickets 03, 05, 12 and 13 name error codes the BFF must branch on: `400 no_active_org` → `/org-selection` and `409 org_not_provisioned` → `/onboarding`. Step A adds `400 email_required` and `503` for Clerk being unreachable. **No ticket says where the code goes in the response body.** FastAPI's default is `{"detail": "<string>"}`, which has no stable code to branch on.
+- **Proposal:** Every error Trellis raises returns `{"detail": {"code": "<snake_case>", "message": "<human text>"}}`, through one small helper (e.g. `api_error(status, code, message)` in `app/core/errors.py`).
+  - Keeping the `detail` key means FastAPI's own errors still have a familiar shape. Request-validation errors (422) keep FastAPI's default list shape.
+  - The BFF branches on `status` + `detail.code`, never on the message text.
+  - The codes are listed in ticket 05 and show up in the OpenAPI spec through `responses=`.
+- **Initial codes:**
+  - `invalid_token` (401)
+  - `auth_unavailable` (503, Clerk keys or Backend API unreachable)
+  - `email_required` (400)
+  - `no_active_org` (400)
+  - `org_not_provisioned` (409)
+  - `forbidden` (403)
+
 ---
 
 ## Already fixed in docs during the audit (no decision needed)

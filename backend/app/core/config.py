@@ -1,5 +1,6 @@
 import urllib.parse
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,8 +18,11 @@ class Settings(BaseSettings):
     # CLERK_SECRET_KEY  : Clerk Dashboard → API Keys → Secret Key (sk_live_... / sk_test_...)
     # CLERK_ISSUER      : Clerk Dashboard → API Keys → Frontend API URL
     #                     e.g. https://your-instance.clerk.accounts.dev
+    # CLERK_AUTHORIZED_PARTIES: frontend origins allowed in the JWT `azp` claim.
+    #                     Set as JSON in .env, e.g. '["https://app.trellis.dev"]'
     CLERK_SECRET_KEY: str = ""
     CLERK_ISSUER: str = ""
+    CLERK_AUTHORIZED_PARTIES: list[str] = ["http://localhost:3000"]
 
     # HuggingFace Inference API — for mxbai-embed-large-v1 embeddings
     HUGGINGFACE_TOKEN: str = ""
@@ -43,6 +47,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @field_validator("CLERK_ISSUER")
+    @classmethod
+    def _strip_issuer_slash(cls, value: str) -> str:
+        # Clerk's `iss` claim has no trailing slash; a copied URL often does.
+        return value.rstrip("/")
 
     def _to_asyncpg_url(self, raw_url: Optional[str]) -> str:
         if not raw_url:

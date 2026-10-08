@@ -37,3 +37,14 @@ dependencies = [
     "tavily-python>=0.8.2",
     "uvicorn[standard]>=0.53.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
