@@ -60,6 +60,14 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
    - **`DELETE /api/v1/admin/members/{user_id}`**: removes the Clerk membership (Backend API), then the `team_members` and `org_members` rows, then invalidates the scope.
      - Refused for a target at or above the caller, and for the last `Admin`.
    - **Errors:** `409 org_not_provisioned` (the BFF redirects to `/onboarding`) and `400 no_active_org` (the BFF redirects to `/org-selection`).
+   - **Error body (ticket 12 D16):** every Trellis error is `{"detail": {"code", "message"}}`, built with `app/core/errors.py::api_error`. The BFF branches on status + `detail.code`: it redirects for the codes above and `invalid_token`, and otherwise shows `detail.message` in a sonner toast. 422 validation errors keep FastAPI's default shape. Codes so far:
+     - `invalid_token` (401)
+     - `auth_unavailable` (503)
+     - `email_required` (400)
+     - `email_in_use` (409)
+     - `no_active_org` (400)
+     - `org_not_provisioned` (409)
+     - `forbidden` (403)
    - **Role endpoints** (`POST /admin/roles`, `PATCH /admin/roles/{id}`, `DELETE /admin/roles/{id}`) enforce:
      - **No privilege escalation:** the new or edited role must sit below the caller's role, and the caller may only grant permissions they hold.
      - **The system role is protected:** `is_system` can't be deleted, re-parented, or lose permissions.
