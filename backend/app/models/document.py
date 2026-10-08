@@ -15,7 +15,8 @@ class Document(Base):
     """
     Governance/SOP document. Tagged to an Org, Role, or Team:
     - scope_type='org': org-wide policy, visible to ALL members of the organization.
-    - scope_type='role': visible to role_id + all descendant roles (roles governed by that role).
+    - scope_type='role': visible to role_id + all ANCESTOR roles (roles above it). Equivalently,
+      a user at role U sees docs tagged to U and U's descendants.
     - scope_type='team': visible to all team_members + roles above the team.
     Uploaded by roles with 'upload_document' permission for their role/team scope.
     """
@@ -42,6 +43,8 @@ class Document(Base):
         default="processing"
     )
     chunk_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Admin-facing reason when status='failed' (set by the ingestion pipeline)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
