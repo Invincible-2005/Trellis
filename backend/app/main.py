@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from app.api.v1 import api_router
 from app.core.config import settings
 from app.services.ingestion import fail_stale_ingestions
 
@@ -47,6 +48,8 @@ app = FastAPI(
     description="Role-aware agentic RAG workspace API",
     lifespan=lifespan,
 )
+
+app.include_router(api_router)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────
