@@ -184,7 +184,8 @@ export default async function OrgSelectionPage({
       <OrganizationList
         hidePersonal
         afterSelectOrganizationUrl={destination}
-        afterCreateOrganizationUrl={destination}
+        // D10 (2026-10-08): a new org must be provisioned before use. Superseded: {destination}
+        afterCreateOrganizationUrl="/onboarding"
       />
     </div>
   );
@@ -204,3 +205,87 @@ export default async function OrgSelectionPage({
 | Server imports | `@clerk/nextjs` | **`@clerk/nextjs/server`** for all server-side helpers |
 | `params`/`searchParams` | Sync objects | **Promises** in Next.js 15+ — must `await` them |
 
+
+---
+
+## Decided 2026-10-08 (Piyush): `proxy.ts` rules. Supersedes the §1 sample.
+
+**Rules**
+1. Public: `/`, `/sign-in(.*)`, `/sign-up(.*)`. `/api/webhooks` is removed because the MVP has no webhooks (trellis 12 D10).
+2. Signed out on any other route → Clerk sign-in, then back to the original page.
+3. Signed in with no active org → `/org-selection`. That route is exempt, so there's no loop.
+4. `/onboarding` follows the normal rules. Right after creation in Clerk, the new org is active.
+5. **BFF routes (`/api/*`) never redirect.** They return JSON errors in the trellis 12 D16 shape:
+   - `401 invalid_token` when signed out;
+   - `400 no_active_org` when there is no active org.
+6. No `/admin` gate here (D4). Clerk's `<SignIn />` already redirects users who are signed in.
+7. **`redirect_url` carries a path only** (no origin), to avoid an open redirect. `/org-selection` accepts it only if it starts with `/` and not `//`; otherwise it uses `/dashboard`.
+
+**`frontend/proxy.ts`**
+```typescript
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
+const isOrgSelectionRoute = createRouteMatcher(['/org-selection(.*)']);
+const isApiRoute = createRouteMatcher(['/api(.*)']);
+
+// Same body as FastAPI errors (trellis ticket 12 D16)
+function apiError(status: number, code: string, message: string) {
+  return NextResponse.json({ detail: { code, message } }, { status });
+}
+
+export default clerkMiddleware(async (auth, req) => {
+  if (isPublicRoute(req)) return;
+
+  const { userId, orgId, redirectToSignIn } = await auth();
+
+  if (!userId) {
+    if (isApiRoute(req)) return apiError(401, 'invalid_token', 'You are not signed in.');
+    return redirectToSignIn({ returnBackUrl: req.url });
+  }
+
+  if (!orgId && !isOrgSelectionRoute(req)) {
+    if (isApiRoute(req)) {
+      return apiError(400, 'no_active_org', 'Select or create an organization first.');
+    }
+    const url = new URL('/org-selection', req.url);
+    url.searchParams.set('redirect_url', req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+});
+
+export const config = {
+  // Unchanged from the current proxy.ts
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/__clerk/:path*',
+    '/(api|trpc)(.*)',
+  ],
+};
+```
+
+**`frontend/.env`** (Clerk reads these): signed-in users always land on `/dashboard`, and rule 3 sends users with no org on to `/org-selection`.
+```
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
+```
+
+**`app/(auth)/org-selection/page.tsx`:**
+- `<OrganizationList hidePersonal afterSelectOrganizationUrl={safeRedirect} afterCreateOrganizationUrl="/onboarding" />`
+- `safeRedirect` = `redirect_url` if it passes rule 7, else `/dashboard`.
+
+**Resulting flows** (implements the trellis map's "User auth redirect flow"):
+- A returning user → `/dashboard` in their last active org (Clerk remembers it).
+- A new user with no org → `/org-selection` → creates an org → `/onboarding`.
+- An invited user → `/dashboard` in the org they were invited to.
+
+**Acceptance checks**
+- [ ] Signed out: `/` loads; `/dashboard` → sign-in → back to `/dashboard`.
+- [ ] Signed out: `fetch('/api/anything')` → 401 JSON `{"detail":{"code":"invalid_token",...}}`, not HTML.
+- [ ] Signed in with no org: `/dashboard` → `/org-selection?redirect_url=%2Fdashboard`; `/org-selection` itself doesn't loop.
+- [ ] Signed in with no org: `fetch('/api/anything')` → 400 `no_active_org` JSON.
+- [ ] `/org-selection?redirect_url=//evil.example` → selecting an org lands on `/dashboard`.
+- [ ] Creating an org in `<OrganizationList>` → `/onboarding`.
