@@ -15,3 +15,12 @@ Decisions to lock:
 - Citation badges: what data does FastAPI send alongside the stream chunks? (chunk IDs? source document title + role scope?)
 - Message history: stored client-side only (session), or persisted to DB and fetched on load?
 - Does the chat have a "thinking / tool calling" indicator while the agent is running its LangGraph steps?
+
+
+## Already answered elsewhere (audit 2026-10-08)
+
+- Message history: persisted server-side. `chat_sessions` metadata in NeonDB + LangGraph checkpoints keyed `{org_id}:{user_id}:{session_id}` (trellis/08). Fetch on load, not client-only.
+- Thinking / tool-call indicator: yes. SSE `status` and `tool_call` events feed `thinking-stepper.tsx` (trellis/04 SSE schema).
+- Citation payload: `citations` event = `[{doc_id, title, chunk_index}]` (trellis/04).
+- BFF proxy: Route Handler with `openapi-fetch` `parseAs: 'stream'` (ticket 03 here).
+- Still open: browser-side consumption (`fetch` + `ReadableStream` reader vs a hook), error/interrupt handling, and the exact endpoint path (trellis/12 D2). Resolve together with trellis/09.

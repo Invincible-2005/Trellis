@@ -1,7 +1,7 @@
 # 11 - Document Ingestion & Chunking Pipeline
 
 - **Type**: `task`
-- **Status**: `ready-for-agent`
+- **Status**: `resolved` (design locked; implementation in progress — `backend/app/services/ingestion.py`)
 - **Assignee**: Agentic Lead & Backend Dev
 - **Blocked by**: 02, 05
 
@@ -29,7 +29,7 @@ Updated SQL vector search WHERE clause:
 ```sql
 AND (
   (scope_type = 'org'  AND org_id = :org_id)
-  OR (scope_type = 'role' AND role_id IN (SELECT id FROM user_ancestor_roles))
+  OR (scope_type = 'role' AND role_id IN (SELECT id FROM visible_roles))  -- user's roles + descendants (ticket 02 CTE)
   OR (scope_type = 'team' AND team_id = ANY(:allowed_team_ids))
 )
 ```
@@ -122,8 +122,9 @@ chunks = pptx_splitter.split_text(slide_text_with_header)
 
 ### 6. Embedding & Denormalized Batch Insert
 
-- **Provider:** HuggingFace Inference API (`mxbai-embed-large-v1`) — free tier, no local RAM cost
-- **Batch Size:** 16–32 chunks per API call
+- **Provider:** HuggingFace Inference API (`mxbai-embed-large-v1`), no local RAM cost. Called directly with `httpx` at `settings.EMBEDDING_API_URL` (the router endpoint). The deprecated LangChain `HuggingFaceInferenceAPIEmbeddings` was dropped 2026-10-08.
+  - ⚠️ **Not actually free (found 2026-10-08):** HF Inference Providers bill against small monthly credits, and the team's token already returns `402 "You have no remaining credits"`. **Decision needed: ticket 12 D14.**
+- **Batch Size:** 32 chunks per API call. Every vector is validated to be `EMBEDDING_DIM` (1024) long.
 
 ```python
 # document_chunks insert with denormalized scope (no JOIN needed at query time)
@@ -142,10 +143,28 @@ for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
 
 ### 7. Failure Handling
 
-- If text extraction fails → `status='failed'`, error message in `description` field, no chunks inserted.
+- If text extraction fails → `status='failed'`, the reason goes in **`documents.error_message`** (not `description`), and no chunks are inserted.
 - If HuggingFace API errors mid-batch → retry up to 3 times with exponential backoff; if all retries fail → `status='failed'`, partial chunks rolled back.
 
-### 8. Open Question Deferred to Stretch
+#### 7a. Implementation (hardened 2026-10-08, `backend/app/services/ingestion.py`)
+
+The earlier drift is resolved. How it works now:
+- **Own session:** `run_ingestion(document_id)` opens its own `async_session()`. Call it as `background_tasks.add_task(run_ingestion, doc.id)` and never pass the request's session.
+- **Atomic:** existing chunks are deleted (re-runs are idempotent), new chunks are inserted, and `status='ready'` + `chunk_count` are set, all in **one commit**. A failed document never leaves searchable chunks.
+- **Failures:** the pipeline rolls back, then runs an explicit `UPDATE … status='failed', error_message=…`. `IngestionError` messages are admin-safe; unexpected errors store a generic message and log the traceback.
+- **SSRF guard:**
+  - `is_allowed_file_url()` accepts https only, on hosts in `INGESTION_ALLOWED_HOSTS` (default `utfs.io`, `*.ufs.sh`), with no port. **`POST /api/v1/documents` must also call it** before creating the row.
+  - Downloads are streamed with redirects refused and capped at `INGESTION_MAX_FILE_BYTES` (25 MB).
+- **Non-blocking:** text extraction runs in `asyncio.to_thread`.
+- **Embedding:** direct `httpx` calls; retries on 429/5xx and network errors (3 attempts, 1 s/2 s backoff); vector shape and dimension are validated.
+- **Extractors:** PPTX now reads tables, grouped shapes and notes (without creating empty notes slides); PDFs are opened with a context manager.
+- **Startup sweep:** the `lifespan` in `main.py` calls `fail_stale_ingestions()`, which marks `processing` documents older than 15 minutes as failed (assumes a single instance, ticket 12 D11).
+- **Migration** `c3f1a9d27e54` adds `documents.error_message`. ⚠️ **Run `alembic upgrade head` before ingestion runs.** The ORM selects this column.
+- **Query side (ticket 09/10):** mxbai expects queries prefixed with `"Represent this sentence for searching relevant passages: "`. Documents are embedded without a prefix.
+- **Verified offline:** URL guard, size cap, redirect and 404 handling, DOCX/PPTX/PDF/TXT extraction, chunk sizes, vector validation.
+- **Not verified live:** the embedding output dimension, because of the HF 402 (D14).
+
+## 8. Open Question Deferred to Stretch
 
 - **Document Versioning:** What happens to existing chunks when an SOP is edited and re-uploaded? v1 decision: re-upload creates a new `documents` record; Admin must manually delete the old one. The old chunks remain until the old document is deleted (cascade delete on `document_id`).
 

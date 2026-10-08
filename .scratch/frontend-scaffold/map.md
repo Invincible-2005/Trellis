@@ -17,7 +17,8 @@ A complete, locked frontend architecture document: every route, layout boundary,
 - Charts: Recharts | Diagrams: React Flow | File uploads: Uploadthing | Edge security: Arcjet
 
 **Standing decisions:**
-- Route groups by auth state: `(public)`, `(authenticated)`, `(admin)` — each with its own layout
+- Route groups (as built, per `spec.md`): `(marketing)` public, `(auth)` sign-in/up + `/org-selection`, `(dashboard)` authenticated shell with `admin/` nested inside it. *(Original wording `(public)/(authenticated)/(admin)` superseded 2026-10-08.)*
+- Next.js 16 renames `middleware.ts` → **`proxy.ts`**; installed Clerk is **`@clerk/nextjs` v7** (ticket 02 was researched against v6 — APIs used there still apply).
 - BFF pattern is non-negotiable: all FastAPI calls happen server-side (Server Components or Route Handlers); the generated API client is never imported in client-side code
 - No frontend code files are created until architecture tickets are resolved
 
@@ -28,8 +29,15 @@ A complete, locked frontend architecture document: every route, layout boundary,
 - [Admin Console Component Architecture](.scratch/frontend-scaffold/issues/06-admin-console-architecture.md): Dedicated sub-routes under /admin/* with shared tab layout; React Flow hierarchy viewer with Sheet/Dialog modal editors; two-step Uploadthing modal tagging docs strictly to Role OR Team.
 - [Authenticated Shell Layout Design](.scratch/frontend-scaffold/issues/05-authenticated-shell-layout.md): Collapsible icon sidebar with top <OrganizationSwitcher /> and bottom <UserButton />; header with breadcrumbs, role badge, and Cmd+K palette; strict route-level _components/ colocation per feature.
 - [Route URL Tree and Page Inventory](.scratch/frontend-scaffold/issues/01-route-url-tree.md): Clean session-based URLs (/dashboard, /tasks, /chat, /admin/*); /org-selection standalone route; tasks split between /dashboard summary and /tasks detail; user strikes on dashboard and review on /admin/strikes.
-- [Clerk Middleware Pattern for Route Groups](.scratch/frontend-scaffold/issues/02-clerk-middleware-pattern.md): Use clerkMiddleware() (v6, public-by-default); wait auth() everywhere; /org-selection lives outside (authenticated) layout; admin gated via uth.protect((has) => has({ role/permission })).
-- [openapi-fetch Server-Only Client Pattern](.scratch/frontend-scaffold/issues/03-openapi-fetch-server-pattern.md): Singleton pi client in lib/api/client.ts with Clerk JWT injected via onRequest middleware; parseAs: 'stream' for SSE proxy Route Handlers; cache() wraps query functions (not the client); import 'server-only' guards the module.
+- [Clerk Middleware Pattern for Route Groups](.scratch/frontend-scaffold/issues/02-clerk-middleware-pattern.md): Use `clerkMiddleware()` (public-by-default; installed v7, file is `proxy.ts`); `await auth()` everywhere; /org-selection lives outside the authenticated shell. Admin gating by Clerk role is **superseded** by trellis/12 D4 (Trellis permissions checked in `admin/layout.tsx`).
+- [openapi-fetch Server-Only Client Pattern](.scratch/frontend-scaffold/issues/03-openapi-fetch-server-pattern.md): Singleton `api` client in `lib/api/client.ts` with the Clerk JWT injected via `onRequest` middleware (Bearer token only, no X-* headers, per D8); `parseAs: 'stream'` for SSE proxy Route Handlers; `cache()` wraps query functions (not the client); `import 'server-only'` guards the module.
+
+## Cross-map links (audit 2026-10-08)
+
+- System-level conflicts that affect the frontend are tracked in [trellis/12-decision-reconciliation](../trellis/issues/12-decision-reconciliation.md): chat endpoint `POST /api/v1/chat/sessions/{session_id}/message` (D2, resolved), `/api/v1` prefix (D3, resolved), admin-console access (D4, resolved: Trellis RBAC, `create_role` OR `add_member` org-wide, per-tab gating, no Clerk-role gate in `proxy.ts`), BFF sends only the Bearer token (D8, resolved), `/onboarding` + `POST /api/v1/orgs/provision` for new orgs (D10, resolved).
+- Ticket 07 here ↔ trellis/09 (SSE) and trellis/07; ticket 08 here ↔ trellis/07 and trellis/05 (polymorphic `GET /api/v1/dashboard`).
+- Ticket 04 (Clerk setup) looks done in practice (`ClerkProvider` + `frontend/.env` exist), but D8/D10 **added dashboard settings** (custom `email`/`name` session claims, self-serve org creation, backend Clerk env vars). Finish the checklist, then mark it resolved.
+- Implementation of identity and onboarding (backend + `/onboarding` page + admin layout gate): [trellis/13](../trellis/issues/13-identity-and-org-provisioning.md).
 
 ## Not yet specified
 

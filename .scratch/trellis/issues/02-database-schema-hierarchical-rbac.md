@@ -75,10 +75,14 @@ class OrgMember(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Org-level role (added 2026-10-08, ticket 12 D9). Its permissions apply org-wide and in every team.
+    # The org creator gets the seeded root "Admin" role. NULL = no org-wide role (team roles only).
+    role_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("roles.id"), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     org: Mapped["Organization"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship(back_populates="org_memberships")
+    role: Mapped[Optional["Role"]] = relationship()
 
 
 class Invitation(Base):
@@ -92,6 +96,9 @@ class Invitation(Base):
     team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id"), nullable=False)
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id"), nullable=False)
     invited_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Clerk delivers the invite email; this row is the source of truth for WHAT the invitee gets
+    # (added 2026-10-08, ticket 12 D10). Used to revoke the Clerk invitation too.
+    clerk_invitation_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
     status: Mapped[str] = mapped_column(
         Enum("pending", "accepted", "expired", name="invitation_status"),
         default="pending"
@@ -122,8 +129,11 @@ class Role(Base):
     parent_role_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("roles.id"), nullable=True)
     # Permissions stored as array of strings (use Enum in strict implementations)
     # Values: 'create_role','create_team','add_member','upload_document',
-    #         'assign_task','give_strike','view_aggregate'
+    #         'assign_task','give_strike','view_aggregate','review_strike'
     permissions: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    # True only for the root "Admin" role seeded at org provisioning (added 2026-10-08, ticket 12 D9).
+    # A system role can't be deleted or re-parented, can't lose permissions, and must keep >= 1 holder.
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -178,7 +188,8 @@ class Document(Base):
     """
     Governance/SOP document. Tagged to an Org, Role, or Team:
     - scope_type='org': org-wide policy, visible to ALL members of the organization.
-    - scope_type='role': visible to role_id + all descendant roles (roles governed by that role).
+    - scope_type='role': visible to role_id + all ANCESTOR roles (roles above it). Equivalently, a user
+      at role U sees docs tagged to U and U's descendants. (Wording fixed 2026-10-08 — see ticket 12.)
     - scope_type='team': visible to all team_members + roles above the team.
     Uploaded by roles with 'upload_document' permission for their role/team scope.
     """
@@ -383,8 +394,16 @@ CREATE INDEX idx_chunks_org_scope_team ON document_chunks (org_id, scope_type, t
 CREATE INDEX idx_roles_org_parent ON roles (org_id, parent_role_id);
 
 -- Team member lookup
-CREATE INDEX idx_team_members_user ON team_members (user_id, org_id);
+-- (fixed 2026-10-08: team_members has no org_id column; org is reached via teams.org_id)
+CREATE INDEX idx_team_members_user ON team_members (user_id);
 CREATE INDEX idx_team_members_team ON team_members (team_id);
+
+-- Org membership + org-level role (ticket 12 D9). Lookup by (org_id, user_id) is already covered
+-- by the UNIQUE constraint; this one serves "who holds role X" (cache invalidation, last-Admin check).
+CREATE INDEX idx_org_members_role ON org_members (org_id, role_id);
+
+-- Pending-invitation auto-apply on first request (ticket 12 D10)
+CREATE INDEX idx_invitations_pending ON invitations (org_id, email) WHERE status = 'pending';
 
 -- Task deadline queries
 CREATE INDEX idx_tasks_team_deadline ON tasks (team_id, deadline, status);
@@ -456,3 +475,10 @@ the `visible_role_ids` list that gets cached and injected into every request.
 ## Context pointer (for map.md)
 
 Schema finalized. Resolves into Tickets 03 and 05.
+
+**Schema changes from the 2026-10-08 audit (ticket 12; migration tracked in ticket 13):**
+- `org_members.role_id` (nullable FK → roles): org-level role (D9).
+- `roles.is_system` (bool, default false): protected root Admin (D9).
+- `invitations.clerk_invitation_id` (nullable, unique): links to the Clerk invitation (D10).
+- Index fixes and additions: `idx_team_members_user` corrected, plus new `idx_org_members_role` and `idx_invitations_pending`.
+- None of the indexes above exist in any Alembic migration yet (ticket 12 "Code drift").

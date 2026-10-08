@@ -13,27 +13,56 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
 
 ## Decisions locked
 
-1. **Authentication & JIT Enrollment**:
-   - Next.js sends Clerk Bearer JWT.
-   - FastAPI verifies via `PyJWT` + `cryptography` (using JWKS from Clerk).
-   - If user doesn't exist in DB, JIT create `User` row on `/auth/me`.
-   - `/auth/context` returns org memberships + pending invitations for the user's email.
-   - Accepting an invitation (`POST /invitations/{id}/accept`) creates `OrgMember` + `TeamMember` rows and redirects to dashboard.
+> ⚠️ **Audit notes (2026-10-08):**
+> - **Prefix locked (ticket 12 D3):** every FastAPI route lives under **`/api/v1`** (only `/health` stays at root). Paths below updated.
+> - **Endpoint list is provisional** (team, 2026-10-08): schemas and contract patterns here are locked; the exact set of REST endpoints is not.
+> - Document schemas updated below to match ticket 11 (`org` scope, `file_type`, `status`, `chunk_count`).
+> - Codegen path superseded by frontend ticket 03: `frontend/lib/api/v1.d.ts`, script `api:generate`.
+
+1. **Authentication & JIT Enrollment** *(updated 2026-10-08, ticket 12 D8 and D10; full pipeline in ticket 03 §2)*:
+   - Next.js sends the Clerk Bearer JWT. User and org come **only** from the verified token; FastAPI ignores `X-Org-*` and `X-User-*` headers.
+   - FastAPI verifies it with `PyJWT` + `cryptography` (Clerk JWKS), checking `iss` and `azp`.
+   - On **any** authenticated request, `get_identity` creates the `users` row just-in-time if it's missing. `email` and `name` come from custom session claims.
+   - On the first request in an org, `get_org_context` creates the `org_members` row just-in-time and **auto-applies pending invitations** (they become `team_members` and are marked `accepted`).
+   - `GET /api/v1/auth/context` returns org memberships, pending invitations, and (if the token has a provisioned active org) the **effective permissions** for that org. The frontend uses them to show or hide navigation and admin tabs (D4).
+   - ~~`POST /api/v1/invitations/{id}/accept`~~: **dropped** (D10). Accepting happens in Clerk, and the Trellis invitation is applied on the invitee's first request.
 2. **Role Hierarchy Representation & Re-parenting**:
-   - `GET /admin/roles` returns a **flat list with computed `depth` and `parent_role_id`**. Frontend uses this directly to build trees, tables, or React Flow graphs.
+   - `GET /api/v1/admin/roles` returns a **flat list with computed `depth` and `parent_role_id`**. Frontend uses this directly to build trees, tables, or React Flow graphs.
    - Roles use **standalone permissions** (explicit array per role, no complex runtime tree inheritance).
-   - Re-parenting is supported via `PATCH /admin/roles/{role_id}` with `{ "parent_role_id": "<uuid>" }`.
-3. **Invitation Pipeline**:
-   - `POST /admin/teams/{team_id}/members` takes `{ email, role_id }`.
-   - If user exists: added immediately to `team_members`.
-   - If user does not exist: creates an `invitations` record with status `pending` and dispatches Clerk invitation.
+   - Re-parenting is supported via `PATCH /api/v1/admin/roles/{role_id}` with `{ "parent_role_id": "<uuid>" }`.
+3. **Invitation Pipeline** *(updated 2026-10-08, ticket 12 D10)*:
+   - `POST /api/v1/admin/teams/{team_id}/members` takes `{ email, role_id }`.
+     - Requires `can_org("add_member")` to invite a new person into the org, or `can("add_member", team_id)` to add an existing org member to the team.
+     - `role_id` must be **strictly below** the caller's highest role (no privilege escalation).
+   - **Already an org member:** added immediately to `team_members`; their scope is invalidated.
+   - **Not an org member yet:**
+     1. Create an `invitations` row (`pending`). It is the source of truth for team and role.
+     2. Create a Clerk org invitation (`POST /v1/organizations/{clerk_org_id}/invitations`, role `org:member`) through the Backend API.
+     3. Store `clerk_invitation_id`.
+   - `DELETE /api/v1/admin/invitations/{id}` revokes the invitation in both Clerk and the DB.
 4. **File Storage Contract**:
    - File uploads handled on frontend via **UploadThing**.
    - FastAPI endpoints only receive and store metadata + final `file_url: str` in DB (no multipart handling in FastAPI).
 5. **Dashboard Response**:
-   - Single polymorphic endpoint `GET /dashboard` returning personal `my_tasks`, `managed_teams` (if managing any teams), and `org_overview` (if user has `view_aggregate` permission).
+   - Single polymorphic endpoint `GET /api/v1/dashboard` returning personal `my_tasks`, `managed_teams` (if managing any teams), and `org_overview` (if user has `view_aggregate` permission).
 6. **SSE Streaming Contract**:
    - Chat streaming schema conforms to Ticket 04 (`status`, `tool_call`, `token`, `citations`, `error`, `done`).
+7. **Org Provisioning, Org Roles & Membership** *(added 2026-10-08, ticket 12 D4, D9 and D10)*:
+   - **`POST /api/v1/orgs/provision`** (identity-only, **idempotent**, called by the `/onboarding` page):
+     - The Clerk org ID comes from the token, never the request body.
+     - The caller's Clerk org role must be `org:admin`; otherwise 403.
+     - The org name is fetched from the Clerk Backend API.
+     - One transaction creates the `organizations` row, the root role `Admin` (`is_system`, all 8 permissions), and `org_members(creator, role=Admin)`.
+     - Returns 201 the first time and 200 if the org already exists.
+   - **`PATCH /api/v1/admin/members/{user_id}`** `{ org_role_id | null }`: sets or clears a member's **org-level** role.
+     - Requires `can_org("add_member")`, and the role must be below the caller's.
+     - Refused if it would leave zero `Admin` holders.
+   - **`DELETE /api/v1/admin/members/{user_id}`**: removes the Clerk membership (Backend API), then the `team_members` and `org_members` rows, then invalidates the scope.
+     - Refused for a target at or above the caller, and for the last `Admin`.
+   - **Errors:** `409 org_not_provisioned` (the BFF redirects to `/onboarding`) and `400 no_active_org` (the BFF redirects to `/org-selection`).
+   - **Role endpoints** (`POST /admin/roles`, `PATCH /admin/roles/{id}`, `DELETE /admin/roles/{id}`) enforce:
+     - **No privilege escalation:** the new or edited role must sit below the caller's role, and the caller may only grant permissions they hold.
+     - **The system role is protected:** `is_system` can't be deleted, re-parented, or lose permissions.
 
 ---
 
@@ -93,13 +122,33 @@ class AuthMeResponse(AppBaseModel):
     active_org_id: Optional[UUID] = None
 
 
+class ActiveOrgPermissions(BaseModel):
+    """Effective permissions in the token's active org (ticket 12 D4 and D9). UI gating only;
+    the backend still enforces every action."""
+    org_id: UUID
+    org_role_id: Optional[UUID] = None
+    org_role_name: Optional[str] = None
+    org_permissions: List[str] = Field(default_factory=list)
+    permissions_by_team: dict[UUID, List[str]] = Field(default_factory=dict)
+    can_open_admin: bool        # can_org("create_role") or can_org("add_member")
+
+
 class AuthContextResponse(AppBaseModel):
     organizations: List[OrgSummary]
     pending_invitations: List[InvitationResponse]
+    active_org: Optional[ActiveOrgPermissions] = None   # None if no active or provisioned org
 
 
-class CreateOrgRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
+# CreateOrgRequest — SUPERSEDED 2026-10-08 (ticket 12 D10): orgs are created in Clerk
+# (<OrganizationList />), then provisioned via POST /api/v1/orgs/provision (no body).
+class ProvisionOrgResponse(AppBaseModel):
+    org: OrgSummary
+    admin_role_id: UUID
+    created: bool               # False if the org was already provisioned (idempotent call)
+
+
+class UpdateMemberOrgRoleRequest(BaseModel):
+    org_role_id: Optional[UUID] = None   # None clears the org-level role
 
 
 # ─────────────────────────────────────────────
@@ -113,6 +162,7 @@ class RoleResponse(AppBaseModel):
     parent_role_id: Optional[UUID] = None
     depth: int = 0
     permissions: List[str] = Field(default_factory=list)
+    is_system: bool = False          # root Admin; UI disables delete, re-parent and permission removal (D9)
     created_at: datetime
 
 
@@ -185,8 +235,23 @@ class AddTeamMemberResponse(BaseModel):
 # ─────────────────────────────────────────────
 
 class DocScopeTypeEnum(str, Enum):
+    org = "org"      # added 2026-10-08 to match ticket 11
     role = "role"
     team = "team"
+
+
+class DocFileTypeEnum(str, Enum):
+    pdf = "pdf"
+    docx = "docx"
+    pptx = "pptx"
+    txt = "txt"
+    md = "md"
+
+
+class DocStatusEnum(str, Enum):
+    processing = "processing"
+    ready = "ready"
+    failed = "failed"
 
 
 class CreateDocumentRequest(BaseModel):
@@ -196,16 +261,22 @@ class CreateDocumentRequest(BaseModel):
     role_id: Optional[UUID] = None
     team_id: Optional[UUID] = None
     file_url: str = Field(..., description="CDN URL returned by UploadThing")
+    file_type: DocFileTypeEnum
 
 
 class DocumentResponse(AppBaseModel):
     id: UUID
     title: str
     description: Optional[str]
+    file_url: str
+    file_type: DocFileTypeEnum
     scope_type: DocScopeTypeEnum
     role_id: Optional[UUID]
     team_id: Optional[UUID]
     uploaded_by_user_id: UUID
+    status: DocStatusEnum          # frontend polls this after the 202 (ticket 11)
+    chunk_count: Optional[int] = None
+    error_message: Optional[str] = None   # admin-facing reason when status == "failed" (ticket 11 §7a)
     created_at: datetime
 
 
@@ -338,6 +409,8 @@ class DashboardResponse(BaseModel):
 ---
 
 ## Frontend Codegen Script (`package.json`)
+
+> ⚠️ **Superseded by frontend ticket 03** — use `api:generate` → `./lib/api/v1.d.ts`. Kept for history.
 
 In the Next.js `frontend/package.json`:
 

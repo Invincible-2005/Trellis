@@ -19,6 +19,8 @@ Decisions this ticket must lock:
 
 ### 1. Locked URL & Route Structure
 
+> ⚠️ **Folder names superseded (2026-10-08):** ticket 05 and `spec.md` renamed the groups to `(marketing)`, `(auth)`, `(dashboard)` (admin nested at `(dashboard)/admin/*`). **URLs below are unchanged and still canonical;** only the File Location column is stale.
+
 The frontend is structured by auth state route groups: `app/(public)`, `app/(auth)`, `app/(authenticated)`, and `app/(admin)`.
 
 - **Org Context**: Managed via Clerk session state (NOT in the URL path). All app URLs are clean: `/dashboard`, `/tasks`, `/chat`, `/admin`.
@@ -34,6 +36,7 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 | `/sign-in(.*)` | `app/(auth)/sign-in/[[...sign-in]]/page.tsx` | Client / Clerk | Clerk hosted/embedded Sign-in |
 | `/sign-up(.*)` | `app/(auth)/sign-up/[[...sign-up]]/page.tsx` | Client / Clerk | Clerk hosted/embedded Sign-up |
 | `/org-selection` | `app/(auth)/org-selection/page.tsx` | RSC + Clerk Client | Standalone layout. Prompts user to pick/create an org |
+| `/onboarding` | `app/(auth)/onboarding/page.tsx` | RSC | *(added 2026-10-08, trellis/12 D10)* After Clerk org creation: calls `POST /api/v1/orgs/provision`, then redirects to `/dashboard`. Also the target of any `409 org_not_provisioned` |
 | `/dashboard` | `app/(authenticated)/dashboard/page.tsx` | RSC + Client widgets | Authenticated shell (Sidebar + Header). Metrics & strike summary |
 | `/tasks` | `app/(authenticated)/tasks/page.tsx` | RSC + Client interactive | Authenticated shell. Full task management, filter by status/team |
 | `/chat` | `app/(authenticated)/chat/page.tsx` | RSC shell + Client SSE | Authenticated shell. Agentic RAG chat with streaming & citations |
@@ -43,5 +46,5 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 | `/admin/teams` | `app/(admin)/admin/teams/page.tsx` | RSC + Client dialogs | Admin shell. Team creation & member role assignment |
 | `/admin/documents` | `app/(admin)/admin/documents/page.tsx` | RSC + Uploadthing | Admin shell. Upload & tag SOPs to roles or teams |
 | `/admin/strikes` | `app/(admin)/admin/strikes/page.tsx` | RSC + Client dialogs | Admin shell. Strike appeal review & policy validation log |
-| `/api/chat/stream` | `app/api/chat/stream/route.ts` | Route Handler (Edge/Node) | BFF SSE proxy to FastAPI `/api/v1/chat/stream` |
+| `/api/chat/sessions/[sessionId]/message` | `app/api/chat/sessions/[sessionId]/message/route.ts` | Route Handler (Node) | BFF SSE proxy to FastAPI `POST /api/v1/chat/sessions/{session_id}/message` *(path updated 2026-10-08, trellis/12 D2)* |
 

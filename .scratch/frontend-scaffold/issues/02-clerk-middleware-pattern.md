@@ -13,12 +13,23 @@ How does Clerk's Next.js SDK (v6+) gate specific route groups in App Router? Spe
 
 ## Answer
 
+> ⚠️ **Audit notes (2026-10-08):**
+> - Next.js 16 uses **`frontend/proxy.ts`** (not `middleware.ts`); installed `@clerk/nextjs` is **v7**. The `clerkMiddleware`/`auth.protect` patterns below still apply — re-verify against v7 docs when wiring. Current `proxy.ts` is a bare `clerkMiddleware()` with no route protection yet.
+> - The raw-`fetch` Route Handler and `createServerApiClient()` factory below are **superseded by ticket 03** (singleton `openapi-fetch` client + `onRequest` middleware).
+> - **Admin gate resolved (trellis ticket 12 D4):** `proxy.ts` does **not** gate `/admin` with Clerk roles. Clerk roles grant nothing in Trellis.
+>   - `proxy.ts` checks only signed-in and active org.
+>   - `app/(dashboard)/admin/layout.tsx` fetches `GET /api/v1/auth/context` and redirects unless `active_org.can_open_admin` is true (`create_role` or `add_member` held org-wide).
+>   - Each admin tab page checks its own permission.
+>   - FastAPI enforces every action regardless.
+> - **Headers resolved (D8):** the BFF sends **only** `Authorization: Bearer <token>`. `X-Org-Id`, `X-User-Id` and `X-Org-Role` are removed, and FastAPI ignores them.
+> - **New route (D10):** `/onboarding` (in `(auth)`, outside the shell). `<OrganizationList afterCreateOrganizationUrl="/onboarding" />` sends new org creators there to call `POST /api/v1/orgs/provision`. It needs a signed-in user with an active org, so it goes through the normal rules below.
+
 ### Executive Summary
 
 1. **Route groups `(public)`, `(authenticated)`, `(admin)` are filesystem-only** — `middleware.ts` matches against the actual URL pathnames, not the directory names.
 2. **`clerkMiddleware` is public-by-default** — anything not explicitly guarded with `auth.protect()` is accessible.
 3. **`auth()` is async in v6** — always `await auth()` everywhere (Server Components, Route Handlers, middleware).
-4. **BFF org-context forwarding**: pass `Authorization: Bearer <token>`, `X-Org-Id`, `X-Org-Role` headers from Next.js server to FastAPI.
+4. **BFF org-context forwarding**: pass **only** `Authorization: Bearer <token>`. The active org is inside the token. *(`X-Org-Id` and `X-Org-Role` removed 2026-10-08, D8.)*
 5. **`/org-selection` must NOT live inside the `(authenticated)` layout tree** — circular redirect risk.
 
 ---
@@ -38,7 +49,8 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isOrgSelectRoute = createRouteMatcher(['/org-selection(.*)']);
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
+// No isAdminRoute matcher: admin access is decided by Trellis permissions in
+// app/(dashboard)/admin/layout.tsx, not by Clerk roles (trellis ticket 12 D4).
 
 export default clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
@@ -58,12 +70,8 @@ export default clerkMiddleware(async (auth, req) => {
 
   if (isOrgSelectRoute(req)) return;
 
-  // Admin routes: require org:admin role OR org:admin:access permission
-  if (isAdminRoute(req)) {
-    await auth.protect((has) =>
-      has({ role: 'org:admin' }) || has({ permission: 'org:admin:access' })
-    );
-  }
+  // Superseded 2026-10-08 (D4): no Clerk-role gate for /admin here.
+  // Signed-in + active org is all proxy.ts enforces; Trellis RBAC does the rest.
 });
 
 export const config = {
