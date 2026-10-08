@@ -219,9 +219,9 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 
 ## Code drift found (needs a `backend/` change, which requires separate confirmation per AGENTS.md)
 - ~~`backend/app/models/document.py` docstring: the same inverted "descendant" wording as ticket 02.~~ Fixed 2026-10-08.
-- `backend/app/models/role.py` permission comment: missing `review_strike`.
-- `backend/app/core/config.py` `async_migrations_url` and `alembic/env.py`: both use the **pooled** URL. The map says migrations use the direct URL.
-- Migrations: none of the indexes from ticket 02 exist (HNSW `vector_cosine_ops`, scope indexes, role tree, team members, tasks, comments, chat sessions, audit). There is also no `CREATE EXTENSION IF NOT EXISTS vector`.
+- ~~`backend/app/models/role.py` permission comment: missing `review_strike`.~~ Fixed 2026-10-08 (migration `d4e8b2a61f07` commit).
+- ~~`backend/app/core/config.py` `async_migrations_url` and `alembic/env.py`: both use the **pooled** URL.~~ Fixed 2026-10-08: `async_migrations_url` now always uses the direct `DATABASE_URL`.
+- Migrations: **partly fixed 2026-10-08.** `d4e8b2a61f07` adds `idx_org_members_role`, `idx_invitations_pending`, `idx_team_members_user` and `idx_roles_org_parent`. Still missing: the remaining ticket 02 indexes (HNSW `vector_cosine_ops`, chunk scope indexes, tasks, comments, chat sessions, audit), planned as ticket 11's indexes migration. There is also no `CREATE EXTENSION IF NOT EXISTS vector`.
 - ~~`backend/app/services/ingestion.py`: no retry, no failure reason, reuses the request's session.~~ **Fixed 2026-10-08.** The rework also covers the SSRF guard, the atomic commit, extraction off the event loop, and the stale-job sweep (see ticket 11 §7a). ⚠️ Migration `c3f1a9d27e54` must be applied.
 - Scope cache: no invalidation on re-parenting yet (nothing is implemented yet).
 - Repo hygiene:

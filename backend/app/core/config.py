@@ -96,10 +96,11 @@ class Settings(BaseSettings):
     @property
     def async_migrations_url(self) -> str:
         """
-        Uses pooled URL (or direct fallback) with asyncpg sanitization for Alembic migrations.
+        Direct (unpooled) URL with asyncpg sanitization for Alembic migrations.
+        Neon's pooler runs PgBouncer in transaction mode, which breaks DDL
+        transactions and Alembic's locking, so migrations never use it.
         """
-        raw_url = self.DATABASE_URL_POOLED or self.DATABASE_URL
-        return self._to_asyncpg_url(raw_url)
+        return self._to_asyncpg_url(self.DATABASE_URL)
 
     @property
     def sync_database_url(self) -> str:

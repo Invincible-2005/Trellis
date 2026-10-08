@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List
-from sqlalchemy import String, ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy import String, ForeignKey, UniqueConstraint, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -39,7 +39,10 @@ class TeamMember(Base):
     Same user can be Manager in Team A and Employee in Team B.
     """
     __tablename__ = "team_members"
-    __table_args__ = (UniqueConstraint("team_id", "user_id"),)
+    __table_args__ = (
+        UniqueConstraint("team_id", "user_id"),  # also serves lookups by team_id
+        Index("idx_team_members_user", "user_id"),  # a user's teams (resolve_scope)
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id"), nullable=False)

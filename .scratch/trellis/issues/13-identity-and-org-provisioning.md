@@ -67,15 +67,16 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - [ ] Frontend ticket 04 checklist done: custom `email`/`name` session claims, self-serve org creation, and the org claim format (v1 or v2) recorded from a real token.
 
 ### 2. Migration (Alembic, one revision)
-- [ ] `org_members.role_id` (nullable FK → `roles.id`).
-- [ ] `roles.is_system` (bool, `server_default false`).
-- [ ] `invitations.clerk_invitation_id` (nullable, unique).
-- [ ] Indexes from ticket 02:
+- [x] `org_members.role_id` (nullable FK → `roles.id`).
+- [x] `roles.is_system` (bool, `server_default false`).
+- [x] `invitations.clerk_invitation_id` (nullable, unique).
+- [x] Indexes from ticket 02:
   - `idx_org_members_role`
   - `idx_invitations_pending` (partial)
   - the corrected `idx_team_members_user`
-- [ ] Update the SQLAlchemy models: `organization.py` (`OrgMember.role_id`), `role.py` (`is_system`, plus `review_strike` in the comment), `invitation.py`.
-- [ ] **Related drift fix (ticket 12 "Code drift"):** Alembic must use the **direct** (unpooled) URL.
+- [x] Update the SQLAlchemy models: `organization.py` (`OrgMember.role_id`), `role.py` (`is_system`, plus `review_strike` in the comment), `invitation.py`.
+- [x] **Related drift fix (ticket 12 "Code drift"):** Alembic must use the **direct** (unpooled) URL.
+- **Done 2026-10-08:** migration `d4e8b2a61f07` (revises `c3f1a9d27e54`). It also adds `idx_roles_org_parent` for the role-tree walk. `idx_team_members_team` is skipped because the `UNIQUE (team_id, user_id)` constraint already serves it. The FK `org_members.role_id` uses the default ON DELETE (restrict), so a role that someone holds cannot be deleted. **Not yet applied to Neon:** run `uv run alembic current`, then `uv run alembic upgrade head`.
 
 ### 3. Auth package (suggested: `backend/app/auth/`)
 - [ ] `claims.py`: `verify_clerk_jwt`. Check RS256, `iss`, `azp`, `exp`, `nbf` and `sub`, with leeway ≤ 5 s. Parse the v2 org claim with a v1 fallback. Return 401 on any failure.

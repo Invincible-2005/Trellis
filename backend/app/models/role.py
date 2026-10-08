@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, ForeignKey, DateTime, Text, ARRAY
+from sqlalchemy import String, ForeignKey, DateTime, Text, ARRAY, Boolean, Index, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 from app.core.database import Base
@@ -18,6 +18,8 @@ class Role(Base):
     Document access: doc tagged to Role R → visible to R and all ancestors.
     """
     __tablename__ = "roles"
+    # Role-tree walk in resolve_scope (recursive CTE)
+    __table_args__ = (Index("idx_roles_org_parent", "org_id", "parent_role_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
@@ -26,8 +28,12 @@ class Role(Base):
     parent_role_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("roles.id"), nullable=True)
     # Permissions stored as array of strings (use Enum in strict implementations)
     # Values: 'create_role','create_team','add_member','upload_document',
-    #         'assign_task','give_strike','view_aggregate'
+    #         'assign_task','give_strike','view_aggregate','review_strike'
     permissions: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    # The seeded root Admin (D9): can't be deleted, re-parented, or lose permissions
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
