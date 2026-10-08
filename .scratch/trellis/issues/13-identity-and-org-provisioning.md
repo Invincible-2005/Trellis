@@ -22,6 +22,36 @@ Implement the decisions locked in ticket 12 D4, D8, D9 and D10:
 
 ---
 
+## Current code (PR #8, merged 2026-10-08)
+The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification), `backend/app/core/deps.py` (`get_current_user`, `get_scope`, `require_org_scope`) and `backend/app/scope/resolver.py`. **Extend these files; don't create a parallel `app/auth/` package.** The checklist below refers to responsibilities, not new file names.
+
+- **Already fixed** (branch `fix/config-restore-and-resolver`): the resolver runs its queries sequentially (an `AsyncSession` can't run concurrent queries), `AccessScope` is frozen, `in_team()` exists, and the CTE uses `UNION`. The settings the merge dropped are restored in `config.py`.
+
+## ✅ Ready to fix: `auth.py` / `deps.py` (approved 2026-10-08, independent of D15 and the D9 migration)
+
+**`auth.py`**
+- **A1** `azp` check against a new `CLERK_AUTHORIZED_PARTIES: list[str]` setting (default `["http://localhost:3000"]`; set the production origin in `.env`).
+- **A2** Org claims: read v2 `o.id` / `o.rol` first, falling back to v1 `org_id` / `org_role`. Confirm the format with one real token.
+- **A3** `leeway=5`; require `sub`, `exp`, `iat`, `nbf` and `iss`.
+- **A4** `PyJWKClientError` (Clerk's key endpoint unreachable) → 503, not an uncaught 500.
+- **A5** JWKS fetching is synchronous and blocks the event loop: call `verify_clerk_jwt` via `asyncio.to_thread` from `deps.py`.
+- **A6** Generic 401 detail (log the reason instead of returning `Invalid token: {exc}`); normalize a trailing `/` in `CLERK_ISSUER`.
+
+**`deps.py`**
+- **B1** First-login race: `INSERT … ON CONFLICT DO NOTHING`, then re-select. Today two concurrent first requests cause an `IntegrityError` and a 500.
+- **B2** Use the Clerk **primary** email (`primary_email_address_id`), not `email_addresses[0]`. Invitations are matched by email (D10).
+- **B3** No email → 400 "an email address is required" (today it stores `""`, so the second email-less user collides on the unique email).
+- **B4** `httpx` network errors calling Clerk → 503 (today they're uncaught).
+
+**Verification:** test RS256 keys + a fake JWKS. Cover: valid token; wrong `azp`; expired; wrong `iss`; bad signature; v1 and v2 org claims; JWKS down → 503; two concurrent first logins → one row. No calls to Clerk or Neon.
+
+**Deliberately NOT in this fix:**
+- An unknown org currently returns an empty scope with a sentinel `org_id = UUID(int=0)` instead of 409 `org_not_provisioned`. The right behavior depends on **ticket 12 D15**.
+- Org-level role, `can_org`, and creating `org_members` just-in-time (needs this ticket's migration, D9 and D10).
+- Kept: PR #8 fetches email and name from the Clerk Backend API once per user instead of D8's custom claims. That's equivalent, so no change.
+
+---
+
 ## Checklist
 
 ### 1. Config (`backend/app/core/config.py`)

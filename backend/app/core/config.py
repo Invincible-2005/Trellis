@@ -20,6 +20,24 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_ISSUER: str = ""
 
+    # HuggingFace Inference API — for mxbai-embed-large-v1 embeddings
+    HUGGINGFACE_TOKEN: str = ""
+    EMBEDDING_MODEL: str = "mixedbread-ai/mxbai-embed-large-v1"
+    # "{model}" is substituted with EMBEDDING_MODEL
+    EMBEDDING_API_URL: str = (
+        "https://router.huggingface.co/hf-inference/models/{model}/pipeline/feature-extraction"
+    )
+    EMBEDDING_DIM: int = 1024  # must match Vector(1024) on document_chunks.embedding
+
+    # Document ingestion (Ticket 11) — only these hosts may be fetched (SSRF guard).
+    # Entries starting with "." match any subdomain (".ufs.sh" → "abc.ufs.sh").
+    # Set as JSON in .env, e.g. INGESTION_ALLOWED_HOSTS='["utfs.io", ".ufs.sh"]'
+    INGESTION_ALLOWED_HOSTS: list[str] = ["utfs.io", ".ufs.sh"]
+    INGESTION_MAX_FILE_BYTES: int = 25 * 1024 * 1024
+
+    # LangGraph SQLite checkpointer path (dev only; swapped for Postgres in prod)
+    CHECKPOINTS_DB_PATH: str = "checkpoints.db"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
