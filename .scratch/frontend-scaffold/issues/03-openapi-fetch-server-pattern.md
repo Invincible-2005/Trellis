@@ -189,6 +189,11 @@ frontend/lib/api/
 - `queries/auth.ts`: `getMe()` and `getAuthContext()`, both `cache()`-wrapped. `getAuthContext().active_org` drives navigation and the admin-console gate.
 - `v1.d.ts`: generated. Never edit it by hand.
 
+**Writes from browser forms (decided 2026-10-09, trellis/12 D18)**
+- Server Actions in `lib/api/actions/<area>.ts` (`'use server'`). **Reference example (built 2026-10-09): `actions/roles.ts::createRole`**; read side `queries/roles.ts::getRoles`. Copy these for new areas.
+- They call `api.POST/PATCH/DELETE` and **return** `{ ok: true, data } | { ok: false, message }` instead of throwing, so the dialog can toast `message` (Next.js hides thrown error messages in production). Redirect codes still redirect.
+- On success: `revalidatePath('/admin/roles')` (or the page that changed).
+
 **How to update the types**
 - The backend owner runs `uv run python scripts/export_openapi.py` in `backend/` and commits `backend/openapi.json`.
 - After pulling, run `pnpm api:generate` (reads that file) and commit `lib/api/v1.d.ts`.

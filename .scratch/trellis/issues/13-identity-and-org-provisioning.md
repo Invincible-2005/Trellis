@@ -123,7 +123,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - [ ] `DELETE /admin/invitations/{id}`: revoke in Clerk, then mark it expired or delete it.
 - [ ] `PATCH /admin/members/{user_id}` (`org_role_id`): set the org-level role; enforce the escalation and last-Admin guards; invalidate the scope.
 - [ ] `DELETE /admin/members/{user_id}`: Clerk first, then the DB, then invalidation; enforce the escalation and last-Admin guards.
-- [ ] Role CRUD guards (rules in ticket 12 D17; logic in `services/roles.py`, router `api/v1/admin.py`): protect the `is_system` role; new or edited roles must sit below the caller; the caller can only grant permissions they hold; re-parenting calls `invalidate_org`.
+- [x] Role CRUD guards. *Done 2026-10-09: `AccessScope.org_role_id`, `manageable_role_ids` and `can_manage_role()` in `app/scope/resolver.py`; `GET`/`POST /api/v1/admin/roles` and `PATCH`/`DELETE /api/v1/admin/roles/{role_id}` (`app/api/v1/admin.py`, `app/services/roles.py`, `app/schemas/admin.py`). Frontend: `lib/api/queries/roles.ts`, `lib/api/actions/roles.ts`. Not yet exercised against Neon; tests optional.* (Rules in ticket 12 D17; logic in `services/roles.py`, router `api/v1/admin.py`): protect the `is_system` role; new or edited roles must sit below the caller; the caller can only grant permissions they hold; re-parenting calls `invalidate_org`.
 
 ### 6. Frontend
 - [x] `proxy.ts`: signed-in and active-org checks only (frontend ticket 02); public routes include `/`, `/sign-in`, `/sign-up`; **no Clerk-role admin gate**.

@@ -232,10 +232,20 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   2. The new/edited role's parent must be the caller's org role or one of its descendants (strictly below the caller). No parent-less roles; only the seeded `Admin` is a root.
   3. Permissions granted must be a subset of `scope.org_permissions` and from the 8 known actions.
   4. Name unique within the org (409).
-  5. Edit/re-parent: the role itself must already be strictly below the caller, the new parent too, and no loop (not under its own descendant). Permission or parent changes call `invalidate_org`. Create needs no invalidation (no holders yet).
+  5. Edit/re-parent: the role itself must already be strictly below the caller, the new parent too, and no loop (not under its own descendant). Every role write (create, edit, move, delete) calls `invalidate_org`. *(Corrected 2026-10-09: the earlier "create needs no invalidation" was wrong. Roles above the new one must see documents tagged to it, so their cached `visible_role_ids` go stale.)*
+  - Only **added** permissions must be ones the caller holds; removing is always allowed, so editing a role never fails over permissions someone higher gave it.
   6. `is_system` roles can't be edited, moved or deleted.
   7. Delete is refused (409) if anyone holds the role or it has child roles.
 - **Where the code goes:** router `api/v1/admin.py`, schemas `schemas/admin.py`, checks and logic in `services/roles.py` (replaces the "suggested `guards.py`" in ticket 13 step 3, per `backend/CLAUDE.md`).
+
+### D18. How browser forms send changes to the backend (added 2026-10-09, found while connecting role creation) — ✅ RESOLVED 2026-10-09
+- **Gap:** the frontend only had a read pattern (`lib/api/queries/`, used by Server Components). The first write from a browser form ("New role" dialog) had no decided path; the frontend map listed form handling as "not yet specified".
+- **Decision (Piyush): Next.js Server Actions.**
+  - Writes live in `frontend/lib/api/actions/<area>.ts` with `'use server'`, next to `queries/`. They call the existing `api` client (Bearer token only, D8), so the browser still never reaches FastAPI (D3).
+  - **Expected errors are returned, not thrown:** an action returns `{ ok: true, data }` or `{ ok: false, message }`, and the dialog shows `message` in a sonner toast (D16). Thrown errors have their message hidden by Next.js in production. Redirect codes (`invalid_token`, `no_active_org`, `org_not_provisioned`) still redirect.
+  - On success the action calls `revalidatePath(...)` for the page it changed.
+  - Route Handlers stay only for streaming (the chat SSE proxy).
+- **Written into:** frontend-scaffold map, ticket 03 ("As built"), `spec.md`, `frontend/CLAUDE.md`.
 
 ---
 

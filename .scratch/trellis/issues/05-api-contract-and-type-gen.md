@@ -76,6 +76,8 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
    - **Role endpoints** (`POST /admin/roles`, `PATCH /admin/roles/{id}`, `DELETE /admin/roles/{id}`) enforce:
      - **No privilege escalation:** the new or edited role must sit below the caller's role, and the caller may only grant permissions they hold.
      - **The system role is protected:** `is_system` can't be deleted, re-parented, or lose permissions.
+     - **As built 2026-10-09 (`GET`/`POST /api/v1/admin/roles`, schemas in `app/schemas/admin.py`):** `GET` needs console access (`can_org("create_role") or can_org("add_member")`) and returns every org role. `RoleResponse` gains `manageable: bool` (strictly below the caller's org role). `CreateRoleRequest.parent_role_id` is **required**, and `permissions` is typed as the 8 names (unknown → 422). New error codes: `role_not_found` (404), `role_name_taken` (409), `role_has_children` (409), `role_in_use` (409), `invalid_parent` (400).
+     - **As built 2026-10-09 (`PATCH`/`DELETE /api/v1/admin/roles/{role_id}`):** `UpdateRoleRequest` fields are all optional; missing or `null` = unchanged, `description: ""` clears it, `permissions` is the full new list (only *added* ones must be held by the caller). `DELETE` returns 204. The `is_system` Admin role can't be renamed either (D17 rule 6 is stricter than the line above).
      - **Yardstick (ticket 12 D17, 2026-10-09):** "the caller's role" means their **org-level role only**; the caller needs `can_org("create_role")`. A new role's parent must be that role or a descendant (no parent-less roles). Delete is refused while the role is held or has children.
 
 ---

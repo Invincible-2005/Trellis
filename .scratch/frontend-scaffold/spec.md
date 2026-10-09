@@ -120,7 +120,8 @@ frontend/
 │   ├── api/
 │   │   ├── v1.d.ts                               # Auto-generated OpenAPI TypeScript types
 │   │   ├── client.ts                             # Singleton openapi-fetch client with Clerk auth middleware
-│   │   └── queries/                              # cache()-wrapped Server Component data fetchers
+│   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
+│   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
 │   └── utils.ts                                  # cn() and shared formatting utilities
 │
 └── proxy.ts                                      # Next.js 16 name for middleware: Clerk route protection & active-org redirect

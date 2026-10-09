@@ -32,6 +32,8 @@ A complete, locked frontend architecture document: every route, layout boundary,
 - [Clerk Middleware Pattern for Route Groups](.scratch/frontend-scaffold/issues/02-clerk-middleware-pattern.md): Use `clerkMiddleware()` (public-by-default; installed v7, file is `proxy.ts`); `await auth()` everywhere; /org-selection lives outside the authenticated shell. Admin gating by Clerk role is **superseded** by trellis/12 D4 (Trellis permissions checked in `admin/layout.tsx`). **`proxy.ts` rules decided 2026-10-08:** public `/`, `/sign-in`, `/sign-up`; no active org → `/org-selection`; `/api/*` returns D16 JSON errors instead of redirecting; Clerk fallback redirect → `/dashboard`.
 - [openapi-fetch Server-Only Client Pattern](.scratch/frontend-scaffold/issues/03-openapi-fetch-server-pattern.md): Singleton `api` client in `lib/api/client.ts` with the Clerk JWT injected via `onRequest` middleware (Bearer token only, no X-* headers, per D8); `parseAs: 'stream'` for SSE proxy Route Handlers; `cache()` wraps query functions (not the client); `import 'server-only'` guards the module.
 
+- [Form writes (trellis/12 D18)](../trellis/issues/12-decision-reconciliation.md): **Server Actions** in `lib/api/actions/`, returning `{ ok, message }` for toasts; `revalidatePath` on success. Route Handlers only for streaming. *(Form-state library, e.g. react-hook-form, still open.)*
+
 ## Cross-map links (audit 2026-10-08)
 
 - System-level conflicts that affect the frontend are tracked in [trellis/12-decision-reconciliation](../trellis/issues/12-decision-reconciliation.md): chat endpoint `POST /api/v1/chat/sessions/{session_id}/message` (D2, resolved), `/api/v1` prefix (D3, resolved), admin-console access (D4, resolved: Trellis RBAC, `create_role` OR `add_member` org-wide, per-tab gating, no Clerk-role gate in `proxy.ts`), BFF sends only the Bearer token (D8, resolved), `/onboarding` + `POST /api/v1/orgs/provision` for new orgs (D10, resolved).
@@ -45,7 +47,7 @@ A complete, locked frontend architecture document: every route, layout boundary,
 - File and folder naming conventions beyond route structure
 - Error boundary and loading skeleton strategy per route group
 - Dark mode / theming approach for shadcn components
-- Form state management strategy (react-hook-form + zod vs. Server Actions alone)
+- Form state management strategy (react-hook-form + zod vs. Server Actions alone). *The write path is decided (Server Actions, D18); only the form-state library is open.*
 
 ## Out of scope
 

@@ -13,7 +13,7 @@ The canonical file tree is [`.scratch/frontend-scaffold/spec.md`](../.scratch/fr
 | A page / route | `app/<route-group>/<route>/page.tsx`. Groups: `(marketing)` public, `(auth)` sign-in/onboarding, `(dashboard)` signed-in app. |
 | UI that belongs to one page | A private `_components/` folder next to that page. Not in `components/`. |
 | Generic building blocks (shadcn buttons, dialogs, theme toggle) | `components/ui/` (shadcn) or `components/shared/` (our own, used in several places) |
-| Calling the backend | `lib/api/queries/` (server-side data fetchers). The browser never calls FastAPI directly; it goes through the Next.js server (BFF). |
+| Calling the backend | Reads: `lib/api/queries/` (server-side data fetchers). Writes from forms: `lib/api/actions/` (Server Actions that return `{ ok, message }` for a toast). The browser never calls FastAPI directly; it goes through the Next.js server (BFF). |
 | Chat stream proxy | `app/api/chat/sessions/[sessionId]/message/route.ts` |
 | Small helpers | `lib/utils.ts` |
 | Route protection | `proxy.ts` (Next.js 16's name for middleware) |
