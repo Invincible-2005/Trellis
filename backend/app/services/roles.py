@@ -40,7 +40,9 @@ async def list_roles(db: AsyncSession, scope: AccessScope) -> list[RoleResponse]
         )
     ).all()
     depth = _depths({role.id: role.parent_role_id for role in roles})
-    return [_to_response(role, depth[role.id], scope.can_manage_role(role.id)) for role in roles]
+    return [
+        _to_response(role, depth[role.id], scope.can_manage_role(role.id), scope) for role in roles
+    ]
 
 
 async def create_role(db: AsyncSession, scope: AccessScope, body: CreateRoleRequest) -> RoleResponse:
@@ -81,7 +83,7 @@ async def create_role(db: AsyncSession, scope: AccessScope, body: CreateRoleRequ
 
     tree = await _parent_map(db, scope.org_id)
     # Below the caller by construction; the cached scope just doesn't know the new id yet.
-    return _to_response(role, _depths(tree)[role.id], manageable=True)
+    return _to_response(role, _depths(tree)[role.id], manageable=True, scope=scope)
 
 
 async def update_role(
@@ -134,7 +136,7 @@ async def update_role(
     logger.info("User %s updated role %s in org %s", scope.user_id, role.id, scope.org_id)
 
     tree = await _parent_map(db, scope.org_id)
-    return _to_response(role, _depths(tree)[role.id], manageable=True)
+    return _to_response(role, _depths(tree)[role.id], manageable=True, scope=scope)
 
 
 # What still points at a role, and how to say so to the user.
@@ -292,7 +294,7 @@ def _depths(parent_of: Mapping[uuid.UUID, Optional[uuid.UUID]]) -> dict[uuid.UUI
     return depth
 
 
-def _to_response(role: Role, depth: int, manageable: bool) -> RoleResponse:
+def _to_response(role: Role, depth: int, manageable: bool, scope: AccessScope) -> RoleResponse:
     return RoleResponse(
         id=role.id,
         name=role.name,
@@ -302,5 +304,6 @@ def _to_response(role: Role, depth: int, manageable: bool) -> RoleResponse:
         permissions=list(role.permissions or []),
         is_system=role.is_system,
         manageable=manageable,
+        assignable=manageable and set(role.permissions or []) <= scope.org_permissions,
         created_at=role.created_at,
     )

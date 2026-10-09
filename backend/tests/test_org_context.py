@@ -40,6 +40,10 @@ class OrgDB:
         self.members.add(key)
         return SimpleNamespace(rowcount=1 if is_new else 0)
 
+    async def scalars(self, stmt):
+        """Pending-invitation lookup for a new member: none in these tests."""
+        return SimpleNamespace(all=lambda: [])
+
     async def commit(self):
         pass
 

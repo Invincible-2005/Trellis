@@ -28,6 +28,7 @@ Decisions to lock:
 | Tab | Required (org-wide unless noted) |
 |---|---|
 | `/admin/roles` | `create_role` |
+| `/admin/members` | `add_member` *(added 2026-10-09, trellis/12 D25)* |
 | `/admin/teams` | `add_member` or `create_team` |
 | `/admin/documents` | `upload_document` (org-wide **or on any team**) |
 | `/admin/strikes` | `review_strike` |
@@ -45,7 +46,8 @@ Decisions to lock:
 ### 1. Sub-Routes & Layout
 The Admin Console uses dedicated sub-routes wrapped by a shared `app/(dashboard)/admin/layout.tsx`:
 - `/admin/roles`: Visual Role Hierarchy builder (React Flow)
-- `/admin/teams`: Team directory and member assignments
+- `/admin/members`: Everyone in the org with their org role, pending invites, "Invite member" (email + optional role). *Added 2026-10-09 (trellis/12 D25/D26); brief in `plans/member-management/frontend.md`.*
+- `/admin/teams`: Team directory and member assignments (existing org members only, after D25)
 - `/admin/documents`: Policy/SOP document uploader & tagging
 - `/admin/strikes`: Strike appeal reviews and audit log
 The shared admin layout provides top navigation tabs between these four surfaces so admins can switch contexts without re-fetching unrelated data.
