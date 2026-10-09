@@ -140,6 +140,93 @@
         ]
       }
     },
+    "/api/v1/orgs/provision": {
+      "post": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Provision",
+        "description": "Set up the active Clerk org in Trellis: the org, its root `Admin` role and the\ncreator as Admin. Called by the /onboarding page. Returns 201 the first time,\n200 if the org was already set up.",
+        "operationId": "provision_api_v1_orgs_provision_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionOrgResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Workspace set up just now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionOrgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -447,6 +534,29 @@
           "clerk_org_id"
         ],
         "title": "OrgSummary"
+      },
+      "ProvisionOrgResponse": {
+        "properties": {
+          "org": {
+            "$ref": "#/components/schemas/OrgSummary"
+          },
+          "admin_role_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Admin Role Id"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org",
+          "admin_role_id",
+          "created"
+        ],
+        "title": "ProvisionOrgResponse"
       }
     },
     "securitySchemes": {

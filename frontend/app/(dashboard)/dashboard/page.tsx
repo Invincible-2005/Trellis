@@ -1,12 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
+import { getAuthContext } from '@/lib/api/queries/auth';
 
 export default async function DashboardPage() {
-  const { userId, orgId } = await auth();
+  // proxy.ts guarantees a signed-in user with an active org.
+  const context = await getAuthContext();
 
-  if (!userId) redirect('/sign-in');
-  if (!orgId) redirect('/org-selection');
+  // The active org exists in Clerk but isn't set up in Trellis yet (e.g. picked from
+  // the org list before its creator finished setup): send them through setup.
+  if (!context.active_org) redirect('/onboarding');
+
+  const org = context.organizations.find((o) => o.id === context.active_org?.org_id);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
@@ -15,7 +19,8 @@ export default async function DashboardPage() {
         <UserButton />
       </div>
       <p className="text-muted-foreground text-sm">
-        Active Organization ID: <code className="font-mono bg-muted px-2 py-1 rounded">{orgId}</code>
+        Organization: <span className="font-medium text-foreground">{org?.name}</span>
+        {context.active_org.org_role_name && <> · Your role: {context.active_org.org_role_name}</>}
       </p>
       <p className="text-muted-foreground text-xs">
         Full role-scoped metrics dashboard will be implemented in ticket 08.

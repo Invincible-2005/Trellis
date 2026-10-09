@@ -106,11 +106,16 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
   - `create_org_invitation(clerk_org_id, email, inviter_clerk_user_id)`
   - `revoke_org_invitation(clerk_org_id, invitation_id, requesting_user_id)`
   - `delete_org_membership(clerk_org_id, clerk_user_id)`
-- [ ] Decide between the official `clerk-backend-api` Python SDK and raw `httpx`. Raw `httpx` is enough for 4 calls and avoids another dependency.
+- [x] Decide between the official `clerk-backend-api` Python SDK and raw `httpx`. **Raw `httpx` (2026-10-09).** Raw `httpx` is enough for 4 calls and avoids another dependency.
 
 ### 5. Endpoints (all under `/api/v1`)
 - [x] `GET /auth/me` and `GET /auth/context` (identity-only). `context.active_org` holds the effective permissions and `can_open_admin`.
-- [ ] `POST /orgs/provision`: idempotent; requires Clerk `org:admin`; one transaction creates the org, the root `Admin` role (`is_system`, 8 permissions) and the creator's `org_members` row with that role.
+- [x] `POST /orgs/provision`: idempotent; requires Clerk `org:admin`; one transaction creates the org, the root `Admin` role (`is_system`, 8 permissions) and the creator's `org_members` row with that role.
+  > **Done 2026-10-09:** route `app/api/v1/orgs.py`, logic `app/services/orgs.py::provision_org`, schema `app/schemas/orgs.py`, Clerk name lookup `app/services/clerk.py::get_organization` (raw `httpx`, which settles §4's SDK question). The permission list lives in `app/models/role.py::ROLE_PERMISSIONS`.
+  > - Already set up → 200 for **anyone** (a teammate landing on `/onboarding` passes through). `org:admin` is checked only when the org is new → otherwise 403 `forbidden`.
+  > - Concurrent calls: `INSERT … ON CONFLICT (clerk_org_id) DO NOTHING`; the loser returns the existing org with 200.
+  > - Clerk unreachable → 503 `auth_unavailable` (existing D16 code). No new error codes.
+  > - Tests not written (optional).
 - [ ] `POST /admin/teams/{team_id}/members`:
   - Already an org member → add to the team directly.
   - Otherwise → create a Trellis invitation, then the Clerk invitation, then store `clerk_invitation_id`.
@@ -118,14 +123,15 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - [ ] `DELETE /admin/invitations/{id}`: revoke in Clerk, then mark it expired or delete it.
 - [ ] `PATCH /admin/members/{user_id}` (`org_role_id`): set the org-level role; enforce the escalation and last-Admin guards; invalidate the scope.
 - [ ] `DELETE /admin/members/{user_id}`: Clerk first, then the DB, then invalidation; enforce the escalation and last-Admin guards.
-- [ ] Role CRUD guards: protect the `is_system` role; new or edited roles must sit below the caller; the caller can only grant permissions they hold; re-parenting calls `invalidate_org`.
+- [ ] Role CRUD guards (rules in ticket 12 D17; logic in `services/roles.py`, router `api/v1/admin.py`): protect the `is_system` role; new or edited roles must sit below the caller; the caller can only grant permissions they hold; re-parenting calls `invalidate_org`.
 
 ### 6. Frontend
-- [ ] `proxy.ts`: signed-in and active-org checks only (frontend ticket 02); public routes include `/`, `/sign-in`, `/sign-up`; **no Clerk-role admin gate**.
-- [ ] `lib/api/client.ts`: Bearer token only, no `X-*` headers (frontend ticket 03).
-- [ ] `/org-selection`: `<OrganizationList hidePersonal afterCreateOrganizationUrl="/onboarding" />`.
-- [ ] `(auth)/onboarding/page.tsx`: call `POST /api/v1/orgs/provision`, then `redirect('/dashboard')`. Show a clear message on 403.
-- [ ] BFF query helper: on 409 `org_not_provisioned` → `redirect('/onboarding')`; on 400 `no_active_org` → `redirect('/org-selection')`.
+- [x] `proxy.ts`: signed-in and active-org checks only (frontend ticket 02); public routes include `/`, `/sign-in`, `/sign-up`; **no Clerk-role admin gate**.
+- [x] `lib/api/client.ts`: Bearer token only, no `X-*` headers (frontend ticket 03).
+- [x] `/org-selection`: `<OrganizationList hidePersonal afterCreateOrganizationUrl="/onboarding" />`.
+- [x] `(auth)/onboarding/page.tsx`: call `POST /api/v1/orgs/provision`, then `redirect('/dashboard')`. Show a clear message on 403.
+- [x] BFF query helper: on 409 `org_not_provisioned` → `redirect('/onboarding')`; on 400 `no_active_org` → `redirect('/org-selection')`.
+  > **Done 2026-10-09** (teammates' PR #14, follow-up fixes 2026-10-09): `/onboarding` uses `unwrap` and shows the error with "Try again" (dev bypass link removed); `/dashboard` calls `getAuthContext()` and sends a not-yet-set-up org to `/onboarding`; `lib/api/errors.ts::unwrap` is the one error helper (`lib/api/queries/bff-utils.ts` is a duplicate, to delete). `.env` uses `FASTAPI_INTERNAL_URL` (not `API_URL`/`NEXT_PUBLIC_API_URL`). End-to-end check pending.
 - [ ] `(dashboard)/admin/layout.tsx`: `getAuthContext()` → redirect unless `can_open_admin`; per-tab visibility (frontend ticket 06 §0).
 
 ### 7. Tests (pytest + httpx `AsyncClient`; generate test RS256 keys and a fake JWKS)
