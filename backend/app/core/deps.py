@@ -54,6 +54,7 @@ from app.core.errors import api_error
 from app.models.organization import Organization, OrgMember
 from app.models.user import User
 from app.scope.resolver import AccessScope, invalidate_scope, resolve_scope
+from app.services.members import apply_pending_invitations
 
 logger = logging.getLogger(__name__)
 
@@ -213,27 +214,29 @@ async def lookup_org_id(db: AsyncSession, clerk_org_id: str) -> Optional[uuid.UU
     return org_id
 
 
-async def ensure_org_member(db: AsyncSession, user_id: uuid.UUID, org_id: uuid.UUID) -> None:
+async def ensure_org_member(db: AsyncSession, user: User, org_id: uuid.UUID) -> None:
     """
     Just-in-time org membership (D8/D10). Safe because the verified token proves
     the user is a member of this org in Clerk, and Trellis only adds people to
-    Clerk orgs itself (or they created the org).
+    Clerk orgs itself (or they created the org). A newly created membership picks
+    up the user's pending invitations (org role / teams) in the same commit.
     """
-    key = (user_id, org_id)
+    key = (user.id, org_id)
     if key in _known_members:
         return
 
     result = await db.execute(
         pg_insert(OrgMember)
-        .values(id=uuid.uuid4(), org_id=org_id, user_id=user_id)
+        .values(id=uuid.uuid4(), org_id=org_id, user_id=user.id)
         .on_conflict_do_nothing(index_elements=[OrgMember.org_id, OrgMember.user_id])
     )
+    joined = bool(result.rowcount)
+    if joined:
+        await apply_pending_invitations(db, user, org_id)
     await db.commit()
-    if result.rowcount:
-        logger.info("User %s joined org %s (just-in-time membership)", user_id, org_id)
-        # TODO(invitations): apply this user's pending invitations for the org here
-        # (they become team_members rows), before the scope below is computed.
-        invalidate_scope(user_id, org_id)
+    if joined:
+        logger.info("User %s joined org %s (just-in-time membership)", user.id, org_id)
+        invalidate_scope(user.id, org_id)
     _known_members[key] = True
 
 
@@ -265,7 +268,7 @@ async def get_org_context(
             "This workspace hasn't been set up yet.",
         )
 
-    await ensure_org_member(db, user.id, org_id)
+    await ensure_org_member(db, user, org_id)
     return OrgContext(user=user, claims=claims, org_id=org_id)
 
 

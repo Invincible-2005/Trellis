@@ -76,6 +76,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
   - the corrected `idx_team_members_user`
 - [x] Update the SQLAlchemy models: `organization.py` (`OrgMember.role_id`), `role.py` (`is_system`, plus `review_strike` in the comment), `invitation.py`.
 - [x] **Related drift fix (ticket 12 "Code drift"):** Alembic must use the **direct** (unpooled) URL.
+- **2026-10-09 (ticket 12 D25):** migration `b5d1f3c8e902` makes `invitations.team_id` and `role_id` nullable (org-only invites from Admin → Members) and replaces the `(email, org_id, team_id)` unique rule with a **unique** `idx_invitations_pending` (one pending invite per org + email; emails stored lowercase). Not yet applied.
 - **Done 2026-10-08:** migration `d4e8b2a61f07` (revises `c3f1a9d27e54`). It also adds `idx_roles_org_parent` for the role-tree walk. `idx_team_members_team` is skipped because the `UNIQUE (team_id, user_id)` constraint already serves it. The FK `org_members.role_id` uses the default ON DELETE (restrict), so a role that someone holds cannot be deleted. **Not yet applied to Neon:** run `uv run alembic current`, then `uv run alembic upgrade head`.
 
 ### 3. Auth package (suggested: `backend/app/auth/`)
@@ -91,7 +92,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - [x] `org_context.py`: `get_org_context`.
   - Map the Clerk org ID to `organizations.id` (cached); return 400 `no_active_org` or 409 `org_not_provisioned` as appropriate.
   - Create the `org_members` row just-in-time.
-  - Apply pending invitations, then `invalidate_scope`. *(Not yet: marked `TODO(invitations)` in `ensure_org_member`; it belongs with the invitation endpoints.)*
+  - Apply pending invitations, then `invalidate_scope`. *(Done 2026-10-09: `ensure_org_member` calls `services/members.py::apply_pending_invitations` in the same commit as the new membership; org-only invite → org role, team invite → `team_members`.)*
 - [x] `scope.py`: `AccessScope` (frozen, with `org_permissions`, `in_team`, `can`, `can_org`), `resolve_scope` (queries A, B and C via `asyncio.gather`), the `TTLCache`, and `invalidate_scope` / `invalidate_org`.
   - **D13 resolved 2026-10-08:** build `member_team_ids` + `governed_team_ids` (every member strictly below one of my roles) and `can_view_team()`; see ticket 03 §gaps.
 - [ ] `guards.py`: the hierarchy helpers.
@@ -101,7 +102,7 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
   - `assert_not_last_admin(org_id, user_id)`.
 
 ### 4. Clerk Backend API client (suggested: `backend/app/services/clerk.py`)
-- [ ] A thin `httpx.AsyncClient` against `https://api.clerk.com/v1`, authenticated with `Bearer CLERK_SECRET_KEY`. Needed operations:
+- [x] A thin `httpx.AsyncClient` against `https://api.clerk.com/v1`, authenticated with `Bearer CLERK_SECRET_KEY`. *Done 2026-10-09 (member-management slice A): `get_organization`, `add_org_membership` (D26 direct add; "already a member" in Clerk counts as success), `create_org_invitation`, `revoke_org_invitation`. `delete_org_membership` comes with member removal. Clerk 4xx → `400 clerk_rejected` with Clerk's message; unreachable, 5xx or 401/403 → `503 auth_unavailable`.* Needed operations:
   - `get_organization(clerk_org_id)` (for the name)
   - `create_org_invitation(clerk_org_id, email, inviter_clerk_user_id)`
   - `revoke_org_invitation(clerk_org_id, invitation_id, requesting_user_id)`
@@ -116,11 +117,16 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
   > - Concurrent calls: `INSERT … ON CONFLICT (clerk_org_id) DO NOTHING`; the loser returns the existing org with 200.
   > - Clerk unreachable → 503 `auth_unavailable` (existing D16 code). No new error codes.
   > - Tests not written (optional).
-- [ ] `POST /admin/teams/{team_id}/members`:
+- [x] **`GET` + `POST /admin/members` (ticket 12 D25/D26), done 2026-10-09** (`app/api/v1/admin.py`, `app/services/members.py`, schemas in `app/schemas/admin.py`):
+  - Both need `can_org("add_member")`. `GET` returns members (with org role) + pending invites.
+  - `POST {email, role_id?}`: role must be strictly below the caller (D17) **and** hold only permissions the caller has (D9); else 403. Email in Trellis `users` → Clerk membership + `org_members` (`status: "added"`); else pending invite + Clerk invite (`status: "invited"`). 409 `already_member` / `already_invited`.
+  - `RoleResponse.assignable` marks roles the caller may give (invite dialog's picker). New admin tab `members`.
+  - Not yet run against Neon/Clerk.
+- [ ] `POST /admin/teams/{team_id}/members` *(after D25: existing org members only)*:
   - Already an org member → add to the team directly.
   - Otherwise → create a Trellis invitation, then the Clerk invitation, then store `clerk_invitation_id`.
   - Enforce the privilege-escalation guard.
-- [ ] `DELETE /admin/invitations/{id}`: revoke in Clerk, then mark it expired or delete it.
+- [x] `DELETE /admin/invitations/{id}`: revoke in Clerk, then mark it expired or delete it. *Done 2026-10-09 (`services/members.py::cancel_invitation`): `can_org("add_member")`; the invite's role must be below the caller (no role → anyone with `add_member`); Clerk revoke first (refusal, e.g. already accepted → 400 `clerk_rejected`, nothing changed), then the row is **deleted**. Missing, other org or already used → 404 `invitation_not_found`.*
 - [ ] `PATCH /admin/members/{user_id}` (`org_role_id`): set the org-level role; enforce the escalation and last-Admin guards; invalidate the scope.
 - [ ] `DELETE /admin/members/{user_id}`: Clerk first, then the DB, then invalidation; enforce the escalation and last-Admin guards.
 - [x] Role CRUD guards. *Done 2026-10-09: `AccessScope.org_role_id`, `manageable_role_ids` and `can_manage_role()` in `app/scope/resolver.py`; `GET`/`POST /api/v1/admin/roles` and `PATCH`/`DELETE /api/v1/admin/roles/{role_id}` (`app/api/v1/admin.py`, `app/services/roles.py`, `app/schemas/admin.py`). Frontend: `lib/api/queries/roles.ts`, `lib/api/actions/roles.ts`. Not yet exercised against Neon; tests optional.* (Rules in ticket 12 D17; logic in `services/roles.py`, router `api/v1/admin.py`): protect the `is_system` role; new or edited roles must sit below the caller; the caller can only grant permissions they hold; re-parenting calls `invalidate_org`.

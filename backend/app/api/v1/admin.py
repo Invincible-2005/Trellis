@@ -1,5 +1,5 @@
 """
-app/api/v1/admin.py — Admin console routes (Ticket 05 §2/§7, Ticket 12 D4/D17)
+app/api/v1/admin.py — Admin console routes (Ticket 05 §2/§7, Ticket 12 D4/D17/D25/D26)
 
 Every route depends on get_scope; the checks themselves live in app/services.
 """
@@ -12,13 +12,16 @@ from app.core.database import get_db
 from app.core.deps import get_scope
 from app.core.errors import error_responses
 from app.schemas.admin import (
+    AddMemberRequest,
+    AddMemberResponse,
     CreateRoleRequest,
+    MemberListResponse,
     RoleListResponse,
     RoleResponse,
     UpdateRoleRequest,
 )
 from app.scope.resolver import AccessScope
-from app.services import roles
+from app.services import members, roles
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -90,3 +93,51 @@ async def delete_role(
     member, invitation or document still uses it.
     """
     await roles.delete_role(db, scope, role_id)
+
+
+@router.get(
+    "/members",
+    response_model=MemberListResponse,
+    responses=error_responses(400, 401, 403, 409, 503),
+)
+async def list_members(
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> MemberListResponse:
+    """Everyone in the org with their org-level role, plus pending invitations (D25)."""
+    return await members.list_members(db, scope)
+
+
+@router.post(
+    "/members",
+    response_model=AddMemberResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 403, 404, 409, 503),
+)
+async def add_member(
+    body: AddMemberRequest,
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> AddMemberResponse:
+    """
+    Add someone by email with an optional org-level role below your own (D26).
+    `status` is "added" if they already use Trellis, "invited" if Clerk emailed them.
+    """
+    return await members.add_member(db, scope, body)
+
+
+@router.delete(
+    "/invitations/{invitation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(400, 401, 403, 404, 409, 503),
+)
+async def cancel_invitation(
+    invitation_id: uuid.UUID,
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Cancel a pending invite: revoked in Clerk (the email link stops working), then
+    removed. Only for invites with no role or a role below yours.
+    """
+    await members.cancel_invitation(db, scope, invitation_id)

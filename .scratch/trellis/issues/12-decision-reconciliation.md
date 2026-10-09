@@ -64,6 +64,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Follow-up — ✅ RESOLVED 2026-10-09 (Piyush): per-tab entry.** The console opens for anyone who may open at least one tab, and shows only those tabs.
   - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")`.
   - `/auth/context` returns `active_org.admin_tabs`; `can_open_admin = bool(admin_tabs)` (`app/api/v1/auth.py::_admin_tabs`).
+  - **Members tab added 2026-10-09 (D25):** `can_org("add_member")`. Tab order: roles, members, teams, documents, strikes. Its role picker uses `GET /api/v1/admin/roles` (`assignable` flag).
   - `GET /api/v1/admin/roles` keeps its `create_role or add_member` gate (only Roles/Teams use it). The Documents tab's picker uses the new `GET /api/v1/documents/tag-options` instead.
   - *Superseded text:* "A role holding only `review_strike` (an HR reviewer) or only `upload_document` can't open the console to reach its tab. **Proposal:** widen entry to \"holds any admin-tab permission org-wide\". Waiting on the team."
   - Written into: frontend-scaffold ticket 06 §0, map, `plans/documents/frontend.md`.
@@ -336,6 +337,21 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Gap:** `team_summary(db, scope)` (ticket 03 §1a) backs both the agent's `get_team_summary` tool and the dashboard's `managed_teams` (ticket 05 `TeamOverview`: member count, task counts, `active_strikes`). No ticket says which teams appear, or who may see the strike count. Under D13, a manager's **own** team is a member team, not a governed one, so "managed teams = governed teams" would hide it from them.
 - **Proposal:** the summary covers every team the user can view (`viewable_team_ids`). Task counts are always included (the user can already list those tasks). `active_strikes` is included only where the user can give or review strikes in that team (`can("give_strike", team) or can("review_strike", team)`); otherwise it is omitted.
 - **To decide:** the strike-count rule.
+
+### D25. Where do people get added to the org: a Members page or the Teams tab? (added 2026-10-09, member-management effort) — ✅ RESOLVED 2026-10-09
+- **Decision (Piyush): Members page.** `/admin/members` lists org members + pending invites and invites into the **org** with an optional org-level role (`can_org("add_member")`, role strictly below the inviter's org role, D17 yardstick). The Teams tab only puts existing org members into teams (`can("add_member", team)`). `invitations.team_id` becomes nullable (migration); an invite's `role_id` is the org role. Supersedes the team-first invite in D10-B / ticket 05 §3.
+- *Original gap text below.*
+- **Gap:** D10-B and ticket 05 §3 put "add a person" inside a team: `POST /api/v1/admin/teams/{team_id}/members {email, role_id}`, and `invitations.team_id` is `NOT NULL`. Piyush wants an org-level `/admin/members` page (list of org members + "Invite member") that the frontend spec doesn't have. No team endpoints exist yet, so a team-only invite would block adding anyone.
+- **Proposal:** `/admin/members` invites into the **org** with an optional **org-level role** (below the inviter's, D17 yardstick, `can_org("add_member")`). Putting existing org members into teams stays in the Teams tab (`can("add_member", team)`). `invitations.team_id` becomes nullable; the invite's `role_id` is then the org role.
+- **Next question after this:** what "already exists" means for the direct-add path (has a Trellis/Clerk account vs already in this org), and whether direct add skips the invitee's consent.
+
+### D26. Inviting someone who already has an account (added 2026-10-09, member-management effort) — ✅ RESOLVED 2026-10-09
+- **Gap:** Piyush wants two paths (existing user → added directly; new user → invite email). D10-B only says "already an org member → add to team, otherwise invite"; it doesn't define "already exists" for the org itself.
+- **Decision (Piyush): add directly.** `POST /api/v1/admin/members {email, role_id?}`:
+  - Email found in Trellis `users` (has signed in before) → Clerk `POST /v1/organizations/{id}/memberships` (`org:member`), then insert `org_members` with the role, then `invalidate_scope`. Response `status: "added"`. No accept step.
+  - Not found → pending `invitations` row (org role, `team_id` null), then Clerk org invitation, then store `clerk_invitation_id`. Response `status: "invited"`. Applied on the invitee's first request (D10-B).
+  - Already an org member → 409 `already_member`; pending invite for that email → 409 `already_invited`.
+  - Someone with a Clerk account who never opened Trellis falls into the invite path, which still works.
 
 ---
 

@@ -69,7 +69,7 @@ async def context(
     org_id = await lookup_org_id(db, claims.org_id) if claims.org_id else None
     if org_id is not None:
         # Same just-in-time membership as data routes, so the active org is listed below.
-        await ensure_org_member(db, user.id, org_id)
+        await ensure_org_member(db, user, org_id)
         scope = await resolve_scope(user_id=user.id, org_id=org_id, db=db)
         active_org = await _active_org_permissions(db, scope)
 
@@ -103,8 +103,9 @@ async def _pending_invitations(db: AsyncSession, email: str) -> list[InvitationR
             inviter.name.label("invited_by_name"),
         )
         .join(Organization, Organization.id == Invitation.org_id)
-        .join(Team, Team.id == Invitation.team_id)
-        .join(Role, Role.id == Invitation.role_id)
+        # Team and role are optional: invites from Admin → Members join the org only (D25)
+        .outerjoin(Team, Team.id == Invitation.team_id)
+        .outerjoin(Role, Role.id == Invitation.role_id)
         .join(inviter, inviter.id == Invitation.invited_by_user_id)
         .where(func.lower(Invitation.email) == email.lower(), Invitation.status == "pending")
         .order_by(Invitation.created_at.desc())
@@ -162,6 +163,8 @@ def _admin_tabs(scope: AccessScope) -> list[str]:
     tabs = []
     if scope.can_org("create_role"):
         tabs.append("roles")
+    if scope.can_org("add_member"):
+        tabs.append("members")
     if scope.can_org("add_member") or scope.can_org("create_team"):
         tabs.append("teams")
     if scope.can_org("upload_document") or any(

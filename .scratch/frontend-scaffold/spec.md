@@ -88,12 +88,18 @@ frontend/
 │   │       │       ├── role-flow-tree.tsx        # React Flow canvas rendering hierarchy DAG
 │   │       │       ├── role-node.tsx             # Custom React Flow node displaying role & permissions
 │   │       │       └── create-role-dialog.tsx    # Dialog to add role and configure parent_role_id
+│   │       ├── members/                          # Route: /admin/members (add_member; added 2026-10-09, trellis/12 D25)
+│   │       │   ├── page.tsx                      # Org members + pending invites
+│   │       │   └── _components/
+│   │       │       ├── members-table.tsx         # Name, email, org role, joined
+│   │       │       ├── invitations-table.tsx     # Pending invites with Cancel
+│   │       │       └── invite-member-dialog.tsx  # Email + role picker (assignable roles)
 │   │       ├── teams/                            # Route: /admin/teams
 │   │       │   ├── page.tsx                      # Team directory and membership management
 │   │       │   └── _components/
 │   │       │       ├── team-list.tsx             # Cards/table of teams
 │   │       │       ├── create-team-dialog.tsx    # Create new team
-│   │       │       └── add-member-dialog.tsx     # Invite user by email and assign team role
+│   │       │       └── add-member-dialog.tsx     # Put an existing org member into the team with a team role (D25)
 │   │       ├── documents/                        # Route: /admin/documents
 │   │       │   ├── page.tsx                      # Upload & Tag Policy/SOP documents
 │   │       │   └── _components/

@@ -31,6 +31,7 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
    - Roles use **standalone permissions** (explicit array per role, no complex runtime tree inheritance).
    - Re-parenting is supported via `PATCH /api/v1/admin/roles/{role_id}` with `{ "parent_role_id": "<uuid>" }`.
 3. **Invitation Pipeline** *(updated 2026-10-08, ticket 12 D10)*:
+   - > **Superseded in part 2026-10-09 (ticket 12 D25):** new people are invited into the **org** from `/admin/members` (`POST /api/v1/admin/members {email, role_id?}`, org-level role). The team endpoint below only adds existing org members to a team. `InvitationResponse.team_id/team_name/role_id/role_name` are now optional (null for an org-only invite).
    - `POST /api/v1/admin/teams/{team_id}/members` takes `{ email, role_id }`.
      - Requires `can_org("add_member")` to invite a new person into the org, or `can("add_member", team_id)` to add an existing org member to the team.
      - `role_id` must be **strictly below** the caller's highest role (no privilege escalation).
@@ -68,6 +69,9 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
      - `no_active_org` (400)
      - `org_not_provisioned` (409)
      - `forbidden` (403)
+     - `clerk_rejected` (400, added 2026-10-09: Clerk refused an invite or membership, e.g. an invalid email; the message is Clerk's)
+     - `already_member` (409), `already_invited` (409) (added 2026-10-09, `POST /admin/members`)
+     - `invitation_not_found` (404) (added 2026-10-09, `DELETE /admin/invitations/{id}`)
    - **As built 2026-10-08:**
      - `GET /api/v1/auth/me` and `/auth/context` are live (`app/api/v1/auth.py`, schemas in `app/schemas/auth.py`).
      - The error body is published in OpenAPI as `ErrorResponse` via `responses=`, so the generated frontend types include it.

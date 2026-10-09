@@ -32,10 +32,11 @@ class InvitationResponse(AppBaseModel):
     email: str
     org_id: UUID
     org_name: str
-    team_id: UUID
-    team_name: str
-    role_id: UUID
-    role_name: str
+    # null for an org-only invite (D25); role is then the optional org-level role
+    team_id: Optional[UUID] = None
+    team_name: Optional[str] = None
+    role_id: Optional[UUID] = None
+    role_name: Optional[str] = None
     invited_by_name: str
     status: InvitationStatusEnum
     created_at: datetime
@@ -63,7 +64,7 @@ class ActiveOrgPermissions(BaseModel):
     viewable_team_ids: List[UUID] = Field(default_factory=list)   # members + governed teams
     # Admin console tabs this user may open (D4 follow-up, 2026-10-09). The layout
     # and sidebar show exactly these; can_open_admin = at least one tab.
-    admin_tabs: List[Literal["roles", "teams", "documents", "strikes"]] = Field(default_factory=list)
+    admin_tabs: List[Literal["roles", "members", "teams", "documents", "strikes"]] = Field(default_factory=list)
     can_open_admin: bool
 
 
