@@ -68,7 +68,7 @@ Admin uploads file in UI
       1. Fetch raw file bytes from file_url
       2. Extract text (file_type-aware extractor)
       3. Chunk with RecursiveCharacterTextSplitter
-      4. Batch embed via HuggingFace Inference API
+      4. Batch embed via Gemini `batchEmbedContents` (ticket 12 D14; was HuggingFace)
       5. Bulk INSERT document_chunks (with denormalized scope fields)
       6. UPDATE documents SET status='ready', chunk_count=N
   → Frontend polls GET /api/v1/documents/{id} for status
@@ -91,7 +91,7 @@ For `.pptx`: text is extracted per-slide with slide number prepended as context:
 ### 5. Chunking Strategy
 
 - **Library:** `langchain_text_splitters.RecursiveCharacterTextSplitter`
-- **Embedding Model:** `mxbai-embed-large-v1` (1024 dims) — context window 512 tokens.
+- **Embedding Model:** ~~`mxbai-embed-large-v1` (1024 dims) — context window 512 tokens.~~ **`gemini-embedding-001` at 1024 dims (ticket 12 D14, 2026-10-09)** — 2,048-token input, so the 1000-char chunks fit easily.
 
 #### A. Standard Docs (`.pdf`, `.docx`, `.txt`, `.md`):
 - **Chunk Size:** 1000 characters
@@ -122,8 +122,8 @@ chunks = pptx_splitter.split_text(slide_text_with_header)
 
 ### 6. Embedding & Denormalized Batch Insert
 
-- **Provider:** HuggingFace Inference API (`mxbai-embed-large-v1`), no local RAM cost. Called directly with `httpx` at `settings.EMBEDDING_API_URL` (the router endpoint). The deprecated LangChain `HuggingFaceInferenceAPIEmbeddings` was dropped 2026-10-08.
-  - ⚠️ **Not actually free (found 2026-10-08):** HF Inference Providers bill against small monthly credits, and the team's token already returns `402 "You have no remaining credits"`. **Decision needed: ticket 12 D14.**
+- **Provider (2026-10-09, D14):** Gemini API via `app/services/embeddings.py` (`embed_documents` for chunks with `taskType=RETRIEVAL_DOCUMENT`, `embed_query` for questions with `RETRIEVAL_QUERY`), authenticated with `GOOGLE_API_KEY`. Retries: network/5xx after 1 s / 2 s, 429 after 20 s / 40 s. Live-verified 2026-10-09: 1024-dim vectors. *Superseded:* HuggingFace Inference API (`mxbai-embed-large-v1`), no local RAM cost. Called directly with `httpx` at `settings.EMBEDDING_API_URL` (the router endpoint). The deprecated LangChain `HuggingFaceInferenceAPIEmbeddings` was dropped 2026-10-08.
+  - ✅ Resolved by D14 (Gemini). ⚠️ **Not actually free (found 2026-10-08):** HF Inference Providers bill against small monthly credits, and the team's token already returns `402 "You have no remaining credits"`. **Decision needed: ticket 12 D14.**
 - **Batch Size:** 32 chunks per API call. Every vector is validated to be `EMBEDDING_DIM` (1024) long.
 
 ```python
@@ -144,7 +144,7 @@ for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
 ### 7. Failure Handling
 
 - If text extraction fails → `status='failed'`, the reason goes in **`documents.error_message`** (not `description`), and no chunks are inserted.
-- If HuggingFace API errors mid-batch → retry up to 3 times with exponential backoff; if all retries fail → `status='failed'`, partial chunks rolled back.
+- If the embedding API (Gemini since D14) errors mid-batch → retry up to 3 times with exponential backoff; if all retries fail → `status='failed'`, partial chunks rolled back.
 
 #### 7a. Implementation (hardened 2026-10-08, `backend/app/services/ingestion.py`)
 
@@ -159,10 +159,11 @@ The earlier drift is resolved. How it works now:
 - **Embedding:** direct `httpx` calls; retries on 429/5xx and network errors (3 attempts, 1 s/2 s backoff); vector shape and dimension are validated.
 - **Extractors:** PPTX now reads tables, grouped shapes and notes (without creating empty notes slides); PDFs are opened with a context manager.
 - **Startup sweep:** the `lifespan` in `main.py` calls `fail_stale_ingestions()`, which marks `processing` documents older than 15 minutes as failed (assumes a single instance, ticket 12 D11).
+- **Search indexes** (2026-10-09): migration `a7c2e9f4b310` adds the HNSW index (`vector_cosine_ops`) and the chunk scope indexes from ticket 02, declared in the models too.
 - **Migration** `c3f1a9d27e54` adds `documents.error_message`. ⚠️ **Run `alembic upgrade head` before ingestion runs.** The ORM selects this column.
-- **Query side (ticket 09/10):** mxbai expects queries prefixed with `"Represent this sentence for searching relevant passages: "`. Documents are embedded without a prefix.
+- **Query side (ticket 09/10):** the agent's `search_documents` calls `search_chunks(db, scope, question)` in `app/services/documents.py` (built 2026-10-09). It embeds with `embed_query()` (D14), applies the shared visibility rule, and uses pgvector iterative scan so filtered searches still return results. *Superseded:* mxbai expects queries prefixed with `"Represent this sentence for searching relevant passages: "`. Documents are embedded without a prefix.
 - **Verified offline:** URL guard, size cap, redirect and 404 handling, DOCX/PPTX/PDF/TXT extraction, chunk sizes, vector validation.
-- **Not verified live:** the embedding output dimension, because of the HF 402 (D14).
+- ~~**Not verified live:** the embedding output dimension, because of the HF 402 (D14).~~ Verified 2026-10-09 with Gemini: 1024 dims.
 
 ## 8. Open Question Deferred to Stretch
 

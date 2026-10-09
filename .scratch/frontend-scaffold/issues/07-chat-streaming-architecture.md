@@ -1,4 +1,6 @@
 # 07 — Chat Interface Streaming Architecture
+
+> **Added 2026-10-09 (system ticket 12 D20/D22):** answers stream live; the final `citations` event carries only verified sources. A new `confirm` event means the agent wants to save a task/strike/commendation: show a card with the summary and **Confirm** / **Cancel**; the click POSTs `{"resume": "confirm" | "cancel"}` to the same message route and streams the result.
 Type: grilling
 Blocked by: 01, 03
 Status: open

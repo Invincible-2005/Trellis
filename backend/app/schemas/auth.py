@@ -5,7 +5,7 @@ These are the OpenAPI contract the frontend generates its types from.
 """
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,7 +61,10 @@ class ActiveOrgPermissions(BaseModel):
     permissions_by_team: dict[UUID, List[str]] = Field(default_factory=dict)
     member_team_ids: List[UUID] = Field(default_factory=list)
     viewable_team_ids: List[UUID] = Field(default_factory=list)   # members + governed teams
-    can_open_admin: bool        # can_org("create_role") or can_org("add_member")
+    # Admin console tabs this user may open (D4 follow-up, 2026-10-09). The layout
+    # and sidebar show exactly these; can_open_admin = at least one tab.
+    admin_tabs: List[Literal["roles", "teams", "documents", "strikes"]] = Field(default_factory=list)
+    can_open_admin: bool
 
 
 class AuthContextResponse(AppBaseModel):

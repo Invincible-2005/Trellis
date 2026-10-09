@@ -1,7 +1,9 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
+// /api/uploadthing: UploadThing's servers call it back after an upload (signed with
+// UPLOADTHING_TOKEN, no Clerk session). User uploads are gated in app/api/uploadthing/core.ts.
+const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/api/uploadthing(.*)']);
 const isOrgSelectionRoute = createRouteMatcher(['/org-selection(.*)']);
 const isApiRoute = createRouteMatcher(['/api(.*)']);
 

@@ -13,6 +13,26 @@ What is the exact LangGraph `StateGraph` code skeleton — node functions, condi
 
 ## Answer
 
+> ⚠️ **Updated 2026-10-09 (ticket 12 D19, lean graph).** Parts of the topology below are superseded:
+> - Router is **2-way `read` | `write`**; the `conversational` route is removed (the read agent may answer without tools).
+> - Relevancy grader + rewrite loop run **only after `search_documents`**, not after `get_tasks` / `get_team_summary`.
+> - The read agent's final message is the answer; no separate Synthesis LLM call.
+> - Groundedness is a **code check** (cited chunk IDs ⊆ this turn's `retrieved_chunk_ids`), not an LLM grader.
+> - Per-turn state fields are reset on every invocation; the LLM sees a trimmed history (last ~10 turns).
+> - **D20:** the answer streams live; the citation check runs after it and only verified citations are sent. The **Post-Graph Output Guardrail is removed** (scope is enforced at the tools, so the stream can't leak out-of-scope data).
+> - **D21:** the Pre-Graph Input Gate no longer uses Guardrails AI and never checks PII. It is a small phrase-list injection check that only flags (`injection_suspected` in the audit log), plus a ~4,000-character limit (`400 message_too_long`).
+> - **D22:** "HITL Pattern A (conversational confirmation)" is replaced. All three write tools store a `pending_action`, the graph pauses with `interrupt()`, SSE sends `confirm`, and the user's Confirm/Cancel click resumes it (`{"resume": ...}` on the same message endpoint). Permissions are re-checked on confirm.
+> - **D7:** models are Gemini Flash (`CHAT_MODEL`) and Flash-Lite (`ROUTER_MODEL`) via `init_chat_model`. `give_strike` / `give_commendation` also take `team_id`.
+> The original text is kept below for history.
+
+> **Built 2026-10-09 (agent slices 1–2, read path):** `app/services/tasks.py` (`list_tasks`, `team_summary`, D24) next to `app/services/documents.py::search_chunks`; `app/agent/tools.py`, `prompts.py`, `graph.py`; optional `scripts/try_agent.py`. Implementation choices (no decision needed):
+> - Tools get the scope with `get_runtime(AgentContext)`, not an injected `ToolRuntime` argument (that makes LangChain run `AccessScope` through Pydantic and log warnings). Either way it is outside the LLM's tool schema.
+> - Citations are 8-hex tags of the chunk id, e.g. `[3f9a12bc]`; `check_citations` maps tags back to this turn's `retrieved_chunks`.
+> - `search_documents` returns its chunks as the ToolMessage `artifact`; a `collect` node copies them into state and counts tool calls.
+> - The grader runs on Flash-Lite and is skipped (= not relevant) when the search returned nothing. `rewrite` re-runs the search itself and **replaces** the last search ToolMessage (same id), so no synthetic tool calls enter the history.
+> - Write intent goes to a placeholder reply until slice 4 (write tools + `interrupt()`, D22).
+> - Verified: offline graph paths (found after rewrite, not found after 2 rewrites, 8-call budget, invented citation dropped, per-turn reset) and live Gemini (greeting, write routing). Not yet run against the database (Neon was unreachable from the dev machine).
+
 ### 1. High-Level Graph Topology & Node Contracts
 
 The graph operates as an intentional hybrid: a **ReAct execution engine bounded by deterministic guardrail routing**.

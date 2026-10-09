@@ -2,7 +2,6 @@ langchain-classic
 langchain-community
 langchain-core
 langchain-google-genai
-ollama
 langchain-text-splitters
 langgraph
 langgraph-checkpoint-sqlite
@@ -14,10 +13,8 @@ python-dotenv
 fastapi
 uvicorn[standard]
 python-multipart
-tavily-python
 ipykernel
 langchain
-deepeval
 sqlalchemy[asyncio]>=2.0.0
 asyncpg
 psycopg2-binary

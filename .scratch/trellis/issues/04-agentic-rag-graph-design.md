@@ -99,24 +99,32 @@ FastAPI POST /api/v1/chat/sessions/{session_id}/message  (SSE)
 > runtime context (`AgentContext`, see ticket 03 §6). `AgentState` is checkpointed to SQLite, so it holds
 > only conversation + loop bookkeeping — never authorization data. Shape below matches `backend/app/agent/state.py`.
 
+> **Updated 2026-10-09 (ticket 12 D19–D22):** shape now matches the rewritten `backend/app/agent/state.py`.
+
 ```python
-from typing import Annotated, Optional
-from typing_extensions import TypedDict
-from langgraph.graph.message import add_messages
+class RetrievedChunk(TypedDict):                   # one search_documents hit
+    chunk_id: str; document_id: str; title: str; chunk_index: int; text: str
+
+class PendingAction(TypedDict):                    # write waiting for Confirm (D22)
+    tool: Literal["create_task", "give_strike", "give_commendation"]
+    args: dict[str, Any]; summary: str; policy: Optional[dict]
 
 class AgentState(TypedDict):                       # checkpointed per thread
-    messages: Annotated[list, add_messages]        # full conversation + tool messages
-    intent: Optional[str]                          # "conversational" | "retrieve" | "write" (ticket 10 router)
-    retrieved_chunks: list[str]                    # chunk text for grader / synthesis
-    retrieved_chunk_ids: list[str]                 # groundedness + audit
+    messages: Annotated[list, add_messages]        # only field that carries over between turns
+    intent: Optional[Literal["read", "write"]]     # 2-way router (D19)
+    retrieved_chunks: list[RetrievedChunk]         # search_documents only
+    verified_citation_ids: list[str]               # code citation check (D20)
+    dropped_citation_count: int
+    pending_action: Optional[PendingAction]        # D22
     rewrite_count: int                             # caps query rewrites at 2
     step_count: int                                # caps total tool calls at 8
-    groundedness_passed: Optional[bool]
 
 @dataclass(frozen=True)
 class AgentContext:                                # per request, NEVER checkpointed
     scope: AccessScope
     audit_id: UUID
+
+def new_turn_input(message: str) -> dict: ...      # appends the message, resets every per-turn field
 ```
 
 ---
@@ -152,6 +160,7 @@ installed LangGraph 1.2.11 at implementation time.
 | `token` | `{"content": "..."}` | Incremental answer tokens |
 | `citations` | `[{"doc_id": "...", "title": "...", "chunk_index": 1}]` | Feeds `citation-badge.tsx` |
 | `error` | `{"message": "..."}` | Graceful error display |
+| `confirm` | `{"action": "give_strike", "summary": "...", "policy": {...}}` | Write action waiting for the user's Confirm/Cancel click (added 2026-10-09, ticket 12 D22) |
 | `done` | `{"audit_id": "..."}` | Stream end + audit trace ID |
 
 Schema is extensible — additional `status` step values can be added without breaking the frontend contract.

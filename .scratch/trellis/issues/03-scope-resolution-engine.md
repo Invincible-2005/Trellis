@@ -76,7 +76,7 @@ class AccessScope:
 |---|---|---|
 | `create_role`, `create_team`, `view_aggregate`, `review_strike` | `can_org` | org-wide only |
 | `add_member` | `can_org` to invite someone **into the org**; `can(p, team)` to add an existing org member **to a team** | both |
-| `upload_document` | `can_org` for `org`- or `role`-scoped documents; `can(p, team)` for `team`-scoped documents | both |
+| `upload_document` | `can_org` for `org`- or `role`-scoped documents; `can(p, team)` for `team`-scoped documents. **Tag target (D23, 2026-10-09):** role docs only to the caller's org role or below; team docs only to teams the caller can view | both |
 | `assign_task`, `give_strike` | `can(p, team)` | team |
 
 **No privilege escalation (ticket 12 D9):** creating, editing, assigning or removing roles and members
