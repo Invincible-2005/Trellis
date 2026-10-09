@@ -1,12 +1,17 @@
-﻿"""
+"""
 app/core/deps.py — FastAPI Dependencies (Ticket 03)
 
 Dependency chain injected into every protected route:
 
     Request
-      └── get_current_user()   → (User, ClerkClaims)   [always runs]
-            └── get_scope()    → AccessScope            [skipped if no org_id]
-                  └── route()  → uses scope for data filtering + permission checks
+      └── get_current_user()        → (User, ClerkClaims)   verify JWT, JIT user row
+            └── get_org_context()   → OrgContext            400 no org / 409 not provisioned,
+                  │                                          JIT org membership
+                  └── get_scope()   → AccessScope           cached resolve_scope()
+                        └── route() → data filtering + permission checks
+
+Identity-only routes (/auth/me, /auth/context, /orgs/provision) stop at
+get_current_user so they work before an org is selected or set up.
 
 Usage in any router:
 
@@ -16,7 +21,7 @@ Usage in any router:
     @router.get("/example")
     async def example(scope: AccessScope = Depends(get_scope)):
         if not scope.can("give_strike", team_id):
-            raise HTTPException(403)
+            raise api_error(403, "forbidden", "You can't give strikes in this team.")
         ...
 
     # For routes that only need the user row (e.g. /auth/me):
@@ -30,10 +35,12 @@ Usage in any router:
 import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from typing import Optional
 
 import httpx
-from fastapi import Depends, HTTPException, status
+from cachetools import TTLCache
+from fastapi import Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -44,9 +51,9 @@ from app.core.auth import ClerkClaims, verify_clerk_jwt
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.errors import api_error
-from app.models.organization import Organization
+from app.models.organization import Organization, OrgMember
 from app.models.user import User
-from app.scope.resolver import AccessScope, resolve_scope
+from app.scope.resolver import AccessScope, invalidate_scope, resolve_scope
 
 logger = logging.getLogger(__name__)
 
@@ -175,66 +182,101 @@ async def _fetch_clerk_profile(clerk_user_id: str) -> dict:
     return resp.json()
 
 
-# ── Step 2: resolve AccessScope ───────────────────────────────────────────────
+# ── Step 2: org context (which org, and are you in it?) ──────────────────────
+
+@dataclass(frozen=True)
+class OrgContext:
+    """The verified user plus the Trellis org their token's active org maps to."""
+    user: User
+    claims: ClerkClaims
+    org_id: uuid.UUID
+
+
+# clerk_org_id → organizations.id. Only found orgs are cached: provisioning can
+# make an unknown org appear at any moment, and orgs are never deleted in the MVP.
+_org_id_cache: TTLCache = TTLCache(maxsize=1000, ttl=300)
+
+# (user_id, org_id) pairs whose org_members row is known to exist, so the
+# just-in-time insert runs once per user per org per 5 minutes, not every request.
+_known_members: TTLCache = TTLCache(maxsize=10_000, ttl=300)
+
+
+async def lookup_org_id(db: AsyncSession, clerk_org_id: str) -> Optional[uuid.UUID]:
+    """Map a Clerk org ID to the Trellis org ID, or None if it isn't provisioned yet."""
+    org_id = _org_id_cache.get(clerk_org_id)
+    if org_id is None:
+        org_id = await db.scalar(
+            select(Organization.id).where(Organization.clerk_org_id == clerk_org_id)
+        )
+        if org_id is not None:
+            _org_id_cache[clerk_org_id] = org_id
+    return org_id
+
+
+async def ensure_org_member(db: AsyncSession, user_id: uuid.UUID, org_id: uuid.UUID) -> None:
+    """
+    Just-in-time org membership (D8/D10). Safe because the verified token proves
+    the user is a member of this org in Clerk, and Trellis only adds people to
+    Clerk orgs itself (or they created the org).
+    """
+    key = (user_id, org_id)
+    if key in _known_members:
+        return
+
+    result = await db.execute(
+        pg_insert(OrgMember)
+        .values(id=uuid.uuid4(), org_id=org_id, user_id=user_id)
+        .on_conflict_do_nothing(index_elements=[OrgMember.org_id, OrgMember.user_id])
+    )
+    await db.commit()
+    if result.rowcount:
+        logger.info("User %s joined org %s (just-in-time membership)", user_id, org_id)
+        # TODO(invitations): apply this user's pending invitations for the org here
+        # (they become team_members rows), before the scope below is computed.
+        invalidate_scope(user_id, org_id)
+    _known_members[key] = True
+
+
+async def get_org_context(
+    ctx: tuple[User, ClerkClaims] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> OrgContext:
+    """
+    Resolve the token's active org to a Trellis org the user belongs to.
+
+    Raises:
+        400 no_active_org        — no org selected in Clerk (frontend → /org-selection)
+        409 org_not_provisioned  — org exists in Clerk, not set up in Trellis yet
+                                   (frontend → /onboarding)
+    """
+    user, claims = ctx
+    if not claims.org_id:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            "no_active_org",
+            "Select or create an organization first.",
+        )
+
+    org_id = await lookup_org_id(db, claims.org_id)
+    if org_id is None:
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "org_not_provisioned",
+            "This workspace hasn't been set up yet.",
+        )
+
+    await ensure_org_member(db, user.id, org_id)
+    return OrgContext(user=user, claims=claims, org_id=org_id)
+
+
+# ── Step 3: resolve AccessScope ───────────────────────────────────────────────
 
 async def get_scope(
-    ctx: tuple[User, ClerkClaims] = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ) -> AccessScope:
     """
-    Resolve and return the user's full AccessScope.
-
-    If the JWT contains no org_id (user is not part of any org yet), returns
-    an empty AccessScope. The route or frontend must handle this gracefully
-    — typically by redirecting to the org creation or org selection page.
-
-    This is the main dependency for all data routes:
+    The user's AccessScope in their active org. Main dependency for all data routes:
         scope: AccessScope = Depends(get_scope)
     """
-    user, claims = ctx
-
-    # No org in JWT — user is authenticated but not yet provisioned in any org
-    if not claims.org_id:
-        return AccessScope(
-            user_id=user.id,
-            org_id=uuid.UUID(int=0),  # sentinel — routes must check scope.is_empty
-        )
-
-    # Look up internal org UUID from the Clerk org_id string in the JWT
-    org_result = await db.execute(
-        select(Organization).where(Organization.clerk_org_id == claims.org_id)
-    )
-    org = org_result.scalar_one_or_none()
-
-    if org is None:
-        # Org exists in Clerk but hasn't been mirrored to our DB yet.
-        # This can happen for brand-new orgs before the first admin action.
-        return AccessScope(
-            user_id=user.id,
-            org_id=uuid.UUID(int=0),  # sentinel — is_empty will be True
-        )
-
-    return await resolve_scope(user_id=user.id, org_id=org.id, db=db)
-
-
-# ── Optional: convenience guard for org-required routes ──────────────────────
-
-async def require_org_scope(
-    scope: AccessScope = Depends(get_scope),
-) -> AccessScope:
-    """
-    Stricter dependency for routes that must have an org context.
-    Raises 403 if the user is not yet part of any org.
-
-    Usage:
-        @router.get("/dashboard")
-        async def dashboard(scope: AccessScope = Depends(require_org_scope)):
-            ...
-    """
-    if scope.is_empty:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of any organization. "
-                   "Create one or ask an admin to add you.",
-        )
-    return scope
+    return await resolve_scope(user_id=ctx.user.id, org_id=ctx.org_id, db=db)

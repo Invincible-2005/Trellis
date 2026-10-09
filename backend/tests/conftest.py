@@ -38,6 +38,17 @@ def _jwk(private_key, kid: str) -> dict:
 
 
 @pytest.fixture(autouse=True)
+def clear_caches():
+    """Scope, org-ID and membership caches are module-level; isolate every test."""
+    from app.core import deps
+    from app.scope import resolver
+
+    for cache in (resolver._scope_cache, deps._org_id_cache, deps._known_members):
+        cache.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def clerk_settings(monkeypatch):
     monkeypatch.setattr(settings, "CLERK_ISSUER", ISSUER)
     monkeypatch.setattr(settings, "CLERK_AUTHORIZED_PARTIES", [ORIGIN])

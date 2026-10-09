@@ -1,23 +1,24 @@
+// The single typed client for calling FastAPI from the Next.js server (BFF).
+// Types come from ./v1.d.ts — regenerate with `pnpm api:generate` after the backend
+// re-exports backend/openapi.json.
 import 'server-only';
 import createClient, { type Middleware } from 'openapi-fetch';
 import { auth } from '@clerk/nextjs/server';
 import type { paths } from './v1';
 
-const authMiddleware: Middleware = {
+// Adds the signed-in user's Clerk session token to every request, per request.
+// ONLY the token: the user and active org are inside it, and FastAPI ignores
+// X-User-* / X-Org-* headers. Never set auth on client defaults (shared across requests).
+const clerkToken: Middleware = {
   async onRequest({ request }) {
     if (request.headers.has('Authorization')) return request;
-
     try {
       const { getToken } = await auth();
       const token = await getToken();
-      if (token) {
-        // Invariant D8: Only Bearer token. No X-Org-Id or X-User-Id headers.
-        request.headers.set('Authorization', `Bearer ${token}`);
-      }
+      if (token) request.headers.set('Authorization', `Bearer ${token}`);
     } catch {
-      // No active request context (e.g. build-time or static routes)
+      // No request context (e.g. build-time rendering): call goes out unauthenticated → 401.
     }
-
     return request;
   },
 };
@@ -26,9 +27,4 @@ export const api = createClient<paths>({
   baseUrl: process.env.FASTAPI_INTERNAL_URL ?? 'http://127.0.0.1:8000',
 });
 
-api.use(authMiddleware);
-
-// Optional unauthenticated client for public endpoints
-export const publicApi = createClient<paths>({
-  baseUrl: process.env.FASTAPI_INTERNAL_URL ?? 'http://127.0.0.1:8000',
-});
+api.use(clerkToken);

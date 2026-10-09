@@ -175,3 +175,24 @@ frontend/lib/api/
 - **Next.js 15+ fetch defaults to `no-store`** — correct for authed BFF calls. For cacheable lookups, pass `next: { revalidate: 3600 }` per-call.
 - **`await connection()`** — use in Server Components that call public FastAPI endpoints to opt out of Partial Prerendering and ensure fresh data.
 
+
+---
+
+## As built 2026-10-08 (Piyush): use this, don't rebuild it
+
+**Files in `frontend/lib/api/`**
+- `client.ts`: the `api` singleton with the Clerk token middleware, as in §2. `publicApi` was dropped because the MVP has no webhooks.
+- `errors.ts`: `unwrap(api.GET(...))` returns the data or:
+  - **redirects** on `invalid_token` → `/sign-in`, `no_active_org` → `/org-selection`, `org_not_provisioned` → `/onboarding`;
+  - **throws `ApiError`** (`status`, `code`, `message`) for every other error. Show `err.message` in a sonner toast.
+  - If the backend is unreachable, it throws `ApiError` with code `backend_unavailable`.
+- `queries/auth.ts`: `getMe()` and `getAuthContext()`, both `cache()`-wrapped. `getAuthContext().active_org` drives navigation and the admin-console gate.
+- `v1.d.ts`: generated. Never edit it by hand.
+
+**How to update the types**
+- The backend owner runs `uv run python scripts/export_openapi.py` in `backend/` and commits `backend/openapi.json`.
+- After pulling, run `pnpm api:generate` (reads that file) and commit `lib/api/v1.d.ts`.
+- `pnpm api:generate:live` reads a running backend at `127.0.0.1:8000` instead.
+
+**Backend URL**
+- `FASTAPI_INTERNAL_URL` in `frontend/.env`. It defaults to `http://127.0.0.1:8000` when unset.
