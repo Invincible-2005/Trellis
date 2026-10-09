@@ -76,6 +76,7 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
    - **Role endpoints** (`POST /admin/roles`, `PATCH /admin/roles/{id}`, `DELETE /admin/roles/{id}`) enforce:
      - **No privilege escalation:** the new or edited role must sit below the caller's role, and the caller may only grant permissions they hold.
      - **The system role is protected:** `is_system` can't be deleted, re-parented, or lose permissions.
+     - **Yardstick (ticket 12 D17, 2026-10-09):** "the caller's role" means their **org-level role only**; the caller needs `can_org("create_role")`. A new role's parent must be that role or a descendant (no parent-less roles). Delete is refused while the role is held or has children.
 
 ---
 

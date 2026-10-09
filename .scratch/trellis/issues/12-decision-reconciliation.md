@@ -224,6 +224,19 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - `org_not_provisioned` (409)
   - `forbidden` (403)
 
+### D17. Role creation: who counts as "the caller's role"? (added 2026-10-09) — ✅ RESOLVED 2026-10-09
+- **Gap:** Ticket 05 says a new or edited role "must sit below the caller's role" and the caller "may only grant permissions they hold", but a user can hold an org-level role plus a different role in each team. Which one is the yardstick?
+- **Decision (Piyush):** the caller's **org-level role only**. Role endpoints require `can_org("create_role")`, which already looks only at the org-level role, so the yardstick matches the gate. Team roles never count.
+- **Rules for `POST/PATCH/DELETE /api/v1/admin/roles`:**
+  1. Caller needs `can_org("create_role")`.
+  2. The new/edited role's parent must be the caller's org role or one of its descendants (strictly below the caller). No parent-less roles; only the seeded `Admin` is a root.
+  3. Permissions granted must be a subset of `scope.org_permissions` and from the 8 known actions.
+  4. Name unique within the org (409).
+  5. Edit/re-parent: the role itself must already be strictly below the caller, the new parent too, and no loop (not under its own descendant). Permission or parent changes call `invalidate_org`. Create needs no invalidation (no holders yet).
+  6. `is_system` roles can't be edited, moved or deleted.
+  7. Delete is refused (409) if anyone holds the role or it has child roles.
+- **Where the code goes:** router `api/v1/admin.py`, schemas `schemas/admin.py`, checks and logic in `services/roles.py` (replaces the "suggested `guards.py`" in ticket 13 step 3, per `backend/CLAUDE.md`).
+
 ---
 
 ## Already fixed in docs during the audit (no decision needed)

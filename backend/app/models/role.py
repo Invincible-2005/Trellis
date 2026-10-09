@@ -12,6 +12,19 @@ if TYPE_CHECKING:
 # ROLE HIERARCHY
 # ─────────────────────────────────────────────
 
+# Every permission a role can hold. The seeded root Admin holds all of them (D9).
+ROLE_PERMISSIONS: tuple[str, ...] = (
+    "create_role",
+    "create_team",
+    "add_member",
+    "upload_document",
+    "assign_task",
+    "give_strike",
+    "view_aggregate",
+    "review_strike",
+)
+
+
 class Role(Base):
     """
     Global org role. Tree via parent_role_id (recursive CTE for traversal).
@@ -26,9 +39,7 @@ class Role(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     parent_role_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("roles.id"), nullable=True)
-    # Permissions stored as array of strings (use Enum in strict implementations)
-    # Values: 'create_role','create_team','add_member','upload_document',
-    #         'assign_task','give_strike','view_aggregate','review_strike'
+    # Permissions stored as array of strings; values are listed in ROLE_PERMISSIONS below
     permissions: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
     # The seeded root Admin (D9): can't be deleted, re-parented, or lose permissions
     is_system: Mapped[bool] = mapped_column(
