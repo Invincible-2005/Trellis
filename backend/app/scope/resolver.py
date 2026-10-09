@@ -62,6 +62,11 @@ class AccessScope:
         staffed team; a manager does not govern a peer manager's team.
     org_permissions:
         Permissions of the org-level role (D9). Apply in every team.
+    org_role_id:
+        The org-level role (D9), or None if the user has none.
+    manageable_role_ids:
+        Every role strictly below the org-level role (D17). Team roles never
+        count here. The caller may edit, delete or assign only these roles.
     permissions_by_team:
         team_id → permissions of the user's role in that team.
         Permission strings: create_role | create_team | add_member |
@@ -73,6 +78,8 @@ class AccessScope:
     member_team_ids: frozenset[uuid.UUID] = frozenset()
     governed_team_ids: frozenset[uuid.UUID] = frozenset()
     org_permissions: frozenset[str] = frozenset()
+    org_role_id: Optional[uuid.UUID] = None
+    manageable_role_ids: frozenset[uuid.UUID] = frozenset()
     permissions_by_team: Mapping[uuid.UUID, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -98,6 +105,10 @@ class AccessScope:
     def can_org(self, permission: str) -> bool:
         """Org-wide action (admin console, create_role, invite into org): org-level role only."""
         return permission in self.org_permissions
+
+    def can_manage_role(self, role_id: uuid.UUID) -> bool:
+        """Is this role strictly below the user's org-level role (D17)?"""
+        return role_id in self.manageable_role_ids
 
 
 # ── Pure scope computation ────────────────────────────────────────────────────
@@ -143,9 +154,14 @@ def build_scope(
     my_team_roles = list(my_team_roles)
     seeds = {role_id for _, role_id, _ in my_team_roles}
     org_permissions: frozenset[str] = frozenset()
+    org_role_id: Optional[uuid.UUID] = None
+    manageable: frozenset[uuid.UUID] = frozenset()
     if org_role is not None:
-        seeds.add(org_role[0])
+        org_role_id = org_role[0]
+        seeds.add(org_role_id)
         org_permissions = frozenset(org_role[1] or ())
+        # D17: only the org-level role is the yardstick for managing roles.
+        manageable = _strictly_below([org_role_id], parent_of)
 
     below = _strictly_below(seeds, parent_of)
 
@@ -165,6 +181,8 @@ def build_scope(
         member_team_ids=frozenset(permissions_by_team),
         governed_team_ids=governed,
         org_permissions=org_permissions,
+        org_role_id=org_role_id,
+        manageable_role_ids=manageable,
         permissions_by_team=MappingProxyType(permissions_by_team),
     )
 
