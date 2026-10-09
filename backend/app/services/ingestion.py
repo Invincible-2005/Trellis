@@ -24,11 +24,9 @@ Chunking decisions  (Ticket 11):
     Standard docs  (.pdf, .docx, .txt, .md) : 1000 chars / 200 overlap
     Presentations  (.pptx)                   : 500 chars  / 100 overlap
 
-Embedding model  (Ticket 02 / Ticket 11):
-    mixedbread-ai/mxbai-embed-large-v1  →  1024-dim vectors
-    Called via HuggingFace Inference API  (no local GPU required)
-    Documents are embedded WITHOUT a prefix. Queries (search_documents) must be
-    prefixed with "Represent this sentence for searching relevant passages: ".
+Embedding  (Ticket 12 D14):
+    gemini-embedding-001 → 1024-dim vectors, via app/services/embeddings.py
+    (embed_documents here; search_documents uses embed_query from the same module).
 """
 
 import io
@@ -46,6 +44,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.core.config import settings
 from app.core.database import async_session
 from app.models.document import Document, DocumentChunk
+from app.services.embeddings import EmbeddingError, embed_documents
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +66,6 @@ _PPTX_SPLITTER = RecursiveCharacterTextSplitter(
     chunk_overlap=100,
     separators=["\n\n", "\n", " • ", ". ", " ", ""],
 )
-
-_EMBED_BATCH_SIZE = 32
-_EMBED_MAX_ATTEMPTS = 3
-_RETRYABLE_STATUS = {429, 500, 502, 503, 504}  # HF returns 503 while a model loads
 
 
 # ─── Step 1: Fetch raw bytes from UploadThing CDN ─────────────────────────────
@@ -217,59 +212,7 @@ def _chunk_text(text: str, file_type: str) -> list[str]:
     return [c for c in chunks if c.strip()]
 
 
-# ─── Step 4: Embed chunks via HuggingFace Inference API ──────────────────────
-
-def _validate_embeddings(vectors: object, expected_count: int) -> list[list[float]]:
-    """Guards against wrong shapes (e.g. token-level output) before they reach pgvector."""
-    if not isinstance(vectors, list) or len(vectors) != expected_count:
-        raise IngestionError("Embedding service returned an unexpected response.")
-    for vector in vectors:
-        if (
-            not isinstance(vector, list)
-            or len(vector) != settings.EMBEDDING_DIM
-            or not all(isinstance(x, (int, float)) for x in vector)
-        ):
-            raise IngestionError(
-                f"Embedding service returned vectors that are not {settings.EMBEDDING_DIM}-dimensional."
-            )
-    return vectors
-
-
-async def _embed_batch(client: httpx.AsyncClient, url: str, batch: list[str]) -> list[list[float]]:
-    """One batch, retried with exponential backoff (1 s, 2 s) on 429/5xx and network errors."""
-    for attempt in range(1, _EMBED_MAX_ATTEMPTS + 1):
-        try:
-            response = await client.post(url, json={"inputs": batch})
-        except httpx.TransportError as exc:
-            if attempt == _EMBED_MAX_ATTEMPTS:
-                raise IngestionError("Embedding service is unreachable.") from exc
-        else:
-            if response.status_code == 200:
-                return _validate_embeddings(response.json(), len(batch))
-            if response.status_code not in _RETRYABLE_STATUS or attempt == _EMBED_MAX_ATTEMPTS:
-                raise IngestionError(f"Embedding service failed (HTTP {response.status_code}).")
-        delay = 2 ** (attempt - 1)
-        logger.warning("[ingestion] Embedding batch attempt %d failed — retrying in %ds", attempt, delay)
-        await asyncio.sleep(delay)
-    raise AssertionError("unreachable")
-
-
-async def _embed_chunks(chunks: list[str]) -> list[list[float]]:
-    """
-    Embeds chunks in batches of 32 via the HuggingFace Inference API.
-
-    Model: mixedbread-ai/mxbai-embed-large-v1  →  1024 dimensions
-    """
-    url = settings.EMBEDDING_API_URL.format(model=settings.EMBEDDING_MODEL)
-    headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_TOKEN}"}
-    all_embeddings: list[list[float]] = []
-
-    async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
-        for i in range(0, len(chunks), _EMBED_BATCH_SIZE):
-            batch = chunks[i : i + _EMBED_BATCH_SIZE]
-            all_embeddings.extend(await _embed_batch(client, url, batch))
-
-    return all_embeddings
+# ─── Step 4: Embed — see app/services/embeddings.py (embed_documents) ─────────
 
 
 # ─── Step 5: Replace DocumentChunk rows (no commit — caller owns the transaction)
@@ -378,7 +321,10 @@ async def run_ingestion(document_id: uuid.UUID) -> None:
             logger.info("[ingestion] %d chunks produced for %s", len(chunks), document_id)
 
             # Step 4 — Embed
-            embeddings = await _embed_chunks(chunks)
+            try:
+                embeddings = await embed_documents(chunks)
+            except EmbeddingError as exc:
+                raise IngestionError(str(exc)) from exc
 
             # Step 5 — Insert + finalise in ONE transaction
             await _replace_chunks(db, document, chunks, embeddings)

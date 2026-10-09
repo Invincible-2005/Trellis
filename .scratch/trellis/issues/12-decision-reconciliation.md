@@ -61,7 +61,12 @@ A cross-check of both Wayfinder maps against each other and against the code in 
     - Strikes: `review_strike`
   - **Frontend:** `proxy.ts` checks only signed-in and active org. `(dashboard)/admin/layout.tsx` fetches effective permissions (`GET /api/v1/auth/context`) and redirects to `/dashboard` if the user isn't allowed. Navigation and tabs are shown or hidden from the same data.
   - **Backend:** every admin endpoint enforces its own permission. The frontend gate only affects what users see.
-- **Follow-up (open):** A role holding only `review_strike` (an HR reviewer) or only `upload_document` can't open the console to reach its tab. **Proposal:** widen entry to "holds any admin-tab permission org-wide". Waiting on the team.
+- **Follow-up — ✅ RESOLVED 2026-10-09 (Piyush): per-tab entry.** The console opens for anyone who may open at least one tab, and shows only those tabs.
+  - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")`.
+  - `/auth/context` returns `active_org.admin_tabs`; `can_open_admin = bool(admin_tabs)` (`app/api/v1/auth.py::_admin_tabs`).
+  - `GET /api/v1/admin/roles` keeps its `create_role or add_member` gate (only Roles/Teams use it). The Documents tab's picker uses the new `GET /api/v1/documents/tag-options` instead.
+  - *Superseded text:* "A role holding only `review_strike` (an HR reviewer) or only `upload_document` can't open the console to reach its tab. **Proposal:** widen entry to \"holds any admin-tab permission org-wide\". Waiting on the team."
+  - Written into: frontend-scaffold ticket 06 §0, map, `plans/documents/frontend.md`.
 - **Written into:** ticket 03 §1, ticket 05, frontend tickets 02 and 06, `spec.md`.
 
 ### D5. Commendation data model
@@ -72,7 +77,15 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Gap:** The PRD §8 lists `reviewed_by_user_id` and `appeal_notes` on strikes, and frontend `/admin/strikes` is designed for appeal review. The `Strike` model has neither field, and the map lists the appeal flow as undecided.
 - **Also check:** With HITL Pattern A (ticket 10), the agent validates the strike before the DB commit. Is the `pending_agent_review` status still needed?
 
-### D7. Chat LLM provider
+### D7. Chat LLM provider — ✅ RESOLVED 2026-10-09
+- **Decision (Piyush): Gemini Flash on Google's free tier** via the already-installed `langchain-google-genai`.
+  - Two settings: `CHAT_MODEL` (read + write agents) and `ROUTER_MODEL` (Flash-Lite, higher free limits). Key in `GOOGLE_API_KEY`. Models are created with LangChain `init_chat_model`, so switching provider later is a settings change.
+  - **Checked by Piyush in AI Studio (2026-10-09): Flash-Lite free tier ≈ 15 RPM, 250k TPM, 500–1,000 RPD.** Enough for development (the router makes one call per message).
+  - Free-tier limits are unclear and have been cut before (third-party guides: ~10–15 RPM, ~20–1,500 requests/day). Check the real quota in AI Studio; if the daily cap is too tight, top up for demo day or switch provider via settings.
+  - The lean graph (D19) keeps a message to 2–4 calls, which is what makes the free tier realistic.
+  - Query-time embedding still follows D14 (must match ingestion).
+  - **Unused packages:** `tavily-python` and `deepeval` removed 2026-10-09 (`uv remove` + `requirements.txt`). `ollama` kept pending D14.
+- *Original gap text below.*
 - **Gap:** No ticket picks the chat or router model. `requirements.txt` includes `langchain-google-genai`, `ollama`, `tavily-python` and `deepeval`, and none of them are justified in any ticket. Guardrails AI (ticket 10) is not installed.
 - **To decide:**
   - The provider and model for the Router (fast, structured output).
@@ -183,7 +196,17 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Role-scoped docs are unaffected: they stay visible to the role and its ancestors.
   - **Written into:** ticket 03 (fields and §gaps), ticket 13 step 3, and the map.
 
-### D14. Embedding provider and cost (added 2026-10-08, found during the ingestion smoke test)
+### D14. Embedding provider and cost (added 2026-10-08, found during the ingestion smoke test) — ✅ RESOLVED 2026-10-09
+- **Decision (Piyush): Gemini embeddings, `gemini-embedding-001`, `outputDimensionality = 1024`.**
+  - Same Google key and free account as the chat LLM (D7). Free tier reported at ~100 RPM / ~1,000 RPD (Google forum figures; confirm in AI Studio). One `batchEmbedContents` request embeds a whole batch of chunks.
+  - **No migration:** `document_chunks.embedding` stays `Vector(1024)`. **No re-embedding:** nothing was ever embedded (the HF call returned 402 and the documents endpoint isn't built).
+  - Google's `taskType` replaces mxbai's query prefix: chunks use `RETRIEVAL_DOCUMENT`, questions (`search_documents`) use `RETRIEVAL_QUERY`. The query side must use the same model and dimension.
+  - Cosine distance (`<=>`) is unaffected by Gemini's non-normalized 1024-dim output.
+  - Free-tier note: Google may use free-tier inputs to improve its products. Fine for demo documents.
+  - Why not the others: HF credits and Mixedbread cost money; local mxbai via Ollama needs Ollama on every laptop and ~1.3 GB extra RAM on the server. (`mxbai` the model is free; HF's hosted inference is what stopped being free.)
+  - **Built 2026-10-09:** `app/services/embeddings.py` (`embed_documents`, `embed_query`); ingestion uses it; config switched (`HUGGINGFACE_TOKEN` removed); `ollama` removed. Live call verified 1024-dim vectors.
+  - **Written into:** ticket 11, map, `app/models/document.py` comment.
+- *Original gap text below.*
 - **Gap:** Ticket 11 assumed the HuggingFace Inference API is a free tier. A live call with the team's token returned **`402 "You have no remaining credits. Purchase pre-paid credits … or subscribe to PRO"`**. HF Inference Providers now bill against small monthly credits, so **document ingestion cannot embed anything right now.**
 - **Constraint:** `document_chunks.embedding` is `Vector(1024)`. Any replacement must produce 1024-dim vectors, or else needs a migration and re-embedding of everything.
 - **Options:**
@@ -247,6 +270,73 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Route Handlers stay only for streaming (the chat SSE proxy).
 - **Written into:** frontend-scaffold map, ticket 03 ("As built"), `spec.md`, `frontend/CLAUDE.md`.
 
+### D19. Agent graph shape: fewer LLM calls per message (added 2026-10-09, agent design review) — ✅ RESOLVED 2026-10-09
+- **Gap:** ticket 10 runs about 6–8 LLM calls per message (input guardrail, 3-way router, ReAct calls, relevancy grader, synthesis, LLM groundedness grader, output guardrail). Free LLM tiers allow roughly 10–15 requests a minute, so two users chatting at once hit the limit.
+- **Bug in ticket 10:** the relevancy grader runs after *every* retrieve, including `get_tasks` / `get_team_summary`. An empty task list ("Do I have overdue tasks?" → none) is graded "not relevant", rewritten twice, then refused, instead of answering "You have no overdue tasks."
+- **Decision (Piyush): lean graph.**
+  1. **Router is 2-way: `read` | `write`.** No `conversational` route: small talk goes to the read agent, which may answer without calling a tool. This removes the risk of a workspace question being misrouted to "conversational" and answered from general knowledge. Write tools are still bound only on the `write` route.
+  2. **Relevancy grader + query rewrite (max 2) run only after `search_documents`.** Task and summary lookups are answered as-is; empty is a valid answer.
+  3. **The read agent's final message is the answer** (no separate synthesis LLM call).
+  4. **Groundedness is checked in code:** the answer cites chunk numbers; code checks every cited chunk ID is in this turn's `retrieved_chunk_ids`. No extra LLM call.
+- **Result:** typical message = 2–4 LLM calls. All security guarantees are unchanged (they live in tools + `AccessScope`).
+- **Implementation rules written with this decision (no decision needed, bugs to avoid):**
+  - Per-turn fields (`step_count`, `rewrite_count`, `retrieved_chunks`, `retrieved_chunk_ids`, `groundedness_passed`, `intent`) are **reset in the input of every invocation**. They are checkpointed, so otherwise message 2 starts at step 8/8.
+  - The LLM sees a **trimmed history** (last ~10 turns, old tool outputs dropped); the full history stays in the checkpoint.
+- **Written into:** ticket 10 (§0 update), map.
+
+### D20. Streaming vs after-the-answer checks (added 2026-10-09, agent design review) — ✅ RESOLVED 2026-10-09
+- **Conflict:** ticket 04/09 stream `token` events live, but ticket 10 runs the groundedness check and a Guardrails AI output filter *after* the answer is finished, so anything they would cut has already been shown.
+- **Decision (Piyush): stream live, then fix up citations.**
+  - `token` events stream as the read agent writes.
+  - After the answer ends, the code citation check (D19) runs. The `citations` event carries **only** citations whose chunk ID was retrieved this turn. If any were dropped, the backend appends a short note ("1 source couldn't be verified") before `done`.
+  - **The output guardrail (Guardrails AI on the answer) is removed.** Reason: the LLM only ever receives data inside the caller's `AccessScope`, so the stream cannot leak out-of-scope data; a bad citation is a quality issue, not a leak. An output PII filter would also strip the employee names the user asked about.
+- **Written into:** ticket 10 (§0 update), ticket 09 (header note), map.
+
+### D21. Input check before the LLM (added 2026-10-09, agent design review) — ✅ RESOLVED 2026-10-09
+- **Gap:** ticket 10 Node 1 runs Guardrails AI on every message and rejects (400) on suspected injection **or PII**. Names and emails are normal input here (strikes, tasks, HR questions), so the PII check blocks core use cases. Injection blocking adds little: scope is enforced at the tools, so an injection cannot reach out-of-scope data. Guardrails AI is not installed and is heavy (hub validators, NLP models).
+- **Decision (Piyush): flag and log, don't block; no PII check.**
+  - **No PII check on input.**
+  - **Home-made injection heuristic:** a short list (~10) of obvious phrases ("ignore previous instructions", "you are now", "system prompt", …), case-insensitive. A match **never blocks**; the turn's audit entry gets `injection_suspected = true` and the message continues. *(PRD `audit_log` has no such column yet; add `injection_suspected BOOL DEFAULT false` when the audit table is migrated.)*
+  - **Length limit:** messages over ~4,000 characters are rejected before streaming starts with `400 message_too_long` (D16 error shape → toast). Protects the free LLM quota.
+  - **Guardrails AI is dropped from the plan.** PRD §10's "Guardrails AI validators on LLM input/output" row is superseded by D20 + D21.
+- **Demo value:** an injection attempt goes through, gets "I couldn't find that in the documents you can access", and the audit log shows it was flagged and reached 0 restricted chunks — proof that the structural guardrail holds.
+- **Written into:** ticket 10 (§0 update), map.
+
+### D22. Confirming actions the agent takes (added 2026-10-09, agent design review) — ✅ RESOLVED 2026-10-09
+- **Gap:** ticket 10's "HITL Pattern A (conversational confirmation)" keeps no record of the pending action (the user's "yes" is a new message that goes back through the router), and whether the agent asks at all is a prompt rule. A document containing hidden instructions could trigger a write with no hard stop.
+- **Decision (Piyush): the graph pauses and the user clicks Confirm or Cancel, for all three write tools** (`create_task`, `give_strike`, `give_commendation`).
+  1. The write node prepares the action and stores it in state as `pending_action` (tool, args, display summary, policy check result for strikes). Nothing is written yet.
+  2. The graph pauses with LangGraph `interrupt()` (needs the checkpointer, which we have).
+  3. SSE emits a new **`confirm`** event `{"action": "give_strike", "summary": "...", "policy": {...}}`, then `done`. The frontend shows a card with **Confirm** / **Cancel**.
+  4. The click is sent to the **same** endpoint, `POST /api/v1/chat/sessions/{session_id}/message`, with body `{"resume": "confirm" | "cancel"}` instead of `{"message": ...}` (keeps D2's single chat endpoint). The backend resumes with `Command(resume=...)`.
+  5. On confirm, the tool **re-checks permissions with the fresh `AccessScope`** of the resume request, then writes exactly `pending_action`. On cancel, nothing is written and the agent says so.
+  6. A new normal message while an action is pending cancels it.
+- **Result:** nothing is written without a human click on exactly what was shown; a prompt-injected document can at most produce a card the user cancels.
+- **Written into:** ticket 10 (§0 update), ticket 09 (`confirm` event + resume body), ticket 04 (SSE table), frontend-scaffold/07 (header note), map.
+
+### D23. Where may a document be tagged? (added 2026-10-09, documents effort slice C) — ✅ RESOLVED 2026-10-09
+- **Gap:** ticket 03 says who may upload (`can_org("upload_document")` for org/role docs, `can("upload_document", team)` for team docs) but not *which* role or team a document may be tagged to. An HR user could tag a document to `Admin` (then can't see her own upload) or to a peer role like `Finance` (pushing content the agent will quote to Finance as policy).
+- **Decision (Piyush): "at or below yourself".**
+  - **Org docs:** `can_org("upload_document")`.
+  - **Role docs:** `can_org("upload_document")` **and** `role_id` is the caller's org-level role or a role below it (`role_id == scope.org_role_id or scope.can_manage_role(role_id)`), same yardstick as D17. Else 403 `forbidden`: "You can only tag documents to your own role or roles below it."
+  - **Team docs:** `can("upload_document", team_id)` **and** `can_view_team(team_id)` (member or governed, D13). Else 403 `forbidden`.
+  - Role or team from another org → 404 (`role_not_found` / `team_not_found`), like a missing one.
+- **Result:** uploaders always see what they uploaded and can't place documents above or beside themselves.
+- **Delete (Piyush, same day): "if you could upload it there, you can delete it".** `DELETE /api/v1/documents/{id}` applies the same check to the document's current tag. A document the caller can't see → 404 `document_not_found`. Chunks are removed with it (cascade). This covers uploaders who leave or change roles.
+- **Written into:** ticket 03 (permission table note), map, `plans/documents/backend.md` slice C.
+
+### Small agent gaps written in directly (2026-10-09, agent design review, no decision needed)
+- `give_strike` / `give_commendation` take `team_id` as well as `to_user_id` (a person can be on two teams; the hierarchy check is per team). Filled from the `@team` mention or asked for by the agent.
+- Each graph step gets an SSE `status` name, defined in ticket 09: `checking_input`, `routing`, `searching_documents`, `looking_up_tasks`, `grading_relevance`, `rewriting_query`, `preparing_action`, `writing_answer`, `verifying_citations`.
+- Task/summary tool results are not "chunks": they go to the agent as tool messages and are never put in `retrieved_chunk_ids` or cited.
+
+### D24. Who sees a team's summary, and its strike count? (added 2026-10-09, agent slice 1) — ✅ RESOLVED 2026-10-09
+- **Decision (Piyush): the proposal below.** Summary = every team the user can view, with task counts; `active_strikes` only where `can("give_strike", team) or can("review_strike", team)`, otherwise `null`. "Active" = any status except `dismissed`. Applies to chat and the dashboard (same function). Implemented in `app/services/tasks.py::team_summary`.
+- *Original gap text below.*
+- **Gap:** `team_summary(db, scope)` (ticket 03 §1a) backs both the agent's `get_team_summary` tool and the dashboard's `managed_teams` (ticket 05 `TeamOverview`: member count, task counts, `active_strikes`). No ticket says which teams appear, or who may see the strike count. Under D13, a manager's **own** team is a member team, not a governed one, so "managed teams = governed teams" would hide it from them.
+- **Proposal:** the summary covers every team the user can view (`viewable_team_ids`). Task counts are always included (the user can already list those tasks). `active_strikes` is included only where the user can give or review strikes in that team (`can("give_strike", team) or can("review_strike", team)`); otherwise it is omitted.
+- **To decide:** the strike-count rule.
+
 ---
 
 ## Already fixed in docs during the audit (no decision needed)
@@ -261,10 +351,12 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - Frontend map, frontend tickets 01, 02 and 06, and `spec.md`: updated for the real route groups (`(marketing)/(auth)/(dashboard)`), Next 16 `proxy.ts`, Clerk v7, and `org` scope tagging.
 
 ## Code drift found (needs a `backend/` change, which requires separate confirmation per AGENTS.md)
+- ~~`backend/app/core/config.py`: no LLM settings.~~ Fixed 2026-10-09: `GOOGLE_API_KEY`, `CHAT_MODEL` (`google_genai:gemini-flash-latest`), `ROUTER_MODEL` (`google_genai:gemini-flash-lite-latest`), `CHAT_MAX_MESSAGE_CHARS=4000` (D7, D21).
+- ~~`backend/app/agent/state.py`: old 3-way `intent`, LLM groundedness field, no `pending_action`, no per-turn reset.~~ Fixed 2026-10-09: rewritten for D19–D22; adds `AgentContext` and `new_turn_input()`.
 - ~~`backend/app/models/document.py` docstring: the same inverted "descendant" wording as ticket 02.~~ Fixed 2026-10-08.
 - ~~`backend/app/models/role.py` permission comment: missing `review_strike`.~~ Fixed 2026-10-08 (migration `d4e8b2a61f07` commit).
 - ~~`backend/app/core/config.py` `async_migrations_url` and `alembic/env.py`: both use the **pooled** URL.~~ Fixed 2026-10-08: `async_migrations_url` now always uses the direct `DATABASE_URL`.
-- Migrations: **partly fixed 2026-10-08.** `d4e8b2a61f07` adds `idx_org_members_role`, `idx_invitations_pending`, `idx_team_members_user` and `idx_roles_org_parent`. Still missing: the remaining ticket 02 indexes (HNSW `vector_cosine_ops`, chunk scope indexes, tasks, comments, chat sessions, audit), planned as ticket 11's indexes migration. There is also no `CREATE EXTENSION IF NOT EXISTS vector`.
+- Migrations: **document search indexes added 2026-10-09** (`a7c2e9f4b310`: `CREATE EXTENSION IF NOT EXISTS vector`, HNSW `vector_cosine_ops`, chunk scope indexes, `documents (org_id, created_at)`); task, comment, chat-session and audit indexes still come with those features. Earlier: **partly fixed 2026-10-08.** `d4e8b2a61f07` adds `idx_org_members_role`, `idx_invitations_pending`, `idx_team_members_user` and `idx_roles_org_parent`. Still missing: the remaining ticket 02 indexes (HNSW `vector_cosine_ops`, chunk scope indexes, tasks, comments, chat sessions, audit), planned as ticket 11's indexes migration. There is also no `CREATE EXTENSION IF NOT EXISTS vector`.
 - ~~`backend/app/services/ingestion.py`: no retry, no failure reason, reuses the request's session.~~ **Fixed 2026-10-08.** The rework also covers the SSRF guard, the atomic commit, extraction off the event loop, and the stale-job sweep (see ticket 11 §7a). ⚠️ Migration `c3f1a9d27e54` must be applied.
 - Scope cache: no invalidation on re-parenting yet (nothing is implemented yet).
 - Repo hygiene:

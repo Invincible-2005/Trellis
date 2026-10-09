@@ -97,6 +97,7 @@ frontend/
 │   │       ├── documents/                        # Route: /admin/documents
 │   │       │   ├── page.tsx                      # Upload & Tag Policy/SOP documents
 │   │       │   └── _components/
+│   │       │       ├── documents-table.tsx       # Rows, status badge (polls while processing), delete (added 2026-10-09)
 │   │       │       ├── doc-upload-dropzone.tsx   # Uploadthing file dropzone
 │   │       │       └── tag-scope-select.tsx      # Modal to choose Org / Role / Team scope tag
 │   │       └── strikes/                          # Route: /admin/strikes
@@ -106,6 +107,9 @@ frontend/
 │   │               └── strike-audit-drawer.tsx   # Drawer showing agent RAG validation rationale
 │   │
 │   └── api/
+│       ├── uploadthing/                          # Added 2026-10-09 (documents effort)
+│       │   ├── core.ts                           # Upload rules: file types, 16 MB, gate = signed in + upload_document
+│       │   └── route.ts                          # UploadThing endpoint (public in proxy.ts for UploadThing's callback)
 │       └── chat/
 │           └── sessions/
 │               └── [sessionId]/
@@ -122,6 +126,7 @@ frontend/
 │   │   ├── client.ts                             # Singleton openapi-fetch client with Clerk auth middleware
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
+│   ├── uploadthing.ts                            # Typed UploadDropzone / UploadButton (added 2026-10-09)
 │   └── utils.ts                                  # cn() and shared formatting utilities
 │
 └── proxy.ts                                      # Next.js 16 name for middleware: Clerk route protection & active-org redirect

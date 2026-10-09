@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, ForeignKey, Enum, Integer, DateTime, Text
+from sqlalchemy import String, ForeignKey, Enum, Integer, DateTime, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -21,6 +21,7 @@ class Document(Base):
     Uploaded by roles with 'upload_document' permission for their role/team scope.
     """
     __tablename__ = "documents"
+    __table_args__ = (Index("idx_documents_org_created", "org_id", "created_at"),)  # list page
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
@@ -57,11 +58,23 @@ class DocumentChunk(Base):
     document for fast WHERE filtering inside the ANN query — avoids a JOIN during retrieval.
     """
     __tablename__ = "document_chunks"
+    __table_args__ = (
+        # Nearest-neighbour search (cosine distance, `<=>`), ticket 02
+        Index(
+            "idx_chunks_embedding_hnsw", "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        # Scope filters applied inside the vector search
+        Index("idx_chunks_org_scope", "org_id", "scope_type"),
+        Index("idx_chunks_org_scope_role", "org_id", "scope_type", "role_id"),
+        Index("idx_chunks_org_scope_team", "org_id", "scope_type", "team_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[List[float]] = mapped_column(Vector(1024), nullable=False)  # mxbai-embed-large-v1 (1024 dims)
+    embedding: Mapped[List[float]] = mapped_column(Vector(1024), nullable=False)  # gemini-embedding-001 at 1024 dims (ticket 12 D14)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     # Denormalized for fast scope filtering in vector search
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)

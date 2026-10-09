@@ -24,14 +24,24 @@ class Settings(BaseSettings):
     CLERK_ISSUER: str = ""
     CLERK_AUTHORIZED_PARTIES: list[str] = ["http://localhost:3000"]
 
-    # HuggingFace Inference API — for mxbai-embed-large-v1 embeddings
-    HUGGINGFACE_TOKEN: str = ""
-    EMBEDDING_MODEL: str = "mixedbread-ai/mxbai-embed-large-v1"
+    # Embeddings (ticket 12 D14): Gemini API, authenticated with GOOGLE_API_KEY below
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
     # "{model}" is substituted with EMBEDDING_MODEL
     EMBEDDING_API_URL: str = (
-        "https://router.huggingface.co/hf-inference/models/{model}/pipeline/feature-extraction"
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents"
     )
     EMBEDDING_DIM: int = 1024  # must match Vector(1024) on document_chunks.embedding
+
+    # Chat LLM (ticket 12 D7). "provider:model" strings for LangChain's
+    # init_chat_model, so switching provider is a .env change, not a code change.
+    # GOOGLE_API_KEY is used for both chat and embeddings, and is passed explicitly
+    # (Settings doesn't export to os.environ).
+    GOOGLE_API_KEY: str = ""  # Google AI Studio → Get API key
+    CHAT_MODEL: str = "google_genai:gemini-flash-latest"
+    ROUTER_MODEL: str = "google_genai:gemini-flash-lite-latest"
+
+    # Chat input check (ticket 12 D21): longer messages get 400 message_too_long
+    CHAT_MAX_MESSAGE_CHARS: int = 4000
 
     # Document ingestion (Ticket 11) — only these hosts may be fetched (SSRF guard).
     # Entries starting with "." match any subdomain (".ufs.sh" → "abc.ufs.sh").

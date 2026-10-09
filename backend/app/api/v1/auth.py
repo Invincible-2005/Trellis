@@ -137,6 +137,7 @@ async def _active_org_permissions(db: AsyncSession, scope: AccessScope) -> Activ
         )
     ).first()
 
+    tabs = _admin_tabs(scope)
     return ActiveOrgPermissions(
         org_id=scope.org_id,
         org_role_id=org_role.id if org_role else None,
@@ -147,5 +148,26 @@ async def _active_org_permissions(db: AsyncSession, scope: AccessScope) -> Activ
         },
         member_team_ids=sorted(scope.member_team_ids),
         viewable_team_ids=sorted(scope.viewable_team_ids),
-        can_open_admin=scope.can_org("create_role") or scope.can_org("add_member"),
+        admin_tabs=tabs,
+        can_open_admin=bool(tabs),
     )
+
+
+def _admin_tabs(scope: AccessScope) -> list[str]:
+    """
+    Admin console tabs the user may open (D4 + follow-up 2026-10-09). Each tab's
+    own permission, org-wide; upload_document also counts on any team, so a team
+    manager can upload their team's documents. The backend checks every action anyway.
+    """
+    tabs = []
+    if scope.can_org("create_role"):
+        tabs.append("roles")
+    if scope.can_org("add_member") or scope.can_org("create_team"):
+        tabs.append("teams")
+    if scope.can_org("upload_document") or any(
+        "upload_document" in perms for perms in scope.permissions_by_team.values()
+    ):
+        tabs.append("documents")
+    if scope.can_org("review_strike"):
+        tabs.append("strikes")
+    return tabs

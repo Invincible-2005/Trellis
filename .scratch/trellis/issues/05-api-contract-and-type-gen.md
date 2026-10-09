@@ -295,6 +295,7 @@ class DocumentResponse(AppBaseModel):
     status: DocStatusEnum          # frontend polls this after the 202 (ticket 11)
     chunk_count: Optional[int] = None
     error_message: Optional[str] = None   # admin-facing reason when status == "failed" (ticket 11 §7a)
+    deletable: bool = False               # added 2026-10-09 (ticket 12 D23): caller could upload it to this tag
     created_at: datetime
 
 
@@ -407,7 +408,7 @@ class TeamOverview(BaseModel):
     team_name: str
     member_count: int
     task_summary: TaskSummary
-    active_strikes: int
+    active_strikes: int   # ⚠️ 2026-10-09 (ticket 12 D24): Optional[int], None unless the user can give/review strikes in the team. Code: app/schemas/tasks.py (also adds `blocked` to TaskSummary)
 
 
 class OrgOverview(BaseModel):
