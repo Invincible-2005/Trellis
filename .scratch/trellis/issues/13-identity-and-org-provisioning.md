@@ -162,3 +162,11 @@ The teammate's PR #8 already added `backend/app/core/auth.py` (JWT verification)
 - Clerk webhooks (v2 drift repair, ticket 12 D10).
 - ~~D13 team visibility (decide first).~~ Resolved; now part of step 3.
 - D4 follow-up: widening console entry to any admin-tab permission.
+
+## Router-level guards (added 2026-10-10)
+
+The auth and org checks are attached to routers, so a new endpoint can't skip them by forgetting `Depends(get_scope)`:
+- `api_router` (all of `/api/v1`): `dependencies=[Depends(get_current_user)]`.
+- Org data routers (`admin`, `documents`; add to `tasks`, `chat`, `dashboard` when built): `dependencies=[Depends(get_org_context)]`.
+- `/auth/*` and `/orgs/provision` stay user-only (they run before an org is picked or set up).
+- Kept as FastAPI dependencies, not Starlette middleware: typed user/scope in routes, no skip-list for `/health` and `/docs`, no interference with SSE streaming. `openapi.json` unchanged.

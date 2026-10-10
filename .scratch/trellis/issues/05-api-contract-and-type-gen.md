@@ -32,6 +32,7 @@ Establish end-to-end type safety between FastAPI and Next.js by defining typed P
    - Re-parenting is supported via `PATCH /api/v1/admin/roles/{role_id}` with `{ "parent_role_id": "<uuid>" }`.
 3. **Invitation Pipeline** *(updated 2026-10-08, ticket 12 D10)*:
    - > **Superseded in part 2026-10-09 (ticket 12 D25):** new people are invited into the **org** from `/admin/members` (`POST /api/v1/admin/members {email, role_id?}`, org-level role). The team endpoint below only adds existing org members to a team. `InvitationResponse.team_id/team_name/role_id/role_name` are now optional (null for an org-only invite).
+   - > **Superseded in part 2026-10-10 (ticket 12 D28):** team endpoints live under `/api/v1/teams` (not `/admin/teams`) because the team pages are `/teams` for everyone. Adding takes an existing org member (`user_id`) + team `role_id`. The team schemas below are replaced by `backend/app/schemas/teams.py` (card fields: `my_role_name`, `member_count`, `open_tasks`, `overdue_tasks`, button flags `can_add_member` / `can_assign_task` / `deletable`; members with `removable`; `GET /teams/{id}/candidates`).
    - `POST /api/v1/admin/teams/{team_id}/members` takes `{ email, role_id }`.
      - Requires `can_org("add_member")` to invite a new person into the org, or `can("add_member", team_id)` to add an existing org member to the team.
      - `role_id` must be **strictly below** the caller's highest role (no privilege escalation).
@@ -338,6 +339,9 @@ class TaskResponse(AppBaseModel):
     submissions: List[TaskSubmissionResponse] = Field(default_factory=list)
 
 
+# ⚠️ 2026-10-10 (ticket 12 D32/D33): code is backend/app/schemas/tasks.py. Task responses are `TaskResult`
+# (+ team_name, assigned_to_name, created_by_name, overdue, can_edit, can_change_status), no submissions yet;
+# CreateTaskRequest.assigned_to_user_id is required and blocked_by_task_id is left out (dependencies later).
 class CreateTaskRequest(BaseModel):
     team_id: UUID
     title: str = Field(..., min_length=2, max_length=200)

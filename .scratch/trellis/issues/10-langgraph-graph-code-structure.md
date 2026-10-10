@@ -30,6 +30,7 @@ What is the exact LangGraph `StateGraph` code skeleton — node functions, condi
 > - Citations are 8-hex tags of the chunk id, e.g. `[3f9a12bc]`; `check_citations` maps tags back to this turn's `retrieved_chunks`.
 > - `search_documents` returns its chunks as the ToolMessage `artifact`; a `collect` node copies them into state and counts tool calls.
 > - The grader runs on Flash-Lite and is skipped (= not relevant) when the search returned nothing. `rewrite` re-runs the search itself and **replaces** the last search ToolMessage (same id), so no synthetic tool calls enter the history.
+> - Optional LangSmith tracing (dev/demo data only): `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` in `backend/.env`, off by default; `config.py` exports them to the environment only when on.
 > - Write intent goes to a placeholder reply until slice 4 (write tools + `interrupt()`, D22).
 > - Verified: offline graph paths (found after rewrite, not found after 2 rewrites, 8-call budget, invented citation dropped, per-turn reset) and live Gemini (greeting, write routing). Not yet run against the database (Neon was unreachable from the dev machine).
 

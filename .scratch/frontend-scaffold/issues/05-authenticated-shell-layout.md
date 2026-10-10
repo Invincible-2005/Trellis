@@ -24,7 +24,7 @@ Decisions to lock:
 - **Header Bar**:
   - Left: Hamburger toggle (mobile / collapse) + Breadcrumbs.
   - Right: Active "Role Badge" (displaying current role in active org/team) + Global Command Palette search trigger (`Cmd+K`).
-- **Role-Based Filtering**: Single unified shell. Navigation items dynamically show/hide based on Clerk session role and resolved permissions.
+- **Role-Based Filtering**: Single unified shell. Navigation items dynamically show/hide based on ~~Clerk session role and~~ resolved permissions from `GET /api/v1/auth/context` *(Clerk-role part superseded by trellis/12 D4/D8: Clerk roles grant nothing). Build plan: `plans/app-shell/` (local), 2026-10-10.*
 
 ### 2. Route Group & Colocation Directory Pattern
 Adopting colocation with Next.js private folders (`_components`):

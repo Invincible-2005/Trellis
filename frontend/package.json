@@ -11,6 +11,7 @@
     "api:generate:live": "openapi-typescript http://127.0.0.1:8000/openapi.json -o ./lib/api/v1.d.ts"
   },
   "dependencies": {
+    "@arcjet/next": "^1.14.1",
     "@clerk/nextjs": "^7.9.2",
     "@hookform/resolvers": "^5.9.1",
     "@uploadthing/react": "^7.3.3",

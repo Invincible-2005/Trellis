@@ -33,6 +33,7 @@ A complete, locked frontend architecture document: every route, layout boundary,
 - [openapi-fetch Server-Only Client Pattern](.scratch/frontend-scaffold/issues/03-openapi-fetch-server-pattern.md): Singleton `api` client in `lib/api/client.ts` with the Clerk JWT injected via `onRequest` middleware (Bearer token only, no X-* headers, per D8); `parseAs: 'stream'` for SSE proxy Route Handlers; `cache()` wraps query functions (not the client); `import 'server-only'` guards the module.
 
 - [Form writes (trellis/12 D18)](../trellis/issues/12-decision-reconciliation.md): **Server Actions** in `lib/api/actions/`, returning `{ ok, message }` for toasts; `revalidatePath` on success. Route Handlers only for streaming. *(Form-state library, e.g. react-hook-form, still open.)*
+- [Request protection (trellis/12 D27)](../trellis/issues/12-decision-reconciliation.md): Arcjet in `lib/middleware/`: `gate()` runs in `proxy.ts` (shield, bots, read limit); Server Actions start with `limit(tier)` (write / heavyRead / heavyWrite). No CORS.
 
 ## Cross-map links (audit 2026-10-08)
 
