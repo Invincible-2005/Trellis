@@ -3,6 +3,7 @@
 // Expected failures come back as { ok: false, message } for a toast: Next.js hides
 // the message of a thrown error in production. Redirect codes still redirect.
 import { revalidatePath } from 'next/cache';
+import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
 import type { components } from '../v1';
@@ -22,6 +23,8 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
  *   else toast.success(result.data.status === 'added' ? 'Added' : 'Invitation sent');
  */
 export async function addMember(input: AddMemberInput): Promise<ActionResult<AddMemberResult>> {
+  const blocked = await limit('heavyWrite');
+  if (blocked) return blocked;
   try {
     const result = await unwrap(api.POST('/api/v1/admin/members', { body: input }));
     revalidatePath('/admin/members');
@@ -33,6 +36,8 @@ export async function addMember(input: AddMemberInput): Promise<ActionResult<Add
 
 /** Cancel a pending invite; its email link stops working. Only for invites with no role or a role below yours. */
 export async function cancelInvitation(invitationId: string): Promise<ActionResult<null>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
   try {
     await unwrap(
       api.DELETE('/api/v1/admin/invitations/{invitation_id}', {

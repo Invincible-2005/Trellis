@@ -30,7 +30,8 @@ TEAM_ROLE_PAIRS = [
     (BETA, MANAGER), (BETA, EMPLOYEE),
     (GAMMA, EMPLOYEE),
     (HR_TEAM, HR),
-]  # EMPTY has no members, so it never appears here
+    (EMPTY, None),  # a team with no members comes back with no role (D29)
+]
 
 ALL_PERMS = {"create_role", "create_team", "add_member", "upload_document",
              "assign_task", "give_strike", "view_aggregate", "review_strike"}
@@ -52,8 +53,8 @@ def scope_for(my_team_roles=(), org_role=None):
 def test_org_admin_on_no_team_sees_every_staffed_team():
     admin = scope_for(org_role=(ADMIN, ALL_PERMS))
     assert admin.member_team_ids == frozenset()
-    assert admin.viewable_team_ids == {ALPHA, BETA, GAMMA, HR_TEAM}
-    assert not admin.can_view_team(EMPTY)  # empty teams: admin console only
+    # D29: an empty team is visible to whoever can staff it (org-level create_team/add_member)
+    assert admin.viewable_team_ids == {ALPHA, BETA, GAMMA, HR_TEAM, EMPTY}
 
 
 def test_hr_sees_teams_led_by_managers_but_not_own_level():

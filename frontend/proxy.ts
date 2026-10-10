@@ -1,23 +1,27 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { apiError, gate } from '@/lib/middleware/gate';
 
 // /api/uploadthing: UploadThing's servers call it back after an upload (signed with
 // UPLOADTHING_TOKEN, no Clerk session). User uploads are gated in app/api/uploadthing/core.ts.
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/api/uploadthing(.*)']);
+const isUploadThingRoute = createRouteMatcher(['/api/uploadthing(.*)']);
 const isOrgSelectionRoute = createRouteMatcher(['/org-selection(.*)']);
 const isApiRoute = createRouteMatcher(['/api(.*)']);
 
-// Same body as FastAPI errors (trellis ticket 12 D16)
-function apiError(status: number, code: string, message: string) {
-  return NextResponse.json({ detail: { code, message } }, { status });
-}
-
 export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) return;
+  // UploadThing's callback is a server, which the bot check would block.
+  if (isUploadThingRoute(req)) return;
 
   const { userId, orgId, redirectToSignIn } = await auth();
 
-  // 1. Unauthenticated users
+  // 1. Arcjet front gate for every request: attacks, bots, and the read limit (trellis/12 D27)
+  const blocked = await gate(req, userId);
+  if (blocked) return blocked;
+
+  if (isPublicRoute(req)) return;
+
+  // 2. Unauthenticated users
   if (!userId) {
     if (isApiRoute(req)) {
       return apiError(401, 'invalid_token', 'You are not signed in.');
@@ -25,7 +29,7 @@ export default clerkMiddleware(async (auth, req) => {
     return redirectToSignIn({ returnBackUrl: req.url });
   }
 
-  // 2. Signed-in users without an active organization
+  // 3. Signed-in users without an active organization
   if (!orgId && !isOrgSelectionRoute(req)) {
     if (isApiRoute(req)) {
       return apiError(400, 'no_active_org', 'Select or create an organization first.');

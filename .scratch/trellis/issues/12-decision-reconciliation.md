@@ -353,6 +353,56 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Already an org member → 409 `already_member`; pending invite for that email → 409 `already_invited`.
   - Someone with a Clerk account who never opened Trellis falls into the invite path, which still works.
 
+### D27. Request protection: CORS and rate limits (added 2026-10-10, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** Nothing said where request protection lives. The frontend map only listed "Edge security: Arcjet". Piyush proposed CORS plus chained Arcjet with four custom tiers: read, write, heavyRead (fewer requests than read), heavyWrite.
+- **Decision (Piyush): Arcjet in Next.js, front gate + per-action; no CORS.**
+  - **No CORS on FastAPI.** The browser only talks to Next.js (same origin); Next.js → FastAPI is server-to-server, where CORS doesn't apply. Adding `CORSMiddleware` would only let browser JS call FastAPI directly, against the BFF rule.
+  - **Arcjet lives in Next.js, not FastAPI.** Every request reaching FastAPI comes from the Next.js server's IP, so bot and IP checks can't tell users apart there.
+  - **Front gate (`proxy.ts`, every request):** shield + bot detection (search engines and link previews allowed), plus the **read** limit for signed-in users, in one Arcjet call. `/api/uploadthing` skips it (UploadThing's server callback would look like a bot).
+  - **Per-action tiers:** `proxy.ts` can't tell Server Actions apart (they all POST to the page URL), so each action calls `limit(tier)` first and returns `{ ok: false, message }` for the toast (D18). Limits are per Clerk `userId` (sliding window):
+    - read 120/min (proxy.ts);
+    - write 20/min (role create/edit/delete, document delete, cancel invite);
+    - heavyRead 5/min (chat message: 2–4 Gemini calls each; wire into the chat route when built, ticket 09);
+    - heavyWrite 10 per 10 min (document indexing, invites).
+  - **Code:** `frontend/lib/middleware/` (`arcjet.ts` rules + numbers, `gate.ts` front gate, `limit.ts` per-action). Not named `frontend/middleware/` because Next.js 16 deprecated that name for `proxy.ts`. Blocked → 429 `rate_limited` / 403 `blocked` in the D16 shape.
+  - **No `ARCJET_KEY` → Arcjet is off** and everything passes, so teammates can run without a key.
+- **Known gap (ties to D11 deployment):** Arcjet guards only the Next.js door. If FastAPI's URL is public, a signed-in user could call it directly with their own token and skip the limits; keep FastAPI unreachable from outside when deploying.
+
+### D28. Where does team work happen: a `/teams` page for everyone, or `/admin/teams` only? (added 2026-10-10, teams effort, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** frontend tickets 01/06 and `spec.md` put teams only under `/admin/teams` (tab opens for `can_org("add_member")` or `can_org("create_team")`; `auth.py` `admin_tabs`). Piyush's idea: `/teams` lists teams, `/teams/[teamId]` has "Add member" and "Create task". With admin-only teams, a team-level manager (team role with `add_member`/`assign_task`, no org role) and plain team members can't open their own team.
+- **Recommendation:** `/teams` + `/teams/[teamId]` in the main app for everyone. The list = teams you can see (D13: on it, or every member is below you), not only teams you created. Buttons by permission: Create team = `can_org("create_team")`; Add member = `can("add_member", team)` (existing org members only, D25; team role strictly below the caller, D9); Create task = `can("assign_task", team)`. Backend routes under `/api/v1/teams` (not `/admin/teams`). The admin Teams tab is dropped. `/tasks` stays as "all my tasks" and uses the same create-task endpoint.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted as written. Updated: map, ticket 05 (team endpoints move to `/api/v1/teams`), frontend tickets 01/06, `spec.md`. Code drift: `auth.py` `admin_tabs` still emits `"teams"`.
+
+### D29. Who sees a team that has no members yet? (added 2026-10-10, teams effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** D13 visibility = member, or *every* member ranks below you. `resolver.py::build_scope` only counts teams **with at least one member**, so a newly created, empty team is visible to nobody, including the person who just created it. Nothing decides whether the creator joins the team.
+- **Recommendation:** the creator does **not** join (an Admin on every team they create would stop HR from seeing those teams under D13, and put the Admin in team task lists). An empty team is visible to anyone with org-level `create_team` or `add_member` (the people who can staff it). Once it has a member, the normal D13 rule applies. Small change in `build_scope` (also fetch empty teams in the org).
+- **Alternative:** "Create team" also asks for a first member (team lead + team role), so a team is never empty.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted. Creator doesn't join; empty teams visible to org-level `create_team` / `add_member` holders; normal D13 once staffed. Code: `build_scope` (ticket 03) to include empty teams for those holders.
+
+### D30. Which team role may a team manager give when adding someone to their team? (added 2026-10-10, teams effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** D17 measures "strictly below the caller" from the **org-level role only** (`manageable_role_ids`, used by `services/members.py::_get_assignable_role`). That fits creating roles and org invites. But D28 lets a team-level manager (team role with `add_member`, no org role) add members on `/teams/[teamId]`; with the org-only yardstick they could give no role at all, so a team-level `add_member` would be useless.
+- **Recommendation:** for team actions, the yardstick is the caller's org role **or** their role in that team: the given role must be strictly below either one, and carry only permissions the caller has in that team (`can(p, team)`). Same rule for removing a member. Org-level actions (D17) unchanged.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted. Code: an `AccessScope` helper for "roles below me in this team" (org role ∪ team role) used by the team member endpoints.
+
+### D31. Deleting a team: what happens to its tasks, strikes and documents? (added 2026-10-10, teams effort, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** no ticket covers deleting a team. `tasks.team_id`, `strikes.team_id`, `documents.team_id` and `invitations.team_id` all point at `teams.id` with the default ON DELETE (restrict), so a plain delete fails once the team has any work.
+- **Recommendation:** `DELETE /api/v1/teams/{id}` needs `can_org("create_team")` and a team the caller oversees (empty, or every member below them, D13/D29). It is allowed only while the team has **no tasks, strikes or team documents** (else 409 `team_not_empty`); its member rows and pending team invitations go with it, then `invalidate_org`. Same idea as roles: a role someone holds can't be deleted. No migration.
+- **Alternatives:** delete everything with it (loses strike history); archive instead of delete (needs a migration and an "archived" filter in every team query).
+- **Decision (Piyush, 2026-10-10):** recommendation accepted (block until empty).
+- **Built 2026-10-10 (teams slice C):** invitations that name the team are not deleted but turned into org-only invites (`team_id` and `role_id` cleared): the invitee still joins the org with no role, no Clerk call, and a team role can't turn into an org role. Since D25 the app no longer creates team invites, so this only covers old rows.
+
+### D32. Tasks: who may create one, and for whom? (added 2026-10-10, tasks effort) — ✅ RESOLVED 2026-10-10
+- **Scope of the first tasks round (Piyush, 2026-10-10):** core only: create, list (team page + `/tasks`), change status, edit, delete. Dependencies (`blocked_by_task_id`), submissions and comments come later; their tables exist, so no migration is needed then.
+- **Who creates (Piyush, 2026-10-10):** whoever's role has `assign_task` in that team: `can("assign_task", team)` (org role or team role).
+- **Gap: for whom.** Ticket 04/10 only says `create_task` checks `assign_task`. Nothing says whether a manager may assign work to a peer manager or to someone above them. The locked rule (D9) is that users act only on roles strictly below their own.
+- **Recommendation:** assignee = yourself, nobody, or a team member whose team role passes `can_give_in_team` (strictly below your org role or your role in that team, D30). The assignee must be on the team. Same rule for the chat agent's `create_task` (it calls the same service function).
+- **Decision (Piyush, 2026-10-10):** the assignee must be **a team member ranked below the creator** (`can_give_in_team(assignee's team role, team)`, D30 yardstick). Assigning to yourself and unassigned tasks are **not** allowed for now (easy to add later). `tasks.assigned_to_user_id` stays nullable in the DB; the API requires it.
+
+### D33. Tasks: who may change status, edit or delete? (added 2026-10-10, tasks effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** nothing says who may move a task between todo / in progress / done / blocked, or edit (title, description, deadline, assignee) or delete it.
+- **Recommendation:** a task's **managers** = people with `can("assign_task", team)` for whom the assignee's team role passes `can_give_in_team` (exactly who could have created it, D32). Managers may do everything; the **assignee** may only change the status. If the assignee has left the team, anyone with `assign_task` in the team counts as a manager. Reassigning follows D32 for the new assignee. Each task carries `can_edit` / `can_change_status` flags for the buttons.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted.
+
 ---
 
 ## Already fixed in docs during the audit (no decision needed)
@@ -367,6 +417,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - Frontend map, frontend tickets 01, 02 and 06, and `spec.md`: updated for the real route groups (`(marketing)/(auth)/(dashboard)`), Next 16 `proxy.ts`, Clerk v7, and `org` scope tagging.
 
 ## Code drift found (needs a `backend/` change, which requires separate confirmation per AGENTS.md)
+- ~~`backend/app/api/v1/auth.py::_admin_tabs` and `schemas/auth.py` `admin_tabs`: still include `"teams"`; D28 (2026-10-10) dropped the admin Teams tab.~~ Fixed 2026-10-10 (teams slice A; `openapi.json` and `v1.d.ts` regenerated).
 - ~~`backend/app/core/config.py`: no LLM settings.~~ Fixed 2026-10-09: `GOOGLE_API_KEY`, `CHAT_MODEL` (`google_genai:gemini-flash-latest`), `ROUTER_MODEL` (`google_genai:gemini-flash-lite-latest`), `CHAT_MAX_MESSAGE_CHARS=4000` (D7, D21).
 - ~~`backend/app/agent/state.py`: old 3-way `intent`, LLM groundedness field, no `pending_action`, no per-turn reset.~~ Fixed 2026-10-09: rewritten for D19–D22; adds `AgentContext` and `new_turn_input()`.
 - ~~`backend/app/models/document.py` docstring: the same inverted "descendant" wording as ticket 02.~~ Fixed 2026-10-08.

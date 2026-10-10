@@ -43,7 +43,9 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 | `/documents` | `app/(authenticated)/documents/page.tsx` | RSC | Authenticated shell. Browse accessible SOPs / policies |
 | `/admin` | `app/(admin)/admin/page.tsx` | RSC | Admin shell. Overview & quick admin navigation |
 | `/admin/roles` | `app/(admin)/admin/roles/page.tsx` | Client (React Flow) | Admin shell. Interactive role hierarchy tree & permissions |
-| `/admin/teams` | `app/(admin)/admin/teams/page.tsx` | RSC + Client dialogs | Admin shell. Team creation & member role assignment |
+| `/teams` | `app/(dashboard)/teams/page.tsx` | RSC + Client dialogs | Teams you can see (D13); Create team if `can_org("create_team")` (added 2026-10-10, trellis/12 D28) |
+| `/teams/[teamId]` | `app/(dashboard)/teams/[teamId]/page.tsx` | RSC + Client dialogs | Members + tasks; Add member if `can("add_member", team)`, Create task if `can("assign_task", team)` (D28) |
+| ~~`/admin/teams`~~ | ~~`app/(admin)/admin/teams/page.tsx`~~ | | (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`) |
 | `/admin/documents` | `app/(admin)/admin/documents/page.tsx` | RSC + Uploadthing | Admin shell. Upload & tag SOPs to roles or teams |
 | `/admin/strikes` | `app/(admin)/admin/strikes/page.tsx` | RSC + Client dialogs | Admin shell. Strike appeal review & policy validation log |
 | `/api/chat/sessions/[sessionId]/message` | `app/api/chat/sessions/[sessionId]/message/route.ts` | Route Handler (Node) | BFF SSE proxy to FastAPI `POST /api/v1/chat/sessions/{session_id}/message` *(path updated 2026-10-08, trellis/12 D2)* |

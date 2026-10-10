@@ -159,14 +159,13 @@ def _admin_tabs(scope: AccessScope) -> list[str]:
     Admin console tabs the user may open (D4 + follow-up 2026-10-09). Each tab's
     own permission, org-wide; upload_document also counts on any team, so a team
     manager can upload their team's documents. The backend checks every action anyway.
+    No Teams tab: teams have their own /teams pages (D28).
     """
     tabs = []
     if scope.can_org("create_role"):
         tabs.append("roles")
     if scope.can_org("add_member"):
         tabs.append("members")
-    if scope.can_org("add_member") or scope.can_org("create_team"):
-        tabs.append("teams")
     if scope.can_org("upload_document") or any(
         "upload_document" in perms for perms in scope.permissions_by_team.values()
     ):
