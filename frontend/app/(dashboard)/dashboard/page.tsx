@@ -1,30 +1,32 @@
-import { redirect } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
-import { getAuthContext } from '@/lib/api/queries/auth';
+import { redirect } from "next/navigation"
+import { getAuthContext } from "@/lib/api/queries/auth"
 
 export default async function DashboardPage() {
-  // proxy.ts guarantees a signed-in user with an active org.
-  const context = await getAuthContext();
+  const context = await getAuthContext()
 
-  // The active org exists in Clerk but isn't set up in Trellis yet (e.g. picked from
-  // the org list before its creator finished setup): send them through setup.
-  if (!context.active_org) redirect('/onboarding');
+  if (!context.active_org) {
+    redirect("/onboarding")
+  }
 
-  const org = context.organizations.find((o) => o.id === context.active_org?.org_id);
+  const org = context.organizations.find((o) => o.id === context.active_org?.org_id)
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-3xl font-bold">Welcome to Trellis</h1>
-        <UserButton />
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Welcome to Trellis</h1>
+        <p className="text-muted-foreground text-sm">
+          Organization: <span className="font-medium text-foreground">{org?.name}</span>
+          {context.active_org.org_role_name && (
+            <> · Your role: {context.active_org.org_role_name}</>
+          )}
+        </p>
       </div>
-      <p className="text-muted-foreground text-sm">
-        Organization: <span className="font-medium text-foreground">{org?.name}</span>
-        {context.active_org.org_role_name && <> · Your role: {context.active_org.org_role_name}</>}
-      </p>
-      <p className="text-muted-foreground text-xs">
-        Full role-scoped metrics dashboard will be implemented in ticket 08.
-      </p>
-    </main>
-  );
+
+      <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+        <p className="text-muted-foreground text-sm">
+          Full role-scoped metrics dashboard will be implemented in ticket 08.
+        </p>
+      </div>
+    </div>
+  )
 }
