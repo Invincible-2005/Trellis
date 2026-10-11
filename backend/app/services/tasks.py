@@ -342,7 +342,12 @@ def _task_result(scope: AccessScope, row, now: datetime) -> TaskResult:
 async def _check_assignee(
     db: AsyncSession, scope: AccessScope, team_id: uuid.UUID, user_id: uuid.UUID
 ) -> None:
-    """D32: the assignee is on the team, with a team role below the user."""
+    """D32: the assignee is on the team, with a team role below the user, and isn't the user."""
+    # Checked by user, not role: your own team role can sit below your org role (D32).
+    if user_id == scope.user_id:
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "forbidden", "You can't give a task to yourself."
+        )
     role_id = await db.scalar(
         select(TeamMember.role_id).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
     )

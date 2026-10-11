@@ -334,7 +334,32 @@ class Strike(Base):
     )
     escalated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Appeal (added 2026-10-10, D6). New strikes are saved as "confirmed";
+    # "pending_agent_review" is no longer written. One appeal per strike.
+    appeal_notes: Mapped[Optional[str]] = mapped_column(Text)
+    reviewed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))  # never the giver
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+
+
+# ─────────────────────────────────────────────
+# COMMENDATIONS (added 2026-10-10, D5)
+# ─────────────────────────────────────────────
+
+class Commendation(Base):
+    """
+    Positive counterpart to Strike. Given by someone ranked above the receiver in that team
+    (D5: no permission needed, no peers). No RAG check, status, appeal or escalation.
+    """
+    __tablename__ = "commendations"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id"), nullable=False)
+    given_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    given_to_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 # ─────────────────────────────────────────────
 # AUDIT LOG

@@ -117,7 +117,7 @@ The graph operates as an intentional hybrid: a **ReAct execution engine bounded 
 * **Slot Filling:** If parameters are missing (e.g., no deadline specified), the LLM responds conversationally without invoking DB mutations.
 * **Tools:**
   * `create_task(...)`: Verifies `scope.has_permission("assign_task")` for target team.
-  * `give_commendation(...)`: Validates hierarchy check (caller above target or same-team peer).
+  * `give_commendation(...)`: Validates hierarchy check: caller ranked above the target in that team (D5, 2026-10-10). *(Superseded: "or same-team peer".)*
   * `give_strike(...)`: 
     1. Verifies caller is hierarchically above target.
     2. Runs internal RAG retrieval against policy/SOP docs in pgvector.

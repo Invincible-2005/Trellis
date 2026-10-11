@@ -62,7 +62,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - **Frontend:** `proxy.ts` checks only signed-in and active org. `(dashboard)/admin/layout.tsx` fetches effective permissions (`GET /api/v1/auth/context`) and redirects to `/dashboard` if the user isn't allowed. Navigation and tabs are shown or hidden from the same data.
   - **Backend:** every admin endpoint enforces its own permission. The frontend gate only affects what users see.
 - **Follow-up — ✅ RESOLVED 2026-10-09 (Piyush): per-tab entry.** The console opens for anyone who may open at least one tab, and shows only those tabs.
-  - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")`.
+  - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")` *(widened 2026-10-10 by D6: or `review_strike` on any team)*.
   - `/auth/context` returns `active_org.admin_tabs`; `can_open_admin = bool(admin_tabs)` (`app/api/v1/auth.py::_admin_tabs`).
   - **Members tab added 2026-10-09 (D25):** `can_org("add_member")`. Tab order: roles, members, teams, documents, strikes. Its role picker uses `GET /api/v1/admin/roles` (`assignable` flag).
   - `GET /api/v1/admin/roles` keeps its `create_role or add_member` gate (only Roles/Teams use it). The Documents tab's picker uses the new `GET /api/v1/documents/tag-options` instead.
@@ -70,13 +70,26 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Written into: frontend-scaffold ticket 06 §0, map, `plans/documents/frontend.md`.
 - **Written into:** ticket 03 §1, ticket 05, frontend tickets 02 and 06, `spec.md`.
 
-### D5. Commendation data model
+### D5. Commendation data model — ✅ RESOLVED 2026-10-10
 - **Gap:** `give_commendation` is in the MVP (map, ticket 04 tools, ticket 05 `CommendationResponse`), but there is no `Commendation` table in ticket 02, the code, or the migrations.
 - **Recommendation:** A `commendations` table that mirrors `strikes` without status or escalation: `id`, `org_id`, `team_id`, `given_by_user_id`, `given_to_user_id`, `reason`, `created_at`.
+- **Also found 2026-10-10:** the map said "same hierarchy check as strikes", ticket 10 said "caller above target **or same-team peer**".
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  - **Table:** `commendations` as recommended above (no status, appeal or escalation). New migration. API shapes already in ticket 05 (`CommendationResponse`, `CreateCommendationRequest`).
+  - **Who may give one:** only someone **ranked above** the person in that team: the receiver's role in that team is strictly below the giver's org role or the giver's role in that team (same yardstick as strikes and D30). **No permission needed** (no `give_commendation` permission added); peers can't commend each other. Self-commendation is impossible by the same rule.
+  - The ticket 10 "or same-team peer" wording is superseded.
 
-### D6. Strike appeal fields and flow
+### D6. Strike appeal fields and flow — ✅ RESOLVED 2026-10-10
 - **Gap:** The PRD §8 lists `reviewed_by_user_id` and `appeal_notes` on strikes, and frontend `/admin/strikes` is designed for appeal review. The `Strike` model has neither field, and the map lists the appeal flow as undecided.
 - **Also check:** With HITL Pattern A (ticket 10), the agent validates the strike before the DB commit. Is the `pending_agent_review` status still needed?
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  - **New columns on `strikes`:** `appeal_notes` (the receiver's reason), `reviewed_by_user_id`, `reviewed_at`. One migration.
+  - **Statuses:** a new strike is saved as `confirmed` (the agent checks policy *before* saving, D22). `pending_agent_review` is no longer used (left in the enum, not written). Receiver appeals → `appealed`. Reviewer upholds → back to `confirmed` with `reviewed_*` set, or dismisses → `dismissed`.
+  - **One appeal per strike:** only the receiver can appeal, only from `confirmed`, and only if it was never reviewed.
+  - **Who reviews:** anyone with `can("review_strike", team)` for the strike's team (org-level role **or** role in that team), **except the person who gave the strike**.
+  - **Gray area (giver is the only reviewer):** the appeal **waits** for someone else. The giver never self-reviews; the Strikes tab shows them "You gave this strike, so someone else must review it" and the Admin can give `review_strike` to another role.
+  - **Counting:** `confirmed` and `appealed` strikes count toward the 3-strike escalation; `dismissed` ones don't.
+  - **Consequence for the admin console (D4):** the Strikes tab opens for `can_org("review_strike")` **or `review_strike` on any team** (same pattern as the Documents tab), and lists only appeals the viewer may review.
 
 ### D7. Chat LLM provider — ✅ RESOLVED 2026-10-09
 - **Decision (Piyush): Gemini Flash on Google's free tier** via the already-installed `langchain-google-genai`.
@@ -162,16 +175,21 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Webhooks deferred to v2** as drift repair (`organizationMembership.deleted`, `organization.deleted`, `user.updated`, `user.deleted`). In the MVP, a user removed directly in the Clerk dashboard already loses access, because their token no longer carries the org; only stale rows remain.
 - **Implementation:** ticket 13.
 
-### D11. Deployment realities vs current design (added 2026-10-08)
+### D11. Deployment realities vs current design (added 2026-10-08) — ✅ RESOLVED 2026-10-10
 - **Gap:** PRD §17 says the backend runs on Railway or Render and the cache is Upstash Redis. Several MVP choices assume one long-lived process with a local disk:
   1. **The SQLite `checkpoints.db`** is lost on every redeploy unless the host has a persistent volume. Options: attach a volume, or use `AsyncPostgresSaver` (NeonDB) from the first deploy. Ticket 08 says that's a one-line swap.
   2. **The in-process `TTLCache`** (ticket 03) is only correct with **one** backend instance. The PRD's mention of Redis is stale (ticket 03 replaced it). Lock "single instance for MVP".
   3. **FastAPI `BackgroundTasks` ingestion** (ticket 11) is killed by a restart, leaving documents stuck in `processing` forever. A recovery rule is needed, for example on startup mark documents stuck longer than N minutes as `failed`, or re-queue them.
 - **Recommendation:** Run a single instance for the MVP and use the Postgres checkpointer in any deployed environment (SQLite for local dev only). Add a startup sweep for stuck `processing` documents.
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  1. **Chat history:** `AsyncPostgresSaver` on NeonDB **everywhere**, local dev included (package `langgraph-checkpoint-postgres`; `saver.setup()` at startup). No SQLite checkpointer, so no dev/prod switch; `CHECKPOINTS_DB_PATH` and the local `checkpoints.db` go away when the chat endpoint is built.
+  2. **Single backend instance for the MVP** (the in-process `TTLCache` relies on it). No Redis.
+  3. **Stuck uploads:** already built (ticket 11 §7a, `fail_stale_ingestions()` in the `main.py` lifespan, 15 minutes).
 
-### D12. Single-org or multi-org for v1? (added 2026-10-08)
+### D12. Single-org or multi-org for v1? (added 2026-10-08) — ✅ RESOLVED 2026-10-10
 - **Conflict:** The map's "Out of scope" says "Multi-tenant SaaS billing (v1 = single org workspace)". Everything else is built for **multiple orgs per user**: the `org_members` bridge table, `org_id` on every row, Clerk Organizations, `/org-selection`, and `thread_id = {org_id}:...`.
 - **Likely intent:** "Billing is out of scope", not "only one org exists". If so, reword that line to "no billing; multi-org supported, each org isolated by `org_id`". Confirm.
+- ✅ **RESOLVED 2026-10-10 (Piyush): multi-org.** A user may belong to several orgs and switches between them (`/org-selection`); each org's data is isolated by `org_id`. Only billing/Stripe is out of scope. No code change; the map's "Out of scope" line is reworded.
 
 ### D13. Which teams can a user above a team see? (added 2026-10-08, found while writing D9)
 - **Gap:** In ticket 03, `allowed_team_ids` contains only teams the user is a **member** of. The access rule in ticket 02 and the PRD says team-scoped documents are visible to members **and all roles hierarchically above the team**.

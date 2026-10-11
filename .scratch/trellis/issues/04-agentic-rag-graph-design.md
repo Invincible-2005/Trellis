@@ -172,6 +172,8 @@ Schema is extensible — additional `status` step values can be added without br
 
 ### Memory: SQLite Checkpointer (Dev/MVP)
 
+> *Superseded 2026-10-10 (ticket 12 D11): `AsyncPostgresSaver` on NeonDB everywhere; see ticket 08.*
+
 ```python
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
