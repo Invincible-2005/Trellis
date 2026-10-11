@@ -21,3 +21,7 @@ Specifically:
 - How does the Next.js BFF Route Handler at `app/api/chat/sessions/[sessionId]/message/route.ts` proxy the stream using `openapi-fetch` with `parseAs: "stream"` (already decided in ticket 03)?
 - How does the frontend consume the typed SSE frames to update: `thinking-stepper.tsx` (status/tool_call events), incremental text (token events), `citation-badge.tsx` (citations event)?
 - How are errors and stream interruptions handled gracefully on both ends?
+
+## Rate limit (added 2026-10-10, ticket 12 D27)
+
+The BFF chat route (`app/api/chat/sessions/[sessionId]/message/route.ts`) starts with `limit('heavyRead')` from `frontend/lib/middleware/limit.ts` (5 messages/min per user) and turns a block into `apiError(429, 'rate_limited', message)` before opening the stream. Confirm/Cancel resumes (D22) count too.

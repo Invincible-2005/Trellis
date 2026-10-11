@@ -64,7 +64,9 @@ class ActiveOrgPermissions(BaseModel):
     viewable_team_ids: List[UUID] = Field(default_factory=list)   # members + governed teams
     # Admin console tabs this user may open (D4 follow-up, 2026-10-09). The layout
     # and sidebar show exactly these; can_open_admin = at least one tab.
-    admin_tabs: List[Literal["roles", "members", "teams", "documents", "strikes"]] = Field(default_factory=list)
+    # No "teams" tab since D28 (2026-10-10): teams live at /teams.
+    # No "documents" tab since D34 (2026-10-11): policies are uploaded on /organization.
+    admin_tabs: List[Literal["roles", "members", "strikes"]] = Field(default_factory=list)
     can_open_admin: bool
 
 

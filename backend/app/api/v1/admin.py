@@ -1,7 +1,8 @@
 """
 app/api/v1/admin.py — Admin console routes (Ticket 05 §2/§7, Ticket 12 D4/D17/D25/D26)
 
-Every route depends on get_scope; the checks themselves live in app/services.
+The router requires an org (get_org_context); every route also depends on get_scope.
+The checks themselves live in app/services.
 """
 import uuid
 
@@ -9,7 +10,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_scope
+from app.core.deps import get_org_context, get_scope
 from app.core.errors import error_responses
 from app.schemas.admin import (
     AddMemberRequest,
@@ -23,7 +24,7 @@ from app.schemas.admin import (
 from app.scope.resolver import AccessScope
 from app.services import members, roles
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_org_context)])
 
 
 @router.get(

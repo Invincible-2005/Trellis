@@ -45,11 +45,12 @@ frontend/
 │   ├── (dashboard)/                              # Authenticated application shell
 │   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check
 │   │   ├── _components/                          # Shell-level private components
-│   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar with <OrganizationSwitcher />
+│   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar; collapse button fixed top-left, <OrganizationSwitcher /> beside it (2026-10-11)
 │   │   │   ├── app-header.tsx                    # Breadcrumbs, Active Role badge, Command search trigger
-│   │   │   ├── nav-items.tsx                     # Nav items filtered by auth/context permissions
-│   │   │   ├── user-nav.tsx                      # Clerk <UserButton /> + Theme toggle
-│   │   │   └── command-menu.tsx                  # Cmd+K quick search modal
+│   │   │   ├── nav-items.tsx                     # Nav items filtered by auth/context permissions; Admin opens a sub-list of the user's admin_tabs (2026-10-11)
+│   │   │   ├── user-nav.tsx                      # Whole row (avatar, name, email) opens an account menu: Manage account (Clerk) / Sign out; theme toggle beside it (2026-10-11)
+│   │   │   ├── use-mobile.ts                     # shadcn sidebar's phone-size helper; moved here from hooks/ (no top-level hooks/ folder, decided 2026-10-10)
+│   │   │   └── command-menu.tsx                  # Cmd+K quick search modal (optional)
 │   │   │
 │   │   ├── dashboard/                            # Route: /dashboard
 │   │   │   ├── page.tsx                          # Role-scoped summary view (Recharts metrics, deadlines)
@@ -58,12 +59,28 @@ frontend/
 │   │   │       ├── deadline-tracker.tsx          # Upcoming task deadlines widget
 │   │   │       └── personal-strikes-card.tsx     # Current user strike summary
 │   │   │
-│   │   ├── tasks/                                # Route: /tasks
-│   │   │   ├── page.tsx                          # Dedicated task management table
+│   │   ├── teams/                                # Route: /teams (added 2026-10-10, trellis/12 D28)
+│   │   │   ├── page.tsx                          # Teams you can see (D13); Create team if can_org(create_team)
+│   │   │   ├── _components/
+│   │   │   │   ├── team-list.tsx                 # Cards: name · "You: <role>" or "Overseeing" · N members · open/overdue tasks
+│   │   │   │   └── create-team-dialog.tsx        # Create new team
+│   │   │   └── [teamId]/                         # Route: /teams/[teamId]
+│   │   │       ├── page.tsx                      # Members + team tasks (task-data-table + create-task-dialog from tasks/_components)
+│   │   │       └── _components/
+│   │   │           ├── team-members-table.tsx    # Name, team role
+│   │   │           ├── add-member-dialog.tsx     # Existing org member + team role (D25); shown if can(add_member, team)
+│   │   │           └── delete-team-button.tsx    # Confirm + deleteTeam; shown if deletable (D31)
+│   │   │       (Create task reuses tasks/_components/create-task-dialog.tsx; shown if can(assign_task, team))
+│   │   │       Data: lib/api/queries/teams.ts, lib/api/actions/teams.ts (added 2026-10-10)
+│   │   │
+│   │   ├── tasks/                                # Route: /tasks (core round 2026-10-10, trellis/12 D32/D33)
+│   │   │   ├── page.tsx                          # My tasks by default; filters in URL search params
 │   │   │   └── _components/
-│   │   │       ├── task-data-table.tsx           # Sortable, filterable task list
-│   │   │       ├── task-filter-toolbar.tsx       # Filter by status, team, assignee
-│   │   │       └── create-task-dialog.tsx        # Task assignment dialog (with dependency selector)
+│   │   │       ├── task-data-table.tsx           # Rows; status dropdown if can_change_status, Edit/Delete if can_edit (also on team page)
+│   │   │       ├── task-filter-toolbar.tsx       # Mine/All, team, status, overdue
+│   │   │       ├── create-task-dialog.tsx        # Team, title, description, assignee (assignable members), deadline (no dependency selector yet)
+│   │   │       └── edit-task-dialog.tsx          # Same fields prefilled; only for can_edit
+│   │   │       Data: lib/api/queries/tasks.ts, lib/api/actions/tasks.ts (added 2026-10-10)
 │   │   │
 │   │   ├── chat/                                 # Route: /chat
 │   │   │   ├── page.tsx                          # Role-aware Agentic RAG chat interface
@@ -73,11 +90,12 @@ frontend/
 │   │   │       ├── citation-badge.tsx            # Clickable SOP source references
 │   │   │       └── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
 │   │   │
-│   │   ├── documents/                            # Route: /documents
-│   │   │   ├── page.tsx                          # Role-accessible SOP & policy document browser
+│   │   ├── organization/                         # Route: /organization (replaces /documents, trellis/12 D34, 2026-10-11)
+│   │   │   ├── page.tsx                          # Org description + policies you can see, grouped org / role / team; Upload if tag-options not empty
 │   │   │   └── _components/
-│   │   │       ├── document-grid.tsx             # Card grid of accessible docs
-│   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for policy docs
+│   │   │       ├── policy-list.tsx               # Rows: title, scope, status badge (polls while processing), Delete if deletable
+│   │   │       ├── upload-policy-dialog.tsx      # Uploadthing dropzone → tag picker (org / role / team) → createDocument
+│   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for a policy
 │   │   │
 │   │   └── admin/                                # Route: /admin/* (create_role OR add_member org-wide; per-tab perms)
 │   │       ├── layout.tsx                        # Tabs + gate: redirect unless auth/context.active_org.can_open_admin (D4)
@@ -94,18 +112,8 @@ frontend/
 │   │       │       ├── members-table.tsx         # Name, email, org role, joined
 │   │       │       ├── invitations-table.tsx     # Pending invites with Cancel
 │   │       │       └── invite-member-dialog.tsx  # Email + role picker (assignable roles)
-│   │       ├── teams/                            # Route: /admin/teams
-│   │       │   ├── page.tsx                      # Team directory and membership management
-│   │       │   └── _components/
-│   │       │       ├── team-list.tsx             # Cards/table of teams
-│   │       │       ├── create-team-dialog.tsx    # Create new team
-│   │       │       └── add-member-dialog.tsx     # Put an existing org member into the team with a team role (D25)
-│   │       ├── documents/                        # Route: /admin/documents
-│   │       │   ├── page.tsx                      # Upload & Tag Policy/SOP documents
-│   │       │   └── _components/
-│   │       │       ├── documents-table.tsx       # Rows, status badge (polls while processing), delete (added 2026-10-09)
-│   │       │       ├── doc-upload-dropzone.tsx   # Uploadthing file dropzone
-│   │       │       └── tag-scope-select.tsx      # Modal to choose Org / Role / Team scope tag
+│   │       │   (teams/ tab removed 2026-10-10, trellis/12 D28 → see /teams above)
+│   │       │   (documents/ tab removed 2026-10-11, trellis/12 D34 → uploads live on /organization above)
 │   │       └── strikes/                          # Route: /admin/strikes
 │   │           ├── page.tsx                      # Strike appeal review & policy validation audit
 │   │           └── _components/
@@ -132,8 +140,12 @@ frontend/
 │   │   ├── client.ts                             # Singleton openapi-fetch client with Clerk auth middleware
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
+│   ├── middleware/                               # Arcjet request protection (trellis/12 D27, added 2026-10-10)
+│   │   ├── arcjet.ts                             # All rules + per-user limits (read, write, heavyRead, heavyWrite)
+│   │   ├── gate.ts                               # gate(): front gate run by proxy.ts (shield, bots, read limit)
+│   │   └── limit.ts                              # limit(tier): first line of a Server Action / chat route
 │   ├── uploadthing.ts                            # Typed UploadDropzone / UploadButton (added 2026-10-09)
 │   └── utils.ts                                  # cn() and shared formatting utilities
 │
-└── proxy.ts                                      # Next.js 16 name for middleware: Clerk route protection & active-org redirect
+└── proxy.ts                                      # Next.js 16 name for middleware: Arcjet gate, Clerk route protection & active-org redirect
 ```

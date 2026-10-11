@@ -19,6 +19,7 @@ Before creating or moving any file in `backend/`, check this map. If the right p
 
 ## Rules of thumb
 - A new endpoint = router in `api/v1/` + schemas in `schemas/` + logic in `services/`. Register the router in `api/v1/__init__.py`.
+- A new router with org data (tasks, chat, dashboard…) gets `dependencies=[Depends(get_org_context)]` in its `APIRouter(...)`, like `admin.py`. The sign-in check is already on all of `/api/v1`.
 - A new table = model in `models/` + an Alembic migration.
 - Don't create a parallel package for something that already has a home (e.g. no second `auth/` next to `core/auth.py`). Extend the existing file.
 - `openapi.json` is generated (`uv run python scripts/export_openapi.py`). Never edit it by hand; regenerate it after changing an endpoint.

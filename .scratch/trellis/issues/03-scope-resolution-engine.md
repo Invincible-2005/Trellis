@@ -357,7 +357,7 @@ await graph.astream(
   - `member_team_ids` (teams I'm on);
   - `governed_team_ids` (teams with ≥1 member where **every** member's team role is strictly below one of my roles).
   
-  Reads use `can_view_team(team_id)` = member OR governed. Writes keep `can(p, team)`. A manager does **not** see a peer manager's team. This supersedes the `allowed_team_ids` field and the "teams does this user belong to" row in §1, which become `member_team_ids` plus `governed_team_ids`.
+  Reads use `can_view_team(team_id)` = member OR governed. Writes keep `can(p, team)`. A manager does **not** see a peer manager's team. *(2026-10-10, ticket 12 D29: an **empty** team is governed by anyone with org-level `create_team` or `add_member`; query 4 is a `LEFT JOIN` from `teams`. D30: `team_manageable_role_ids` + `can_give_in_team(role, team)` and `permissions_in_team(team)` for team member actions. Built in `resolver.py`.)* This supersedes the `allowed_team_ids` field and the "teams does this user belong to" row in §1, which become `member_team_ids` plus `governed_team_ids`.
 
 ## Open questions for the backend dev (not blockers — decide during implementation)
 

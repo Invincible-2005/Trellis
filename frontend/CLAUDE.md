@@ -17,6 +17,7 @@ The canonical file tree is [`.scratch/frontend-scaffold/spec.md`](../.scratch/fr
 | Chat stream proxy | `app/api/chat/sessions/[sessionId]/message/route.ts` |
 | Small helpers | `lib/utils.ts` |
 | Route protection | `proxy.ts` (Next.js 16's name for middleware) |
+| Rate limits and bot protection | `lib/middleware/` (Arcjet). New Server Actions that change data start with `const blocked = await limit('write'); if (blocked) return blocked;` (`heavyWrite` for uploads/invites, `heavyRead` for chat). |
 
 ## Rules of thumb
 - `lib/api/v1.d.ts` is generated from the backend's `openapi.json`. Never edit it by hand.

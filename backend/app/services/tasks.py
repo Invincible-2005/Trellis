@@ -10,21 +10,42 @@ can't view behaves exactly like a missing one.
 
 Team summary (D24): task counts for every viewable team; the active strike
 count only where the user can give or review strikes in that team.
+
+Creating and changing tasks (D32/D33): creating needs assign_task in the team, and
+the assignee must be a team member ranked below the creator (can_give_in_team).
+A task's managers are exactly the people who could have created it; they may
+edit, reassign or delete it. The assignee may only change its status.
 """
+import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Iterable, Optional
 
 from fastapi import status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.errors import api_error
 from app.models.strike import Strike
-from app.models.task import Task
+from app.models.task import Task, TaskSubmission
 from app.models.team import Team, TeamMember
 from app.models.user import User
-from app.schemas.tasks import TaskFilters, TaskResult, TaskSummary, TeamOverview
+from app.schemas.tasks import (
+    CreateTaskRequest,
+    TaskFilters,
+    TaskResult,
+    TaskSummary,
+    TeamOverview,
+    UpdateTaskRequest,
+)
 from app.scope.resolver import AccessScope
+
+logger = logging.getLogger(__name__)
+
+Assignee = aliased(User)
+Creator = aliased(User)
+AssigneeMembership = aliased(TeamMember)
 
 
 def _now() -> datetime:
@@ -49,12 +70,7 @@ async def list_tasks(db: AsyncSession, scope: AccessScope, filters: TaskFilters)
     team_ids = [filters.team_id] if filters.team_id is not None else list(scope.viewable_team_ids)
 
     now = _now()
-    stmt = (
-        select(Task, Team.name.label("team_name"), User.name.label("assignee_name"))
-        .join(Team, Team.id == Task.team_id)
-        .outerjoin(User, User.id == Task.assigned_to_user_id)
-        .where(Team.org_id == scope.org_id, Task.team_id.in_(team_ids))
-    )
+    stmt = _task_query(scope).where(Task.team_id.in_(team_ids))
     if filters.assigned_to_me:
         stmt = stmt.where(Task.assigned_to_user_id == scope.user_id)
     if filters.status is not None:
@@ -63,26 +79,132 @@ async def list_tasks(db: AsyncSession, scope: AccessScope, filters: TaskFilters)
         stmt = stmt.where(_overdue(now))
     stmt = stmt.order_by(Task.deadline.asc().nulls_last(), Task.created_at.desc()).limit(filters.limit)
 
-    return [
-        TaskResult(
-            id=task.id,
-            team_id=task.team_id,
-            team_name=team_name,
-            title=task.title,
-            description=task.description,
-            assigned_to_user_id=task.assigned_to_user_id,
-            assigned_to_name=assignee_name,
-            deadline=task.deadline,
-            status=task.status,
-            overdue=task.deadline is not None and task.deadline < now and task.status != "done",
+    return [_task_result(scope, row, now) for row in (await db.execute(stmt)).all()]
+
+
+async def get_task(db: AsyncSession, scope: AccessScope, task_id: uuid.UUID) -> TaskResult:
+    """
+    One task the user may see.
+
+    Raises:
+        404 task_not_found — missing, in another org, or in a team the user can't view
+    """
+    return _task_result(scope, await _get_task_row(db, scope, task_id), _now())
+
+
+async def create_task(db: AsyncSession, scope: AccessScope, body: CreateTaskRequest) -> TaskResult:
+    """
+    Create a task for a team member ranked below the user (D32). Also used by the
+    chat agent's create_task tool after the user clicks Confirm (D22).
+
+    Raises:
+        404 team_not_found   — missing, in another org, or not viewable
+        403 forbidden        — no assign_task in this team, or the assignee isn't below the user
+        404 member_not_found — the assignee isn't on this team
+    """
+    team_ok = await db.scalar(
+        select(Team.id).where(Team.id == body.team_id, Team.org_id == scope.org_id)
+    )
+    if team_ok is None or not scope.can_view_team(body.team_id):
+        raise api_error(status.HTTP_404_NOT_FOUND, "team_not_found", "Team not found.")
+    if not scope.can("assign_task", body.team_id):
+        raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "You can't assign tasks in this team.")
+    await _check_assignee(db, scope, body.team_id, body.assigned_to_user_id)
+
+    task = Task(
+        id=uuid.uuid4(),
+        team_id=body.team_id,
+        title=body.title,
+        description=body.description,
+        assigned_to_user_id=body.assigned_to_user_id,
+        created_by_user_id=scope.user_id,
+        deadline=body.deadline,
+        status="todo",
+    )
+    db.add(task)
+    await db.commit()
+    logger.info("User %s created task %s in team %s", scope.user_id, task.id, body.team_id)
+    return await get_task(db, scope, task.id)
+
+
+async def update_task(
+    db: AsyncSession, scope: AccessScope, task_id: uuid.UUID, body: UpdateTaskRequest
+) -> TaskResult:
+    """
+    Change a task (D33). The assignee may only change the status; the task's
+    managers may change anything, and a new assignee follows D32.
+
+    Raises:
+        404 task_not_found   — missing or not visible
+        403 forbidden        — not allowed to make this change
+        404 member_not_found — the new assignee isn't on the team
+    """
+    row = await _get_task_row(db, scope, task_id)
+    task = row.Task
+    changes = body.model_dump(include=body.model_fields_set)
+    if not changes:
+        return _task_result(scope, row, _now())
+
+    is_manager = can_manage_task(scope, task.team_id, row.assignee_role_id)
+    if not is_manager:
+        if set(changes) != {"status"}:
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "forbidden",
+                "Only managers above the assignee can edit, reassign or delete this task.",
+            )
+        if task.assigned_to_user_id != scope.user_id:
+            raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "You can't change this task.")
+
+    new_assignee = changes.get("assigned_to_user_id")
+    if new_assignee is not None and new_assignee != task.assigned_to_user_id:
+        await _check_assignee(db, scope, task.team_id, new_assignee)
+
+    for field, value in changes.items():
+        setattr(task, field, value)
+    await db.commit()
+    logger.info("User %s changed task %s: %s", scope.user_id, task_id, sorted(changes))
+    return await get_task(db, scope, task_id)
+
+
+async def delete_task(db: AsyncSession, scope: AccessScope, task_id: uuid.UUID) -> None:
+    """
+    Delete a task; only its managers (D33). Its comments go with it (ON DELETE
+    CASCADE); submissions are removed too, and tasks waiting on it stop waiting.
+
+    Raises:
+        404 task_not_found — missing or not visible
+        403 forbidden      — not one of the task's managers
+    """
+    row = await _get_task_row(db, scope, task_id)
+    if not can_manage_task(scope, row.Task.team_id, row.assignee_role_id):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "forbidden",
+            "Only managers above the assignee can edit, reassign or delete this task.",
         )
-        for task, team_name, assignee_name in (await db.execute(stmt)).all()
-    ]
+    await db.execute(
+        update(Task).where(Task.blocked_by_task_id == task_id).values(blocked_by_task_id=None)
+    )
+    await db.execute(delete(TaskSubmission).where(TaskSubmission.task_id == task_id))
+    await db.execute(delete(Task).where(Task.id == task_id))
+    await db.commit()
+    logger.info("User %s deleted task %s", scope.user_id, task_id)
 
 
-async def team_summary(db: AsyncSession, scope: AccessScope) -> list[TeamOverview]:
-    """One overview per team the user can view, sorted by team name."""
-    team_ids = list(scope.viewable_team_ids)
+async def team_summary(
+    db: AsyncSession,
+    scope: AccessScope,
+    only_team_ids: Iterable[uuid.UUID] | None = None,
+) -> list[TeamOverview]:
+    """
+    One overview per team the user can view, sorted by team name.
+    only_team_ids narrows it (e.g. one team's page); teams the user can't view are dropped.
+    """
+    if only_team_ids is None:
+        team_ids = list(scope.viewable_team_ids)
+    else:
+        team_ids = [team_id for team_id in only_team_ids if scope.can_view_team(team_id)]
     if not team_ids:
         return []
 
@@ -149,3 +271,93 @@ async def team_summary(db: AsyncSession, scope: AccessScope) -> list[TeamOvervie
         )
         for team_id, team_name in teams
     ]
+
+
+# ── task helpers ──────────────────────────────────────────────────────────────
+
+async def _get_task_row(db: AsyncSession, scope: AccessScope, task_id: uuid.UUID):
+    """The task's _task_query row, or 404 if it's missing or in a team the user can't view."""
+    row = (await db.execute(_task_query(scope).where(Task.id == task_id))).first()
+    if row is None or not scope.can_view_team(row.Task.team_id):
+        raise api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "Task not found.")
+    return row
+
+
+def _task_query(scope: AccessScope):
+    """Tasks in the user's org with team name, assignee and creator names, and the assignee's team role."""
+    return (
+        select(
+            Task,
+            Team.name.label("team_name"),
+            Assignee.name.label("assignee_name"),
+            Creator.name.label("creator_name"),
+            AssigneeMembership.role_id.label("assignee_role_id"),
+        )
+        .join(Team, Team.id == Task.team_id)
+        .outerjoin(Assignee, Assignee.id == Task.assigned_to_user_id)
+        .outerjoin(Creator, Creator.id == Task.created_by_user_id)
+        .outerjoin(
+            AssigneeMembership,
+            and_(
+                AssigneeMembership.team_id == Task.team_id,
+                AssigneeMembership.user_id == Task.assigned_to_user_id,
+            ),
+        )
+        .where(Team.org_id == scope.org_id)
+    )
+
+
+def can_manage_task(
+    scope: AccessScope, team_id: uuid.UUID, assignee_role_id: Optional[uuid.UUID]
+) -> bool:
+    """
+    D33: could the user have created this task? assign_task in the team, and the
+    assignee ranks below them. An assignee who left the team (no role) doesn't block.
+    """
+    if not scope.can("assign_task", team_id):
+        return False
+    return assignee_role_id is None or scope.can_give_in_team(assignee_role_id, team_id)
+
+
+def _task_result(scope: AccessScope, row, now: datetime) -> TaskResult:
+    task = row.Task
+    can_edit = can_manage_task(scope, task.team_id, row.assignee_role_id)
+    return TaskResult(
+        id=task.id,
+        team_id=task.team_id,
+        team_name=row.team_name,
+        title=task.title,
+        description=task.description,
+        assigned_to_user_id=task.assigned_to_user_id,
+        assigned_to_name=row.assignee_name,
+        created_by_name=row.creator_name,
+        deadline=task.deadline,
+        status=task.status,
+        overdue=task.deadline is not None and task.deadline < now and task.status != "done",
+        can_edit=can_edit,
+        can_change_status=can_edit or task.assigned_to_user_id == scope.user_id,
+    )
+
+
+async def _check_assignee(
+    db: AsyncSession, scope: AccessScope, team_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    """D32: the assignee is on the team, with a team role below the user, and isn't the user."""
+    # Checked by user, not role: your own team role can sit below your org role (D32).
+    if user_id == scope.user_id:
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "forbidden", "You can't give a task to yourself."
+        )
+    role_id = await db.scalar(
+        select(TeamMember.role_id).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
+    )
+    if role_id is None:
+        raise api_error(
+            status.HTTP_404_NOT_FOUND, "member_not_found", "That person isn't on this team."
+        )
+    if not scope.can_give_in_team(role_id, team_id):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "forbidden",
+            "You can only give tasks to people ranked below you on this team.",
+        )

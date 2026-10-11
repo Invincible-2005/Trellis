@@ -11,7 +11,7 @@ AsyncSession (it cannot run concurrent operations):
   1. the org's role tree (id → parent)
   2. the user's team memberships with each team role's permissions
   3. the user's org-level role and its permissions (D9)
-  4. which roles sit in which team (for governed teams, D13)
+  4. which roles sit in which team, empty teams included (governed teams, D13/D29)
 The tree walk itself happens in Python (build_scope), which keeps the rules in
 one testable function. An org has tens of roles, so fetching the tree is cheap.
 
@@ -57,9 +57,11 @@ class AccessScope:
     member_team_ids:
         Teams the user is a member of.
     governed_team_ids:
-        Teams with at least one member where EVERY member's team role is
-        strictly below one of the user's roles (D13). An org Admin governs every
-        staffed team; a manager does not govern a peer manager's team.
+        Teams the user oversees from above. A staffed team counts when EVERY
+        member's team role is strictly below one of the user's roles (D13): an org
+        Admin governs every staffed team; a manager does not govern a peer
+        manager's team. An empty team counts when the user has org-level
+        create_team or add_member, the people who can staff it (D29).
     org_permissions:
         Permissions of the org-level role (D9). Apply in every team.
     org_role_id:
@@ -67,6 +69,9 @@ class AccessScope:
     manageable_role_ids:
         Every role strictly below the org-level role (D17). Team roles never
         count here. The caller may edit, delete or assign only these roles.
+    team_manageable_role_ids:
+        team_id → every role strictly below the user's role in that team (D30).
+        Only used for team actions (adding or removing a team member).
     permissions_by_team:
         team_id → permissions of the user's role in that team.
         Permission strings: create_role | create_team | add_member |
@@ -83,6 +88,9 @@ class AccessScope:
     permissions_by_team: Mapping[uuid.UUID, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    team_manageable_role_ids: Mapping[uuid.UUID, frozenset[uuid.UUID]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     @property
     def viewable_team_ids(self) -> frozenset[uuid.UUID]:
@@ -97,10 +105,13 @@ class AccessScope:
         """Read access to a team: member, or every member ranks below the user (D13)."""
         return team_id in self.member_team_ids or team_id in self.governed_team_ids
 
+    def permissions_in_team(self, team_id: uuid.UUID) -> frozenset[str]:
+        """Everything the user may do in this team: org-level role + their role in the team."""
+        return self.org_permissions | self.permissions_by_team.get(team_id, frozenset())
+
     def can(self, permission: str, team_id: uuid.UUID) -> bool:
         """Team-scoped action: the org-level role OR the user's role in this team grants it."""
-        return (permission in self.org_permissions
-                or permission in self.permissions_by_team.get(team_id, frozenset()))
+        return permission in self.permissions_in_team(team_id)
 
     def can_org(self, permission: str) -> bool:
         """Org-wide action (admin console, create_role, invite into org): org-level role only."""
@@ -109,6 +120,15 @@ class AccessScope:
     def can_manage_role(self, role_id: uuid.UUID) -> bool:
         """Is this role strictly below the user's org-level role (D17)?"""
         return role_id in self.manageable_role_ids
+
+    def can_give_in_team(self, role_id: uuid.UUID, team_id: uuid.UUID) -> bool:
+        """
+        Team actions only (D30): is this role strictly below the user's org-level
+        role OR their role in this team? Callers also check the role's permissions
+        against permissions_in_team(team_id).
+        """
+        return (role_id in self.manageable_role_ids
+                or role_id in self.team_manageable_role_ids.get(team_id, frozenset()))
 
 
 # ── Pure scope computation ────────────────────────────────────────────────────
@@ -141,7 +161,7 @@ def build_scope(
     parent_of: Mapping[uuid.UUID, Optional[uuid.UUID]],
     my_team_roles: Iterable[tuple[uuid.UUID, uuid.UUID, Iterable[str]]],
     org_role: Optional[tuple[uuid.UUID, Iterable[str]]],
-    team_role_pairs: Iterable[tuple[uuid.UUID, uuid.UUID]],
+    team_role_pairs: Iterable[tuple[uuid.UUID, Optional[uuid.UUID]]],
 ) -> AccessScope:
     """
     Compute an AccessScope from plain rows (no DB access).
@@ -149,7 +169,8 @@ def build_scope(
     parent_of       : every role in the org → its parent role (None for a root)
     my_team_roles   : (team_id, role_id, permissions) for each team the user is on
     org_role        : (role_id, permissions) of the user's org-level role, or None
-    team_role_pairs : (team_id, role_id) for every member of every team in the org
+    team_role_pairs : (team_id, role_id) for every member of every team in the org;
+                      (team_id, None) for a team with no members (D29)
     """
     my_team_roles = list(my_team_roles)
     seeds = {role_id for _, role_id, _ in my_team_roles}
@@ -167,12 +188,22 @@ def build_scope(
 
     roles_in_team: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
     for team_id, role_id in team_role_pairs:
-        roles_in_team[team_id].add(role_id)
-    # Non-empty by construction: a team appears only if it has a member.
-    governed = frozenset(team_id for team_id, roles in roles_in_team.items() if roles <= below)
+        roles = roles_in_team[team_id]  # an empty team keeps an empty set
+        if role_id is not None:
+            roles.add(role_id)
+    # D29: whoever can staff a team at org level oversees it while it's empty.
+    can_staff = bool(org_permissions & {"create_team", "add_member"})
+    governed = frozenset(
+        team_id for team_id, roles in roles_in_team.items()
+        if (roles <= below if roles else can_staff)
+    )
 
     permissions_by_team = {
         team_id: frozenset(perms or ()) for team_id, _, perms in my_team_roles
+    }
+    # D30: in a team, roles below the user's role in that team can also be given.
+    team_manageable = {
+        team_id: _strictly_below([role_id], parent_of) for team_id, role_id, _ in my_team_roles
     }
     return AccessScope(
         user_id=user_id,
@@ -184,6 +215,7 @@ def build_scope(
         org_role_id=org_role_id,
         manageable_role_ids=manageable,
         permissions_by_team=MappingProxyType(permissions_by_team),
+        team_manageable_role_ids=MappingProxyType(team_manageable),
     )
 
 
@@ -266,11 +298,12 @@ async def resolve_scope(
     org_row = org_member.first()
     org_role = (org_row.role_id, org_row.permissions) if org_row else None
 
+    # LEFT JOIN so empty teams come back as (team_id, NULL) (D29).
     pairs = await db.execute(
         text("""
-            SELECT DISTINCT tm.team_id, tm.role_id
-            FROM team_members tm
-            JOIN teams t ON t.id = tm.team_id
+            SELECT DISTINCT t.id AS team_id, tm.role_id
+            FROM teams t
+            LEFT JOIN team_members tm ON tm.team_id = t.id
             WHERE t.org_id = :org_id
         """),
         params,

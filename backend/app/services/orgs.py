@@ -4,6 +4,9 @@ app/services/orgs.py — Setting up a new workspace (Ticket 12 D10, Ticket 13 §
 Clerk org creation → /onboarding → POST /api/v1/orgs/provision → provision_org().
 One transaction creates the org, its protected root Admin role and the
 creator's membership with that role. Calling it again changes nothing.
+
+Also the org profile for the /organization page (Ticket 12 D34/D35): everyone in
+the org reads the description; only holders of the root Admin role edit it.
 """
 import logging
 import uuid
@@ -19,7 +22,8 @@ from app.core.errors import api_error
 from app.models.organization import Organization, OrgMember
 from app.models.role import ROLE_PERMISSIONS, Role
 from app.models.user import User
-from app.scope.resolver import invalidate_scope
+from app.schemas.orgs import OrgProfileResponse, UpdateOrgDescriptionRequest
+from app.scope.resolver import AccessScope, invalidate_scope
 from app.services import clerk
 
 logger = logging.getLogger(__name__)
@@ -110,3 +114,40 @@ async def _existing(db: AsyncSession, clerk_org_id: str) -> ProvisionResult | No
         select(Role.id).where(Role.org_id == org.id, Role.is_system.is_(True))
     )
     return ProvisionResult(org=org, admin_role_id=admin_role_id, created=False)
+
+
+async def get_org_profile(db: AsyncSession, scope: AccessScope) -> OrgProfileResponse:
+    """The active org's name and description, and whether the caller may edit it."""
+    org = await db.get(Organization, scope.org_id)
+    return OrgProfileResponse(
+        id=org.id,
+        name=org.name,
+        description=org.description,
+        can_edit_description=await _holds_root_admin(db, scope),
+    )
+
+
+async def update_org_description(
+    db: AsyncSession, scope: AccessScope, body: UpdateOrgDescriptionRequest
+) -> OrgProfileResponse:
+    """Save the org description (D35: root Admin role only). Empty text clears it."""
+    if not await _holds_root_admin(db, scope):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "forbidden", "Only the organization's Admin can edit its description."
+        )
+    org = await db.get(Organization, scope.org_id)
+    org.description = body.description or None
+    await db.commit()
+    return OrgProfileResponse(
+        id=org.id, name=org.name, description=org.description, can_edit_description=True
+    )
+
+
+async def _holds_root_admin(db: AsyncSession, scope: AccessScope) -> bool:
+    """True if the caller's org-level role is the org's protected root Admin role."""
+    if scope.org_role_id is None:
+        return False
+    is_system = await db.scalar(
+        select(Role.is_system).where(Role.id == scope.org_role_id, Role.org_id == scope.org_id)
+    )
+    return bool(is_system)

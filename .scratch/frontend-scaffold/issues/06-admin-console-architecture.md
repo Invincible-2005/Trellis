@@ -29,9 +29,9 @@ Decisions to lock:
 |---|---|
 | `/admin/roles` | `create_role` |
 | `/admin/members` | `add_member` *(added 2026-10-09, trellis/12 D25)* |
-| `/admin/teams` | `add_member` or `create_team` |
-| `/admin/documents` | `upload_document` (org-wide **or on any team**) |
-| `/admin/strikes` | `review_strike` |
+| ~~`/admin/teams`~~ | ~~`add_member` or `create_team`~~ (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`) |
+| ~~`/admin/documents`~~ | ~~`upload_document` (org-wide **or on any team**)~~ (superseded 2026-10-11 by trellis/12 D34: uploads moved to `/organization`) |
+| `/admin/strikes` | `review_strike` (org-level, or on any team: D6 2026-10-10) |
 
 - **Implementation:**
   - `app/(dashboard)/admin/layout.tsx` (a Server Component) calls a `cache()`-wrapped `getAuthContext()` → `GET /api/v1/auth/context`. If `active_org.can_open_admin` is false, it calls `redirect('/dashboard')`. The tab bar shows exactly `active_org.admin_tabs`.
@@ -47,9 +47,9 @@ Decisions to lock:
 The Admin Console uses dedicated sub-routes wrapped by a shared `app/(dashboard)/admin/layout.tsx`:
 - `/admin/roles`: Visual Role Hierarchy builder (React Flow)
 - `/admin/members`: Everyone in the org with their org role, pending invites, "Invite member" (email + optional role). *Added 2026-10-09 (trellis/12 D25/D26); brief in `plans/member-management/frontend.md`.*
-- `/admin/teams`: Team directory and member assignments (existing org members only, after D25)
-- `/admin/documents`: Policy/SOP document uploader & tagging
-- `/admin/strikes`: Strike appeal reviews and audit log
+- ~~`/admin/teams`: Team directory and member assignments (existing org members only, after D25)~~ (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`)
+- ~~`/admin/documents`: Policy/SOP document uploader & tagging~~ (superseded 2026-10-11 by trellis/12 D34: uploads moved to `/organization`; the plumbing note below still applies there)
+- `/admin/strikes`: Strike appeal reviews and audit log (D6: lists only appeals the viewer may review; the giver of a strike never reviews its appeal)
 The shared admin layout provides top navigation tabs between these four surfaces so admins can switch contexts without re-fetching unrelated data.
 
 ### 2. React Flow Interaction Model

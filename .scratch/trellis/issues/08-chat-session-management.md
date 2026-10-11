@@ -1,5 +1,7 @@
 # 08 - Chat Session Management & SQLite Checkpointer
 
+> **Superseded in part 2026-10-10 (ticket 12 D11):** the checkpointer is `AsyncPostgresSaver` on NeonDB in **every** environment, local dev included. Read "SQLite" / `checkpoints.db` / `AsyncSqliteSaver` below as the Postgres saver (§7 is now the only setup); thread deletion uses the checkpointer's own thread-delete method.
+
 - **Type**: `task`
 - **Status**: `resolved`
 - **Assignee**: Agentic Lead

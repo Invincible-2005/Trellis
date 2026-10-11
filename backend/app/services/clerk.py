@@ -118,7 +118,14 @@ async def create_org_invitation(clerk_org_id: str, email: str, inviter_clerk_use
     resp = await _request(
         "POST",
         path,
-        {"email_address": email, "inviter_user_id": inviter_clerk_user_id, "role": "org:member"},
+        {
+            "email_address": email,
+            "inviter_user_id": inviter_clerk_user_id,
+            "role": "org:member",
+            # Without this, the email link ends on Clerk's hosted page with nowhere to go.
+            # Our <SignUp /> page reads the invite ticket from the link.
+            "redirect_url": f"{settings.FRONTEND_URL.rstrip('/')}/sign-up",
+        },
     )
     if resp.status_code != 200:
         raise _rejected(resp, "POST", path)

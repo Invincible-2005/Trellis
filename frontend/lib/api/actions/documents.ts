@@ -2,6 +2,7 @@
 // Document changes from the Documents page (trellis/12 D18, D23).
 // Expected failures come back as { ok: false, message } for a toast.
 import { revalidatePath } from 'next/cache';
+import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
 import type { components } from '../v1';
@@ -19,6 +20,8 @@ export type CreateDocumentInput = components['schemas']['CreateDocumentRequest']
  *   if (!result.ok) toast.error(result.message);
  */
 export async function createDocument(input: CreateDocumentInput): Promise<ActionResult<Document>> {
+  const blocked = await limit('heavyWrite');
+  if (blocked) return blocked;
   try {
     const document = await unwrap(api.POST('/api/v1/documents', { body: input }));
     revalidatePath('/admin/documents');
@@ -42,6 +45,8 @@ export async function getDocumentStatus(documentId: string): Promise<ActionResul
 
 /** Delete a document and its indexed pieces (only when `deletable` is true). */
 export async function deleteDocument(documentId: string): Promise<ActionResult<null>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
   try {
     await unwrap(api.DELETE('/api/v1/documents/{document_id}', { params: { path: { document_id: documentId } } }));
     revalidatePath('/admin/documents');

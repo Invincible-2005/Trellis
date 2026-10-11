@@ -62,7 +62,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - **Frontend:** `proxy.ts` checks only signed-in and active org. `(dashboard)/admin/layout.tsx` fetches effective permissions (`GET /api/v1/auth/context`) and redirects to `/dashboard` if the user isn't allowed. Navigation and tabs are shown or hidden from the same data.
   - **Backend:** every admin endpoint enforces its own permission. The frontend gate only affects what users see.
 - **Follow-up — ✅ RESOLVED 2026-10-09 (Piyush): per-tab entry.** The console opens for anyone who may open at least one tab, and shows only those tabs.
-  - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")`.
+  - Tabs: Roles `can_org("create_role")`; Teams `can_org("add_member") or can_org("create_team")`; Documents `can_org("upload_document")` **or `upload_document` on any team** (so a team manager can upload team documents, D23); Strikes `can_org("review_strike")` *(widened 2026-10-10 by D6: or `review_strike` on any team)*.
   - `/auth/context` returns `active_org.admin_tabs`; `can_open_admin = bool(admin_tabs)` (`app/api/v1/auth.py::_admin_tabs`).
   - **Members tab added 2026-10-09 (D25):** `can_org("add_member")`. Tab order: roles, members, teams, documents, strikes. Its role picker uses `GET /api/v1/admin/roles` (`assignable` flag).
   - `GET /api/v1/admin/roles` keeps its `create_role or add_member` gate (only Roles/Teams use it). The Documents tab's picker uses the new `GET /api/v1/documents/tag-options` instead.
@@ -70,13 +70,26 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Written into: frontend-scaffold ticket 06 §0, map, `plans/documents/frontend.md`.
 - **Written into:** ticket 03 §1, ticket 05, frontend tickets 02 and 06, `spec.md`.
 
-### D5. Commendation data model
+### D5. Commendation data model — ✅ RESOLVED 2026-10-10
 - **Gap:** `give_commendation` is in the MVP (map, ticket 04 tools, ticket 05 `CommendationResponse`), but there is no `Commendation` table in ticket 02, the code, or the migrations.
 - **Recommendation:** A `commendations` table that mirrors `strikes` without status or escalation: `id`, `org_id`, `team_id`, `given_by_user_id`, `given_to_user_id`, `reason`, `created_at`.
+- **Also found 2026-10-10:** the map said "same hierarchy check as strikes", ticket 10 said "caller above target **or same-team peer**".
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  - **Table:** `commendations` as recommended above (no status, appeal or escalation). New migration. API shapes already in ticket 05 (`CommendationResponse`, `CreateCommendationRequest`).
+  - **Who may give one:** only someone **ranked above** the person in that team: the receiver's role in that team is strictly below the giver's org role or the giver's role in that team (same yardstick as strikes and D30). **No permission needed** (no `give_commendation` permission added); peers can't commend each other. Self-commendation is impossible by the same rule.
+  - The ticket 10 "or same-team peer" wording is superseded.
 
-### D6. Strike appeal fields and flow
+### D6. Strike appeal fields and flow — ✅ RESOLVED 2026-10-10
 - **Gap:** The PRD §8 lists `reviewed_by_user_id` and `appeal_notes` on strikes, and frontend `/admin/strikes` is designed for appeal review. The `Strike` model has neither field, and the map lists the appeal flow as undecided.
 - **Also check:** With HITL Pattern A (ticket 10), the agent validates the strike before the DB commit. Is the `pending_agent_review` status still needed?
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  - **New columns on `strikes`:** `appeal_notes` (the receiver's reason), `reviewed_by_user_id`, `reviewed_at`. One migration.
+  - **Statuses:** a new strike is saved as `confirmed` (the agent checks policy *before* saving, D22). `pending_agent_review` is no longer used (left in the enum, not written). Receiver appeals → `appealed`. Reviewer upholds → back to `confirmed` with `reviewed_*` set, or dismisses → `dismissed`.
+  - **One appeal per strike:** only the receiver can appeal, only from `confirmed`, and only if it was never reviewed.
+  - **Who reviews:** anyone with `can("review_strike", team)` for the strike's team (org-level role **or** role in that team), **except the person who gave the strike**.
+  - **Gray area (giver is the only reviewer):** the appeal **waits** for someone else. The giver never self-reviews; the Strikes tab shows them "You gave this strike, so someone else must review it" and the Admin can give `review_strike` to another role.
+  - **Counting:** `confirmed` and `appealed` strikes count toward the 3-strike escalation; `dismissed` ones don't.
+  - **Consequence for the admin console (D4):** the Strikes tab opens for `can_org("review_strike")` **or `review_strike` on any team** (same pattern as the Documents tab), and lists only appeals the viewer may review.
 
 ### D7. Chat LLM provider — ✅ RESOLVED 2026-10-09
 - **Decision (Piyush): Gemini Flash on Google's free tier** via the already-installed `langchain-google-genai`.
@@ -162,16 +175,21 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Webhooks deferred to v2** as drift repair (`organizationMembership.deleted`, `organization.deleted`, `user.updated`, `user.deleted`). In the MVP, a user removed directly in the Clerk dashboard already loses access, because their token no longer carries the org; only stale rows remain.
 - **Implementation:** ticket 13.
 
-### D11. Deployment realities vs current design (added 2026-10-08)
+### D11. Deployment realities vs current design (added 2026-10-08) — ✅ RESOLVED 2026-10-10
 - **Gap:** PRD §17 says the backend runs on Railway or Render and the cache is Upstash Redis. Several MVP choices assume one long-lived process with a local disk:
   1. **The SQLite `checkpoints.db`** is lost on every redeploy unless the host has a persistent volume. Options: attach a volume, or use `AsyncPostgresSaver` (NeonDB) from the first deploy. Ticket 08 says that's a one-line swap.
   2. **The in-process `TTLCache`** (ticket 03) is only correct with **one** backend instance. The PRD's mention of Redis is stale (ticket 03 replaced it). Lock "single instance for MVP".
   3. **FastAPI `BackgroundTasks` ingestion** (ticket 11) is killed by a restart, leaving documents stuck in `processing` forever. A recovery rule is needed, for example on startup mark documents stuck longer than N minutes as `failed`, or re-queue them.
 - **Recommendation:** Run a single instance for the MVP and use the Postgres checkpointer in any deployed environment (SQLite for local dev only). Add a startup sweep for stuck `processing` documents.
+- ✅ **RESOLVED 2026-10-10 (Piyush):**
+  1. **Chat history:** `AsyncPostgresSaver` on NeonDB **everywhere**, local dev included (package `langgraph-checkpoint-postgres`; `saver.setup()` at startup). No SQLite checkpointer, so no dev/prod switch; `CHECKPOINTS_DB_PATH` and the local `checkpoints.db` go away when the chat endpoint is built.
+  2. **Single backend instance for the MVP** (the in-process `TTLCache` relies on it). No Redis.
+  3. **Stuck uploads:** already built (ticket 11 §7a, `fail_stale_ingestions()` in the `main.py` lifespan, 15 minutes).
 
-### D12. Single-org or multi-org for v1? (added 2026-10-08)
+### D12. Single-org or multi-org for v1? (added 2026-10-08) — ✅ RESOLVED 2026-10-10
 - **Conflict:** The map's "Out of scope" says "Multi-tenant SaaS billing (v1 = single org workspace)". Everything else is built for **multiple orgs per user**: the `org_members` bridge table, `org_id` on every row, Clerk Organizations, `/org-selection`, and `thread_id = {org_id}:...`.
 - **Likely intent:** "Billing is out of scope", not "only one org exists". If so, reword that line to "no billing; multi-org supported, each org isolated by `org_id`". Confirm.
+- ✅ **RESOLVED 2026-10-10 (Piyush): multi-org.** A user may belong to several orgs and switches between them (`/org-selection`); each org's data is isolated by `org_id`. Only billing/Stripe is out of scope. No code change; the map's "Out of scope" line is reworded.
 
 ### D13. Which teams can a user above a team see? (added 2026-10-08, found while writing D9)
 - **Gap:** In ticket 03, `allowed_team_ids` contains only teams the user is a **member** of. The access rule in ticket 02 and the PRD says team-scoped documents are visible to members **and all roles hierarchically above the team**.
@@ -353,7 +371,71 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Already an org member → 409 `already_member`; pending invite for that email → 409 `already_invited`.
   - Someone with a Clerk account who never opened Trellis falls into the invite path, which still works.
 
+### D27. Request protection: CORS and rate limits (added 2026-10-10, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** Nothing said where request protection lives. The frontend map only listed "Edge security: Arcjet". Piyush proposed CORS plus chained Arcjet with four custom tiers: read, write, heavyRead (fewer requests than read), heavyWrite.
+- **Decision (Piyush): Arcjet in Next.js, front gate + per-action; no CORS.**
+  - **No CORS on FastAPI.** The browser only talks to Next.js (same origin); Next.js → FastAPI is server-to-server, where CORS doesn't apply. Adding `CORSMiddleware` would only let browser JS call FastAPI directly, against the BFF rule.
+  - **Arcjet lives in Next.js, not FastAPI.** Every request reaching FastAPI comes from the Next.js server's IP, so bot and IP checks can't tell users apart there.
+  - **Front gate (`proxy.ts`, every request):** shield + bot detection (search engines and link previews allowed), plus the **read** limit for signed-in users, in one Arcjet call. `/api/uploadthing` skips it (UploadThing's server callback would look like a bot).
+  - **Per-action tiers:** `proxy.ts` can't tell Server Actions apart (they all POST to the page URL), so each action calls `limit(tier)` first and returns `{ ok: false, message }` for the toast (D18). Limits are per Clerk `userId` (sliding window):
+    - read 120/min (proxy.ts);
+    - write 20/min (role create/edit/delete, document delete, cancel invite);
+    - heavyRead 5/min (chat message: 2–4 Gemini calls each; wire into the chat route when built, ticket 09);
+    - heavyWrite 10 per 10 min (document indexing, invites).
+  - **Code:** `frontend/lib/middleware/` (`arcjet.ts` rules + numbers, `gate.ts` front gate, `limit.ts` per-action). Not named `frontend/middleware/` because Next.js 16 deprecated that name for `proxy.ts`. Blocked → 429 `rate_limited` / 403 `blocked` in the D16 shape.
+  - **No `ARCJET_KEY` → Arcjet is off** and everything passes, so teammates can run without a key.
+- **Known gap (ties to D11 deployment):** Arcjet guards only the Next.js door. If FastAPI's URL is public, a signed-in user could call it directly with their own token and skip the limits; keep FastAPI unreachable from outside when deploying.
+
+### D28. Where does team work happen: a `/teams` page for everyone, or `/admin/teams` only? (added 2026-10-10, teams effort, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** frontend tickets 01/06 and `spec.md` put teams only under `/admin/teams` (tab opens for `can_org("add_member")` or `can_org("create_team")`; `auth.py` `admin_tabs`). Piyush's idea: `/teams` lists teams, `/teams/[teamId]` has "Add member" and "Create task". With admin-only teams, a team-level manager (team role with `add_member`/`assign_task`, no org role) and plain team members can't open their own team.
+- **Recommendation:** `/teams` + `/teams/[teamId]` in the main app for everyone. The list = teams you can see (D13: on it, or every member is below you), not only teams you created. Buttons by permission: Create team = `can_org("create_team")`; Add member = `can("add_member", team)` (existing org members only, D25; team role strictly below the caller, D9); Create task = `can("assign_task", team)`. Backend routes under `/api/v1/teams` (not `/admin/teams`). The admin Teams tab is dropped. `/tasks` stays as "all my tasks" and uses the same create-task endpoint.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted as written. Updated: map, ticket 05 (team endpoints move to `/api/v1/teams`), frontend tickets 01/06, `spec.md`. Code drift: `auth.py` `admin_tabs` still emits `"teams"`.
+
+### D29. Who sees a team that has no members yet? (added 2026-10-10, teams effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** D13 visibility = member, or *every* member ranks below you. `resolver.py::build_scope` only counts teams **with at least one member**, so a newly created, empty team is visible to nobody, including the person who just created it. Nothing decides whether the creator joins the team.
+- **Recommendation:** the creator does **not** join (an Admin on every team they create would stop HR from seeing those teams under D13, and put the Admin in team task lists). An empty team is visible to anyone with org-level `create_team` or `add_member` (the people who can staff it). Once it has a member, the normal D13 rule applies. Small change in `build_scope` (also fetch empty teams in the org).
+- **Alternative:** "Create team" also asks for a first member (team lead + team role), so a team is never empty.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted. Creator doesn't join; empty teams visible to org-level `create_team` / `add_member` holders; normal D13 once staffed. Code: `build_scope` (ticket 03) to include empty teams for those holders.
+
+### D30. Which team role may a team manager give when adding someone to their team? (added 2026-10-10, teams effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** D17 measures "strictly below the caller" from the **org-level role only** (`manageable_role_ids`, used by `services/members.py::_get_assignable_role`). That fits creating roles and org invites. But D28 lets a team-level manager (team role with `add_member`, no org role) add members on `/teams/[teamId]`; with the org-only yardstick they could give no role at all, so a team-level `add_member` would be useless.
+- **Recommendation:** for team actions, the yardstick is the caller's org role **or** their role in that team: the given role must be strictly below either one, and carry only permissions the caller has in that team (`can(p, team)`). Same rule for removing a member. Org-level actions (D17) unchanged.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted. Code: an `AccessScope` helper for "roles below me in this team" (org role ∪ team role) used by the team member endpoints.
+
+### D31. Deleting a team: what happens to its tasks, strikes and documents? (added 2026-10-10, teams effort, raised by Piyush) — ✅ RESOLVED 2026-10-10
+- **Gap:** no ticket covers deleting a team. `tasks.team_id`, `strikes.team_id`, `documents.team_id` and `invitations.team_id` all point at `teams.id` with the default ON DELETE (restrict), so a plain delete fails once the team has any work.
+- **Recommendation:** `DELETE /api/v1/teams/{id}` needs `can_org("create_team")` and a team the caller oversees (empty, or every member below them, D13/D29). It is allowed only while the team has **no tasks, strikes or team documents** (else 409 `team_not_empty`); its member rows and pending team invitations go with it, then `invalidate_org`. Same idea as roles: a role someone holds can't be deleted. No migration.
+- **Alternatives:** delete everything with it (loses strike history); archive instead of delete (needs a migration and an "archived" filter in every team query).
+- **Decision (Piyush, 2026-10-10):** recommendation accepted (block until empty).
+- **Built 2026-10-10 (teams slice C):** invitations that name the team are not deleted but turned into org-only invites (`team_id` and `role_id` cleared): the invitee still joins the org with no role, no Clerk call, and a team role can't turn into an org role. Since D25 the app no longer creates team invites, so this only covers old rows.
+
+### D32. Tasks: who may create one, and for whom? (added 2026-10-10, tasks effort) — ✅ RESOLVED 2026-10-10
+- **Scope of the first tasks round (Piyush, 2026-10-10):** core only: create, list (team page + `/tasks`), change status, edit, delete. Dependencies (`blocked_by_task_id`), submissions and comments come later; their tables exist, so no migration is needed then.
+- **Who creates (Piyush, 2026-10-10):** whoever's role has `assign_task` in that team: `can("assign_task", team)` (org role or team role).
+- **Gap: for whom.** Ticket 04/10 only says `create_task` checks `assign_task`. Nothing says whether a manager may assign work to a peer manager or to someone above them. The locked rule (D9) is that users act only on roles strictly below their own.
+- **Recommendation:** assignee = yourself, nobody, or a team member whose team role passes `can_give_in_team` (strictly below your org role or your role in that team, D30). The assignee must be on the team. Same rule for the chat agent's `create_task` (it calls the same service function).
+- **Decision (Piyush, 2026-10-10):** the assignee must be **a team member ranked below the creator** (`can_give_in_team(assignee's team role, team)`, D30 yardstick). Assigning to yourself and unassigned tasks are **not** allowed for now (easy to add later). `tasks.assigned_to_user_id` stays nullable in the DB; the API requires it.
+
+### D33. Tasks: who may change status, edit or delete? (added 2026-10-10, tasks effort) — ✅ RESOLVED 2026-10-10
+- **Gap:** nothing says who may move a task between todo / in progress / done / blocked, or edit (title, description, deadline, assignee) or delete it.
+- **Recommendation:** a task's **managers** = people with `can("assign_task", team)` for whom the assignee's team role passes `can_give_in_team` (exactly who could have created it, D32). Managers may do everything; the **assignee** may only change the status. If the assignee has left the team, anyone with `assign_task` in the team counts as a manager. Reassigning follows D32 for the new assignee. Each task carries `can_edit` / `can_change_status` flags for the buttons.
+- **Decision (Piyush, 2026-10-10):** recommendation accepted.
+
 ---
+
+### D34. Document uploads: an admin tab, or a button on the `/documents` page? (added 2026-10-11, raised by Piyush while fixing the sidebar) — ✅ RESOLVED 2026-10-11
+- **Today (ticket 06, D4 follow-up):** uploading, tagging and deleting documents live at `/admin/documents`, gated by `upload_document` (org-wide **or on any team**). `/documents` is the read-only browser for everyone. A team manager who may upload therefore opens "Admin" just to see one tab.
+- **Proposal (same reasoning as D28 for teams):** one `/documents` page for everyone; "Upload" shown when the user has somewhere to tag a document (`GET /documents/tag-options` not empty); "Delete" per row from `deletable`. Drop `documents` from `admin_tabs`; Admin = Roles, Members, Strikes. Backend data rules (D23) unchanged.
+- ✅ **RESOLVED 2026-10-11 (Piyush):** `/documents` becomes **`/organization`**: a short description of the org at the top, then the policy documents the user may see, grouped "Whole organization" / "Your role" / "Your team". **Upload policy** shows when tag-options is not empty; **Delete** per row from `deletable`. `/admin/documents` is dropped and `documents` leaves `admin_tabs` (Admin = Roles, Members, Strikes). Data rules (D23), UploadThing gate and endpoints unchanged.
+  - **Clarified:** task submissions (work handed in on a task, `task.py`) are a separate upload inside tasks, open to the task's assignees with no `upload_document` permission. Policy documents are the AI chat's knowledge base.
+  - **Follow-ups:** backend drops `documents` from `_admin_tabs()` (`api/v1/auth.py`) and the `admin_tabs` Literal; who may edit the org description (next question, D35).
+  - **Built 2026-10-11:** `documents` dropped from `_admin_tabs()` and the Literal; `GET`/`PATCH /api/v1/orgs/current` (`services/orgs.py::get_org_profile/update_org_description`, D35 check = caller's org-level role is the `is_system` role); `lib/api/queries/orgs.ts::getOrganization`, `lib/api/actions/orgs.ts::updateOrgDescription`. 58 tests pass; not yet called against the live DB.
+  - **Written into:** frontend-scaffold tickets 01 and 06, `spec.md`, both maps, `plans/documents/`.
+
+### D35. Who may edit the organization's description? (added 2026-10-11, follow-up to D34) — ✅ RESOLVED 2026-10-11
+- **Gap:** `/organization` shows `organizations.description` (column exists, nullable), but no endpoint reads or writes it and no permission covers it (`ROLE_PERMISSIONS` has none for org details).
+- **Proposal:** holders of the protected root `Admin` role (`is_system`) may edit it with an Edit button on `/organization`; everyone else reads. No new permission. Alternative: anyone with org-wide `create_role`.
+- ✅ **RESOLVED 2026-10-11 (Piyush):** only holders of the protected root `Admin` role (`is_system`) may edit the description (Edit button on `/organization`); everyone in the org reads it. No new permission.
 
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
@@ -367,6 +449,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - Frontend map, frontend tickets 01, 02 and 06, and `spec.md`: updated for the real route groups (`(marketing)/(auth)/(dashboard)`), Next 16 `proxy.ts`, Clerk v7, and `org` scope tagging.
 
 ## Code drift found (needs a `backend/` change, which requires separate confirmation per AGENTS.md)
+- ~~`backend/app/api/v1/auth.py::_admin_tabs` and `schemas/auth.py` `admin_tabs`: still include `"teams"`; D28 (2026-10-10) dropped the admin Teams tab.~~ Fixed 2026-10-10 (teams slice A; `openapi.json` and `v1.d.ts` regenerated).
 - ~~`backend/app/core/config.py`: no LLM settings.~~ Fixed 2026-10-09: `GOOGLE_API_KEY`, `CHAT_MODEL` (`google_genai:gemini-flash-latest`), `ROUTER_MODEL` (`google_genai:gemini-flash-lite-latest`), `CHAT_MAX_MESSAGE_CHARS=4000` (D7, D21).
 - ~~`backend/app/agent/state.py`: old 3-way `intent`, LLM groundedness field, no `pending_action`, no per-turn reset.~~ Fixed 2026-10-09: rewritten for D19–D22; adds `AgentContext` and `new_turn_input()`.
 - ~~`backend/app/models/document.py` docstring: the same inverted "descendant" wording as ticket 02.~~ Fixed 2026-10-08.

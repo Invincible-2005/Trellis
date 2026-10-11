@@ -102,12 +102,12 @@ export const HeroHeader = () => {
                             <div className="flex w-full flex-col space-y-3 sm:flex-row sm:gap-3 sm:space-y-0 md:w-fit">
                                 {/* <ClerkProvider> */}
                                     <Show when="signed-out">
-                                        <SignInButton>
+                                        <SignInButton forceRedirectUrl="/dashboard" signUpForceRedirectUrl="/dashboard">
                                             <Button size="sm">
                                             Get Started
                                         </Button>
                                         </SignInButton>
-                                        <SignUpButton>
+                                        <SignUpButton forceRedirectUrl="/dashboard" signInForceRedirectUrl="/dashboard">
                                             <Button size="sm">
                                             Sign Up
                                         </Button>

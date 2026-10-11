@@ -49,6 +49,20 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [12-D26 Existing users](./issues/12-decision-reconciliation.md): Inviting an email that has signed into Trellis before adds them to the org instantly (Clerk membership + `org_members`); otherwise a Clerk invite email, applied on first login. 409 `already_member` / `already_invited`.
 - [12-D7 Chat LLM](./issues/12-decision-reconciliation.md): Gemini Flash (agents) + Flash-Lite (router), free tier, via `langchain-google-genai` and `init_chat_model`; model names in settings (`CHAT_MODEL`, `ROUTER_MODEL`) so the provider can be swapped.
 - [12-D23 Document tagging](./issues/12-decision-reconciliation.md): "At or below yourself": role docs only to your org role or below (D17 yardstick); team docs need `can("upload_document", team)` + `can_view_team`; org docs need `can_org("upload_document")`. Delete uses the same rule ("if you could upload it there, you can delete it").
+- [12-D27 Request protection](./issues/12-decision-reconciliation.md): **Arcjet in Next.js, no CORS.** `proxy.ts` front gate = shield + bots + per-user read limit; each Server Action / chat route calls `limit('write' | 'heavyRead' | 'heavyWrite')`. Code in `frontend/lib/middleware/`. FastAPI has no CORS (BFF is server-to-server) and must stay unreachable from outside (D11).
+- [12-D28 Team pages](./issues/12-decision-reconciliation.md): Team work lives at **`/teams` + `/teams/[teamId]` for everyone** (list = teams you can see, D13); buttons by permission: Create team `can_org("create_team")`, Add member `can("add_member", team)` (existing org members, role below yours), Create task `can("assign_task", team)`. Backend `/api/v1/teams`; admin Teams tab dropped.
+- [12-D29 Empty teams](./issues/12-decision-reconciliation.md): The creator doesn't join a new team. An empty team is visible to org-level `create_team`/`add_member` holders; once staffed, D13 applies.
+- [12-D30 Team-role yardstick](./issues/12-decision-reconciliation.md): In team actions (add/remove a team member), the given role must be strictly below the caller's org role **or** their role in that team, with only permissions the caller has there (`can(p, team)`). Org-level actions keep D17.
+- [12-D31 Deleting a team](./issues/12-decision-reconciliation.md): `can_org("create_team")` + a team you oversee; blocked with 409 `team_not_empty` while it has tasks, strikes or team documents; member rows and pending team invites go with it.
+- [12-D32 Creating tasks](./issues/12-decision-reconciliation.md): First round = core only (create, list, status, edit, delete). Creator needs `can("assign_task", team)`; the assignee must be a team member ranked below them (D30 yardstick). No self-assigned or unassigned tasks for now.
+- [12-D33 Changing tasks](./issues/12-decision-reconciliation.md): The assignee may only change the status. Anyone who could have created the task (`assign_task` + assignee ranked below them) may edit, reassign or delete it; if the assignee left the team, anyone with `assign_task` there may.
+- [12-D34 Policies page](./issues/12-decision-reconciliation.md): `/documents` becomes `/organization` (org description + the policies you can see). Uploading and deleting policies happen there, for people allowed; no admin Documents tab (`admin_tabs` drops `documents`). Task submissions are a separate upload inside tasks.
+- [12-D35 Org description](./issues/12-decision-reconciliation.md): only holders of the protected root `Admin` role edit the org description on `/organization`; everyone reads it.
+- [12-D12 Multi-org](./issues/12-decision-reconciliation.md): A user may belong to several orgs and switch between them; each org isolated by `org_id`. Only billing is out of scope.
+- [12-D5 Commendations](./issues/12-decision-reconciliation.md): New `commendations` table (like strikes, no status/appeal/escalation). Only someone ranked above the receiver in that team may give one; no permission needed, no peer commendations.
+- [12-D6 Strike appeals](./issues/12-decision-reconciliation.md): New strikes are `confirmed`; the receiver may appeal once (`appeal_notes`); anyone with `can("review_strike", team)` except the giver upholds or dismisses (`reviewed_by_user_id`, `reviewed_at`); if the giver is the only reviewer, the appeal waits. Dismissed strikes stop counting. Strikes tab also opens for team-level `review_strike`.
+- [12-D11 Deployment](./issues/12-decision-reconciliation.md): Chat history (LangGraph checkpointer) in NeonDB via `AsyncPostgresSaver` everywhere, no SQLite; one backend instance for the MVP; stuck uploads already swept at startup.
+- [13 Router-level guards](./issues/13-identity-and-org-provisioning.md): `get_current_user` on all of `/api/v1`, `get_org_context` on every org-data router (2026-10-10), so a new endpoint can't skip the auth/org checks.
 - [Strike system]: Strike highlights to direct manager (role immediately above in team). Threshold (3 strikes) escalates to next level up. Commendation system (`give_commendation`) included in MVP as positive counterpart — same hierarchy check, no RAG validation needed.
 - [Org provisioning flow — decided 2026-09-28]: **Superseded 2026-10-08 by [12-D15](./issues/12-decision-reconciliation.md): D10/D4 kept.** Original text: **Clerk is source of truth (Option A).** User creates org via Clerk on the frontend → Clerk issues `clerk_org_id` → backend mirrors it into `organizations` table on first JWT hit for that org. Backend does NOT auto-create org rows — creation is always user-initiated via Clerk. Only the org creator (admin) can add/remove members and assign roles.
 - [User auth redirect flow — decided 2026-09-28]: Returning user → redirected to last active org workspace (org switcher available on that page). New user with no org → redirected to "Create Organization" page. New user who has been invited by an admin (TeamMember row exists) → redirected directly to their org workspace. Frontend drives all redirect logic based on the `org_id` presence in the Clerk JWT and the user's `AccessScope`.
@@ -59,7 +73,6 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - **Scoring & Evaluation Suite**: Red-teaming benchmark and automated prompt injection defense testing.
 - **Real-time vs. polling**: WebSocket vs. SSE vs. short-polling for live task/notification updates (chat streaming is SSE; this is about dashboard/task status refresh).
 - **Document versioning**: What happens to vector chunks when an SOP document is updated? v1 default: re-upload creates a new document record; Admin deletes old one manually (cascade deletes chunks).
-- **Strike appeal flow**: Employee disputes a strike → flagged to HR / `review_strike`-permissioned role.
 
 ## Open tickets (frontier)
 
@@ -81,12 +94,12 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 1. **Task & Strike Event Escalation / Notifications**:
    - How does a manager or employee get alerted (in-app notification table vs email vs polling)?
 2. **Strike Appeal Flow Details**:
-   - UI and endpoint workflow for reviewing and dismissing strikes. → Now tracked as ticket 12 D6 (includes missing `Strike` columns).
+   - ✅ Decided 2026-10-10 (ticket 12 D6).
 
 ## Out of scope
 
 - Payroll, legal HR, or full enterprise resource planning modules.
-- Multi-tenant SaaS billing / Stripe integration (v1 = single org workspace).
+- Billing / Stripe integration. *(Was "v1 = single org workspace"; superseded by D12 2026-10-10: multi-org is supported, each org isolated by `org_id`.)*
 - Natural language admin role configuration via chat ("AI admin").
 - Full LLM-generated raw SQL queries (replaced by typed tool binding).
 

@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 from typing import Optional
 from pydantic import field_validator
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_ISSUER: str = ""
     CLERK_AUTHORIZED_PARTIES: list[str] = ["http://localhost:3000"]
+    # Where the frontend runs. Clerk invite emails link to FRONTEND_URL/sign-up.
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Embeddings (ticket 12 D14): Gemini API, authenticated with GOOGLE_API_KEY below
     EMBEDDING_MODEL: str = "gemini-embedding-001"
@@ -51,6 +54,13 @@ class Settings(BaseSettings):
 
     # LangGraph SQLite checkpointer path (dev only; swapped for Postgres in prod)
     CHECKPOINTS_DB_PATH: str = "checkpoints.db"
+
+    # LangSmith tracing of agent runs (optional, dev/demo data only: traces contain
+    # prompts, document text and names). Off unless LANGSMITH_TRACING=true.
+    # Key: smith.langchain.com → Settings → API Keys. Each developer uses their own.
+    LANGSMITH_TRACING: bool = False
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = "trellis-dev"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -125,3 +135,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# LangChain reads tracing settings from os.environ, which Settings doesn't fill.
+# Export them only when tracing is on, so it stays off by default.
+if settings.LANGSMITH_TRACING and settings.LANGSMITH_API_KEY:
+    os.environ["LANGSMITH_TRACING"] = "true"
+    os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
+    os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT

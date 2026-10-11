@@ -3,6 +3,7 @@
 // Expected failures come back as { ok: false, message } for a toast: Next.js hides
 // the message of a thrown error in production. Redirect codes still redirect.
 import { revalidatePath } from 'next/cache';
+import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
 import type { components } from '../v1';
@@ -20,6 +21,8 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
  *   if (!result.ok) toast.error(result.message);
  */
 export async function createRole(input: CreateRoleInput): Promise<ActionResult<Role>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
   try {
     const role = await unwrap(api.POST('/api/v1/admin/roles', { body: input }));
     revalidatePath('/admin/roles');
@@ -34,6 +37,8 @@ export async function createRole(input: CreateRoleInput): Promise<ActionResult<R
  * Leave a field out to keep it unchanged; `permissions` is the full new list.
  */
 export async function updateRole(roleId: string, input: UpdateRoleInput): Promise<ActionResult<Role>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
   try {
     const role = await unwrap(
       api.PATCH('/api/v1/admin/roles/{role_id}', { params: { path: { role_id: roleId } }, body: input }),
@@ -47,6 +52,8 @@ export async function updateRole(roleId: string, input: UpdateRoleInput): Promis
 
 /** Delete a role nobody uses. The backend refuses while sub-roles, members, invitations or documents use it. */
 export async function deleteRole(roleId: string): Promise<ActionResult<null>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
   try {
     await unwrap(api.DELETE('/api/v1/admin/roles/{role_id}', { params: { path: { role_id: roleId } } }));
     revalidatePath('/admin/roles');
