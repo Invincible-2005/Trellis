@@ -45,10 +45,10 @@ frontend/
 │   ├── (dashboard)/                              # Authenticated application shell
 │   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check
 │   │   ├── _components/                          # Shell-level private components
-│   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar with <OrganizationSwitcher />
+│   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar; collapse button fixed top-left, <OrganizationSwitcher /> beside it (2026-10-11)
 │   │   │   ├── app-header.tsx                    # Breadcrumbs, Active Role badge, Command search trigger
-│   │   │   ├── nav-items.tsx                     # Nav items filtered by auth/context permissions
-│   │   │   ├── user-nav.tsx                      # Clerk <UserButton /> + Theme toggle
+│   │   │   ├── nav-items.tsx                     # Nav items filtered by auth/context permissions; Admin opens a sub-list of the user's admin_tabs (2026-10-11)
+│   │   │   ├── user-nav.tsx                      # Whole row (avatar, name, email) opens an account menu: Manage account (Clerk) / Sign out; theme toggle beside it (2026-10-11)
 │   │   │   ├── use-mobile.ts                     # shadcn sidebar's phone-size helper; moved here from hooks/ (no top-level hooks/ folder, decided 2026-10-10)
 │   │   │   └── command-menu.tsx                  # Cmd+K quick search modal (optional)
 │   │   │
@@ -90,11 +90,12 @@ frontend/
 │   │   │       ├── citation-badge.tsx            # Clickable SOP source references
 │   │   │       └── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
 │   │   │
-│   │   ├── documents/                            # Route: /documents
-│   │   │   ├── page.tsx                          # Role-accessible SOP & policy document browser
+│   │   ├── organization/                         # Route: /organization (replaces /documents, trellis/12 D34, 2026-10-11)
+│   │   │   ├── page.tsx                          # Org description + policies you can see, grouped org / role / team; Upload if tag-options not empty
 │   │   │   └── _components/
-│   │   │       ├── document-grid.tsx             # Card grid of accessible docs
-│   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for policy docs
+│   │   │       ├── policy-list.tsx               # Rows: title, scope, status badge (polls while processing), Delete if deletable
+│   │   │       ├── upload-policy-dialog.tsx      # Uploadthing dropzone → tag picker (org / role / team) → createDocument
+│   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for a policy
 │   │   │
 │   │   └── admin/                                # Route: /admin/* (create_role OR add_member org-wide; per-tab perms)
 │   │       ├── layout.tsx                        # Tabs + gate: redirect unless auth/context.active_org.can_open_admin (D4)
@@ -112,12 +113,7 @@ frontend/
 │   │       │       ├── invitations-table.tsx     # Pending invites with Cancel
 │   │       │       └── invite-member-dialog.tsx  # Email + role picker (assignable roles)
 │   │       │   (teams/ tab removed 2026-10-10, trellis/12 D28 → see /teams above)
-│   │       ├── documents/                        # Route: /admin/documents
-│   │       │   ├── page.tsx                      # Upload & Tag Policy/SOP documents
-│   │       │   └── _components/
-│   │       │       ├── documents-table.tsx       # Rows, status badge (polls while processing), delete (added 2026-10-09)
-│   │       │       ├── doc-upload-dropzone.tsx   # Uploadthing file dropzone
-│   │       │       └── tag-scope-select.tsx      # Modal to choose Org / Role / Team scope tag
+│   │       │   (documents/ tab removed 2026-10-11, trellis/12 D34 → uploads live on /organization above)
 │   │       └── strikes/                          # Route: /admin/strikes
 │   │           ├── page.tsx                      # Strike appeal review & policy validation audit
 │   │           └── _components/

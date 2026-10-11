@@ -2,76 +2,138 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, ShieldCheck } from "lucide-react"
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  ChevronRight,
+  Network,
+  UserPlus,
+  Flag,
+  type LucideIcon,
+} from "lucide-react"
 
+import type { components } from "@/lib/api/v1"
 import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   useSidebar,
 } from "@/components/ui/sidebar"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-interface NavItemsProps {
-  canOpenAdmin: boolean
-  adminHref: string | null
+export type AdminTab = NonNullable<
+  components["schemas"]["ActiveOrgPermissions"]["admin_tabs"]
+>[number]
+
+const ADMIN_TABS: Record<AdminTab, { label: string; icon: LucideIcon }> = {
+  roles: { label: "Roles", icon: Network },
+  members: { label: "Members", icon: UserPlus },
+  strikes: { label: "Strikes", icon: Flag },
 }
 
-export function NavItems({ canOpenAdmin, adminHref }: NavItemsProps) {
+const ITEMS = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Teams", href: "/teams", icon: Users },
+]
+
+interface NavItemsProps {
+  /** Admin sections this user may open; the Admin entry is hidden when empty. */
+  adminTabs: AdminTab[]
+}
+
+export function NavItems({ adminTabs }: NavItemsProps) {
   const pathname = usePathname()
-  const { setOpenMobile, isMobile } = useSidebar()
+  const { setOpenMobile, isMobile, state } = useSidebar()
+  const compact = state === "collapsed" && !isMobile
 
-  const items = [
-    {
-      label: "Dashboard",
-      href: "/dashboard",
-      icon: LayoutDashboard,
-      show: true,
-    },
-    {
-      label: "Teams",
-      href: "/teams",
-      icon: Users,
-      show: true,
-    },
-    {
-      label: "Admin",
-      href: adminHref ?? "/admin",
-      icon: ShieldCheck,
-      show: canOpenAdmin && Boolean(adminHref),
-    },
-  ].filter((item) => item.show)
-
-  const isItemActive = (href: string) => {
-    if (href.startsWith("/admin")) {
-      return pathname.startsWith("/admin")
-    }
-    return pathname === href || pathname.startsWith(href + "/")
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false)
   }
+
+  const adminLinks = adminTabs.map((tab) => ({ href: `/admin/${tab}`, ...ADMIN_TABS[tab] }))
+  const adminActive = pathname.startsWith("/admin")
 
   return (
     <SidebarMenu className="gap-1.5">
-      {items.map((item) => {
-        const active = isItemActive(item.href)
-        return (
-          <SidebarMenuItem key={item.label}>
-            <SidebarMenuButton
-              asChild
-              isActive={active}
-              tooltip={item.label}
-            >
-              <Link
-                href={item.href}
-                onClick={() => {
-                  if (isMobile) setOpenMobile(false)
-                }}
-              >
-                <item.icon className="size-4" />
-                <span>{item.label}</span>
-              </Link>
-            </SidebarMenuButton>
+      {ITEMS.map((item) => (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.label}>
+            <Link href={item.href} onClick={closeOnMobile}>
+              <item.icon />
+              <span>{item.label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+
+      {adminLinks.length > 0 &&
+        (compact ? (
+          // Icons only: the shield opens a small menu to the right
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton isActive={adminActive} tooltip="Admin">
+                  <ShieldCheck />
+                  <span>Admin</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="min-w-40">
+                <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                {adminLinks.map((link) => (
+                  <DropdownMenuItem key={link.href} asChild>
+                    <Link href={link.href}>
+                      <link.icon />
+                      {link.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
-        )
-      })}
+        ) : (
+          // Full width: Admin opens a list underneath (already open on /admin pages)
+          <Collapsible asChild defaultOpen={adminActive} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton isActive={adminActive} tooltip="Admin">
+                  <ShieldCheck />
+                  <span>Admin</span>
+                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {adminLinks.map((link) => (
+                    <SidebarMenuSubItem key={link.href}>
+                      <SidebarMenuSubButton asChild isActive={isActive(link.href)}>
+                        <Link href={link.href} onClick={closeOnMobile}>
+                          <link.icon />
+                          <span>{link.label}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        ))}
     </SidebarMenu>
   )
 }

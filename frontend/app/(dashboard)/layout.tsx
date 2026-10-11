@@ -22,11 +22,8 @@ export default async function DashboardLayout({
 
   const { active_org } = context
   const orgRoleName = active_org.org_role_name ?? null
-  const canOpenAdmin = active_org.can_open_admin
-  const adminHref =
-    active_org.admin_tabs && active_org.admin_tabs.length > 0
-      ? `/admin/${active_org.admin_tabs[0]}`
-      : null
+  // Admin sections this user may open (backend decides, D4); empty = no Admin link
+  const adminTabs = active_org.admin_tabs ?? []
 
   // Restore sidebar persisted state
   const cookieStore = await cookies()
@@ -34,7 +31,7 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar canOpenAdmin={canOpenAdmin} adminHref={adminHref} />
+      <AppSidebar adminTabs={adminTabs} />
       <SidebarInset>
         <AppHeader orgRoleName={orgRoleName} />
         <main className="flex-1 p-4 md:p-6">{children}</main>
