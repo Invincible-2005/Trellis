@@ -468,6 +468,13 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Changing the audience while the document is `processing` → 409 `document_processing` (ingestion copies the audience onto the chunks it writes). Renaming is always allowed.
 - **Built 2026-10-11 (not yet live-tested):** `PATCH /api/v1/documents/{id}` (`UpdateDocumentRequest`, `services/documents.py::update_document`, tag checks shared with upload in `_check_tag`); `actions/documents.ts::updateDocument`; `admin/documents/_components/edit-document-dialog.tsx` + pencil button in `documents-table.tsx`. 58 backend tests pass; `tsc`, lint and `next build` pass.
 
+### D40. Deleting a document leaves its file in UploadThing (added 2026-10-11, raised by Piyush) — ✅ RESOLVED 2026-10-11
+- **Gap:** delete removed the `documents` row and its chunks (FK `ON DELETE CASCADE`) but never the file in UploadThing: storage kept filling up and the old link kept working. Deleting the file naively was unsafe: any uploader could register a second document with a file link they can see (e.g. an org-wide policy) and then delete their copy, taking the original's file with it.
+- ✅ **Decision (Piyush): one file belongs to one document, and delete removes the file.**
+  - `create_document` refuses a `file_url` already used by any document (all orgs share one UploadThing app) → 409 `file_already_registered`. No migration, no contract change (409 was already listed).
+  - `actions/documents.ts::deleteDocument` reads the document, deletes it in the backend, then calls `UTApi().deleteFiles(<key>)` with the key from the `/f/<key>` link. A failed file delete is only logged: the document is already gone from Trellis.
+- **Built 2026-10-11 (not yet live-tested):** 58 backend tests pass; `tsc` and lint pass.
+
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
 - Ticket 02: the wording for `scope_type='role'` visibility was inverted. It now says "role + ancestors"; the CTE was already correct.

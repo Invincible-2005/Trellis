@@ -158,12 +158,24 @@ async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocu
         400 invalid_file_url                — not an UploadThing CDN URL (SSRF guard, ticket 11)
         404 role_not_found / team_not_found — the tag isn't a role or team in this org
         403 forbidden                       — tag not at or below the caller (D23)
+        409 file_already_registered         — another document already uses this file (D40)
     """
     if not is_allowed_file_url(body.file_url):
         raise api_error(
             status.HTTP_400_BAD_REQUEST,
             "invalid_file_url",
             "The file must be uploaded through the app (UploadThing).",
+        )
+
+    # One file belongs to one document (D40): deleting a document also deletes its
+    # file from UploadThing, so a copy pointing at someone else's file must not exist.
+    # Checked across all orgs because every org shares one UploadThing app.
+    in_use = await db.scalar(select(Document.id).where(Document.file_url == body.file_url).limit(1))
+    if in_use is not None:
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "file_already_registered",
+            "This file is already registered as a document. Upload it again to add another copy.",
         )
 
     await _check_tag(db, scope, body.scope_type, body.role_id, body.team_id)

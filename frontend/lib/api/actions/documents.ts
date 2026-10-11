@@ -2,6 +2,7 @@
 // Document changes from Admin → Documents (trellis/12 D18, D23).
 // Expected failures come back as { ok: false, message } for a toast.
 import { revalidatePath } from 'next/cache';
+import { UTApi } from 'uploadthing/server';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
@@ -69,16 +70,37 @@ export async function updateDocument(
   }
 }
 
-/** Delete a document and its indexed pieces (only when `deletable` is true). */
+/**
+ * Delete a document, its indexed pieces and its file in UploadThing (only when
+ * `deletable` is true). Each file belongs to one document (trellis/12 D40), so
+ * removing the file can't break another document.
+ */
 export async function deleteDocument(documentId: string): Promise<ActionResult<null>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
   try {
-    await unwrap(api.DELETE('/api/v1/documents/{document_id}', { params: { path: { document_id: documentId } } }));
+    const path = { params: { path: { document_id: documentId } } };
+    const document = await unwrap(api.GET('/api/v1/documents/{document_id}', path));
+    await unwrap(api.DELETE('/api/v1/documents/{document_id}', path));
+    await deleteStoredFile(document.file_url);
     revalidatePath('/admin/documents');
     return { ok: true, data: null };
   } catch (err) {
     return toFailure(err);
+  }
+}
+
+// UploadThing links end in /f/<file key> (<app>.ufs.sh/f/<key> or utfs.io/f/<key>).
+// The document is already gone from Trellis by now, so a failure here is only logged:
+// the leftover file costs storage but nobody can reach it through the app.
+async function deleteStoredFile(fileUrl: string) {
+  try {
+    const key = new URL(fileUrl).pathname.match(/^\/f\/([^/]+)$/)?.[1];
+    if (!key) throw new Error('no file key in the link');
+    const { success } = await new UTApi().deleteFiles(decodeURIComponent(key));
+    if (!success) throw new Error('UploadThing refused the delete');
+  } catch (err) {
+    console.error(`[documents] Could not delete ${fileUrl} from UploadThing:`, err);
   }
 }
 

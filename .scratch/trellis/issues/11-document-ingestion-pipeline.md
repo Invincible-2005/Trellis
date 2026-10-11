@@ -174,3 +174,7 @@ The earlier drift is resolved. How it works now:
 ## Context pointer (for map.md)
 
 Resolves into implementation tasks: (a) Alembic migration adding `file_url`, `file_type`, `status`, `chunk_count` to `documents` and adding `org` to `scope_type` ENUM; (b) ingestion service module in FastAPI.
+
+## Deleting a document (2026-10-11, ticket 12 D40)
+
+Delete removes the `documents` row, its chunks (FK `ON DELETE CASCADE`) and the file in UploadThing (`frontend/lib/api/actions/documents.ts::deleteDocument`). Registering a `file_url` that another document already uses is refused (409 `file_already_registered`), so a delete can never remove someone else's file. A delete during `processing` is safe: the ingestion job's chunk insert fails on the missing document and nothing is kept.
