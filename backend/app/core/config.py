@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_ISSUER: str = ""
     CLERK_AUTHORIZED_PARTIES: list[str] = ["http://localhost:3000"]
+    # Where the frontend runs. Clerk invite emails link to FRONTEND_URL/sign-up.
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Embeddings (ticket 12 D14): Gemini API, authenticated with GOOGLE_API_KEY below
     EMBEDDING_MODEL: str = "gemini-embedding-001"

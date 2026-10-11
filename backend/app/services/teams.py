@@ -91,7 +91,11 @@ async def get_team(db: AsyncSession, scope: AccessScope, team_id: uuid.UUID) -> 
             role_name=role_name,
             joined_at=member.joined_at,
             removable=can_add and scope.can_give_in_team(member.role_id, team_id),
-            assignable=can_assign and scope.can_give_in_team(member.role_id, team_id),
+            assignable=(
+                can_assign
+                and user.id != scope.user_id  # no tasks for yourself (D32)
+                and scope.can_give_in_team(member.role_id, team_id)
+            ),
         )
         for member, user, role_name in rows
     ]
@@ -259,7 +263,7 @@ async def add_team_member(
         role_name=role.name,
         joined_at=member.joined_at,
         removable=True,
-        assignable=scope.can("assign_task", team_id),
+        assignable=user.id != scope.user_id and scope.can("assign_task", team_id),
     )
 
 
