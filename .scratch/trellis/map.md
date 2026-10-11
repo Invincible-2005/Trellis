@@ -69,6 +69,7 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [Strike system]: Strike highlights to direct manager (role immediately above in team). Threshold (3 strikes) escalates to next level up. Commendation system (`give_commendation`) included in MVP as positive counterpart — same hierarchy check, no RAG validation needed.
 - [Org provisioning flow — decided 2026-09-28]: **Superseded 2026-10-08 by [12-D15](./issues/12-decision-reconciliation.md): D10/D4 kept.** Original text: **Clerk is source of truth (Option A).** User creates org via Clerk on the frontend → Clerk issues `clerk_org_id` → backend mirrors it into `organizations` table on first JWT hit for that org. Backend does NOT auto-create org rows — creation is always user-initiated via Clerk. Only the org creator (admin) can add/remove members and assign roles.
 - [User auth redirect flow — decided 2026-09-28]: Returning user → redirected to last active org workspace (org switcher available on that page). New user with no org → redirected to "Create Organization" page. New user who has been invited by an admin (TeamMember row exists) → redirected directly to their org workspace. Frontend drives all redirect logic based on the `org_id` presence in the Clerk JWT and the user's `AccessScope`.
+- [12-D40 Document files](./issues/12-decision-reconciliation.md): one file belongs to one document (409 `file_already_registered`); deleting a document also deletes its file from UploadThing (Next.js `deleteDocument` action, `UTApi`).
 
 ## Not yet specified
 
