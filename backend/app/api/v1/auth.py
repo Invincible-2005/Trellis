@@ -157,15 +157,21 @@ async def _active_org_permissions(db: AsyncSession, scope: AccessScope) -> Activ
 def _admin_tabs(scope: AccessScope) -> list[str]:
     """
     Admin console tabs the user may open (D4 + follow-up 2026-10-09). Each tab's
-    own permission, org-wide. The backend checks every action anyway.
-    No Teams tab: teams have their own /teams pages (D28). No Documents tab:
-    policies are uploaded on the /organization page (D34).
+    own permission, org-wide unless noted. The backend checks every action anyway.
+    No Teams tab: teams have their own /teams pages (D28). Documents is an admin
+    tab again (D37, replacing D34's /organization page): only people who may
+    upload somewhere get a documents page at all.
     """
     tabs = []
     if scope.can_org("create_role"):
         tabs.append("roles")
     if scope.can_org("add_member"):
         tabs.append("members")
+    # Org-wide or on any team: a team manager uploads for their own team.
+    if scope.can_org("upload_document") or any(
+        "upload_document" in perms for perms in scope.permissions_by_team.values()
+    ):
+        tabs.append("documents")
     if scope.can_org("review_strike"):
         tabs.append("strikes")
     return tabs

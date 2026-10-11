@@ -423,7 +423,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 
 ---
 
-### D34. Document uploads: an admin tab, or a button on the `/documents` page? (added 2026-10-11, raised by Piyush while fixing the sidebar) — ✅ RESOLVED 2026-10-11
+### D34. Document uploads: an admin tab, or a button on the `/documents` page? (added 2026-10-11, raised by Piyush while fixing the sidebar) — ✅ RESOLVED 2026-10-11 · ⚠️ SUPERSEDED the same day by D37 (back to an admin Documents tab; no `/organization` page)
 - **Today (ticket 06, D4 follow-up):** uploading, tagging and deleting documents live at `/admin/documents`, gated by `upload_document` (org-wide **or on any team**). `/documents` is the read-only browser for everyone. A team manager who may upload therefore opens "Admin" just to see one tab.
 - **Proposal (same reasoning as D28 for teams):** one `/documents` page for everyone; "Upload" shown when the user has somewhere to tag a document (`GET /documents/tag-options` not empty); "Delete" per row from `deletable`. Drop `documents` from `admin_tabs`; Admin = Roles, Members, Strikes. Backend data rules (D23) unchanged.
 - ✅ **RESOLVED 2026-10-11 (Piyush):** `/documents` becomes **`/organization`**: a short description of the org at the top, then the policy documents the user may see, grouped "Whole organization" / "Your role" / "Your team". **Upload policy** shows when tag-options is not empty; **Delete** per row from `deletable`. `/admin/documents` is dropped and `documents` leaves `admin_tabs` (Admin = Roles, Members, Strikes). Data rules (D23), UploadThing gate and endpoints unchanged.
@@ -432,10 +432,41 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - **Built 2026-10-11:** `documents` dropped from `_admin_tabs()` and the Literal; `GET`/`PATCH /api/v1/orgs/current` (`services/orgs.py::get_org_profile/update_org_description`, D35 check = caller's org-level role is the `is_system` role); `lib/api/queries/orgs.ts::getOrganization`, `lib/api/actions/orgs.ts::updateOrgDescription`. 58 tests pass; not yet called against the live DB.
   - **Written into:** frontend-scaffold tickets 01 and 06, `spec.md`, both maps, `plans/documents/`.
 
-### D35. Who may edit the organization's description? (added 2026-10-11, follow-up to D34) — ✅ RESOLVED 2026-10-11
+### D35. Who may edit the organization's description? (added 2026-10-11, follow-up to D34) — ✅ RESOLVED 2026-10-11 · ⏸ PARKED by D37: no page shows the description now; `GET`/`PATCH /api/v1/orgs/current` stay in the backend
 - **Gap:** `/organization` shows `organizations.description` (column exists, nullable), but no endpoint reads or writes it and no permission covers it (`ROLE_PERMISSIONS` has none for org details).
 - **Proposal:** holders of the protected root `Admin` role (`is_system`) may edit it with an Edit button on `/organization`; everyone else reads. No new permission. Alternative: anyone with org-wide `create_role`.
 - ✅ **RESOLVED 2026-10-11 (Piyush):** only holders of the protected root `Admin` role (`is_system`) may edit the description (Edit button on `/organization`); everyone in the org reads it. No new permission.
+- ⏸ **Parked 2026-10-11 (Piyush, after D37):** the admin tab stays named "Documents" (not "Organization"); no page shows the description for now. If it comes back, the suggested home is the Dashboard (everyone reads; Edit only for the `is_system` Admin), reusing `GET`/`PATCH /api/v1/orgs/current`.
+
+### D36. Admin navigation: a tab bar inside `/admin`, or the sidebar's Admin sub-list only? (added 2026-10-11, frontend review of commit 390608c) — ✅ RESOLVED 2026-10-11
+- **Conflict:** frontend ticket 06 §1 gives the admin layout a top tab bar; the sidebar redesign (2026-10-11, `spec.md` `nav-items.tsx`) made the sidebar's Admin entry open a sub-list of `admin_tabs`. Both were built, plus the header breadcrumb ("Admin › Members"): three navigations, and the tab bar never highlights the current tab and adds a second `<main>`.
+- ✅ **RESOLVED 2026-10-11 (Piyush):** **sidebar only.** `admin/layout.tsx` keeps only the permission gate (redirect unless `can_open_admin`) and renders `children` with no heading, tab bar or `<main>`. The sidebar sub-list and the breadcrumb show where the user is. `admin_tabs`, the per-page re-checks and the backend are unchanged.
+  - **Written into:** frontend-scaffold ticket 06 (§0, §1, new §4 fix list), `spec.md`, both maps.
+
+### D37. Who may see the org's documents in the app? (added 2026-10-11, raised by Piyush before building `/organization`) — ✅ RESOLVED 2026-10-11
+- **Question:** D34 made `/organization` a page every member opens (each sees only the documents their role/team may see; Upload/Delete only for people allowed). Should people with no upload permission have a documents page at all?
+- ✅ **RESOLVED 2026-10-11 (Piyush):** **no. Documents go back to an admin tab, `/admin/documents`.** "I don't want anyone with no permission the ability to see our org documents."
+  - **Tab gate:** `upload_document` org-wide **or on any team** (as before D34). The page lists the documents the user may see (D23 visibility, unchanged), with Upload (if tag-options isn't empty) and Delete (if `deletable`).
+  - **Everyone else** has no documents page. The AI chat still answers each person from the documents their role/team may see (the RAG feature itself is unchanged).
+  - **Supersedes** D34 (`/organization` page) and parks D35 (org description has no page).
+  - **Built 2026-10-11:** `_admin_tabs()` (`api/v1/auth.py`) and the `admin_tabs` Literal include `documents` again; `openapi.json` + `v1.d.ts` regenerated; 58 backend tests pass. Frontend: `admin/documents/` restored with the teammates' file names (plus the lint/polling fixes), `organization/` removed, document actions refresh `/admin/documents`, sidebar Admin list shows Documents. `tsc` and `next build` pass.
+  - **Written into:** frontend-scaffold ticket 06 (§0 table, §1, §4), `spec.md`, both maps, `plans/documents/frontend.md`.
+
+### D38. Removing a member and changing their org role: who counts as "below you", and what happens to their work? (added 2026-10-11, members round 2) — ✅ RESOLVED 2026-10-11
+- **Already decided (D10-C, D9, D17):** `DELETE /api/v1/admin/members/{user_id}` removes the Clerk membership first (otherwise just-in-time membership re-adds them), then their `team_members` and `org_members` rows. Only for people below the caller; the root `Admin` holder can never be removed. Changing the org role follows the invite rules: org-wide `add_member`, new role strictly below the caller and holding only permissions they have, or "no role"; nobody changes their own role.
+- **Gap 1:** how to rank a person with no org-level role (only team roles).
+  - ✅ **Decision (Piyush):** **every role they hold must be below the caller's org role**: their org role (if any) and each of their team roles (`can_manage_role`). Example: Recruiter and Manager are siblings; a Recruiter with `add_member` can't remove a person who is Manager on Team Alpha. A person with no roles at all can be acted on by any `add_member` holder (except themselves).
+- **Gap 2:** what happens to their tasks, strikes and documents.
+  - ✅ **Decision (Piyush):** **keep everything.** Tasks stay under their name; the team's managers may reassign or close them (D33: an assignee who left the team doesn't block). Strikes and uploaded documents stay as history. The `users` row stays (a removed person can be added again later).
+- **Implementation detail:** for a few minutes after removal the person's old session token may still name the org; requests in that window get 403 `not_a_member` (the frontend sends them to `/org-selection`) instead of being re-added just-in-time.
+- **Built 2026-10-11 (not yet live-tested):** `PATCH /api/v1/admin/members/{user_id}` `{role_id | null}` and `DELETE /api/v1/admin/members/{user_id}` (`services/members.py::update_member_role/remove_member`, `clerk.remove_org_membership`); `MemberResponse.manageable`; `deps.ensure_org_member` refuses a just-removed user (`not_a_member`). Frontend: `actions/members.ts::updateMemberRole/removeMember`, `errors.ts` redirects `not_a_member` → `/org-selection`, Members table Actions column + `change-role-dialog.tsx` + `remove-member-dialog.tsx`. 58 backend tests pass; `tsc`, lint and `next build` pass.
+
+### D39. Can a document's title, description or audience be changed after upload? (added 2026-10-11, raised by Piyush) — ✅ RESOLVED 2026-10-11
+- **Gap:** delete existed (D23: "if you could upload it there, you can delete it"); changing a document didn't, so fixing a wrong audience meant delete + re-upload + re-index, and the wrong audience could read it (and get it in chat answers) meanwhile.
+- ✅ **Decision (Piyush):** an **Edit** button on rows with `deletable: true`: title, description and **who sees it** (org / role / team). Rules = delete's rule for the current audience, plus upload's rule (D23) for the new one. Replacing the file stays delete + upload.
+  - The document's chunks carry their own copy of the audience (denormalized for search), so the edit updates them in the same commit: the chat follows at once, no re-indexing.
+  - Changing the audience while the document is `processing` → 409 `document_processing` (ingestion copies the audience onto the chunks it writes). Renaming is always allowed.
+- **Built 2026-10-11 (not yet live-tested):** `PATCH /api/v1/documents/{id}` (`UpdateDocumentRequest`, `services/documents.py::update_document`, tag checks shared with upload in `_check_tag`); `actions/documents.ts::updateDocument`; `admin/documents/_components/edit-document-dialog.tsx` + pencil button in `documents-table.tsx`. 58 backend tests pass; `tsc`, lint and `next build` pass.
 
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
@@ -462,3 +493,4 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - ~~`backend/**/__pycache__/*.pyc` files are tracked in git.~~ Fixed 2026-10-08: they are untracked, and `backend/.gitignore` is corrected (its paths were prefixed with `backend/`, so nothing matched).
   - The frontend has both `package-lock.json` and `pnpm-lock.yaml`; `packageManager` is pnpm.
 - The PRD still says the scope cache is "Redis, TTL ~60s". Ticket 03 replaced that with an in-process `TTLCache` with a 5-minute TTL.
+- ~~**Frontend review 2026-10-11 (admin console, commit 390608c):** leftover `admin/documents/` (broke `next build`), missing `admin/page.tsx`, no role edit/delete.~~ Fixed 2026-10-11 by Claude (frontend-scaffold ticket 06 §4); also fixed `lib/api/client.ts`/`errors.ts` swallowing Next's dynamic-rendering signal. Documents then moved back to `/admin/documents` (D37).

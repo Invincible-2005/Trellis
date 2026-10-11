@@ -90,30 +90,36 @@ frontend/
 │   │   │       ├── citation-badge.tsx            # Clickable SOP source references
 │   │   │       └── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
 │   │   │
-│   │   ├── organization/                         # Route: /organization (replaces /documents, trellis/12 D34, 2026-10-11)
-│   │   │   ├── page.tsx                          # Org description + policies you can see, grouped org / role / team; Upload if tag-options not empty
-│   │   │   └── _components/
-│   │   │       ├── policy-list.tsx               # Rows: title, scope, status badge (polls while processing), Delete if deletable
-│   │   │       ├── upload-policy-dialog.tsx      # Uploadthing dropzone → tag picker (org / role / team) → createDocument
-│   │   │       └── document-viewer-sheet.tsx     # Slide-over preview for a policy
+│   │   │   (organization/ (D34) dropped 2026-10-11 by trellis/12 D37: no documents page outside Admin)
 │   │   │
-│   │   └── admin/                                # Route: /admin/* (create_role OR add_member org-wide; per-tab perms)
-│   │       ├── layout.tsx                        # Tabs + gate: redirect unless auth/context.active_org.can_open_admin (D4)
-│   │       ├── page.tsx                          # Redirects to /admin/roles or shows admin overview
+│   │   └── admin/                                # Route: /admin/* (open if any tab is allowed; per-tab perms)
+│   │       ├── layout.tsx                        # Gate only: redirect unless auth/context.active_org.can_open_admin (D4). No tab bar: the sidebar's Admin sub-list is the admin nav (D36, 2026-10-11)
+│   │       ├── page.tsx                          # Redirects to the first tab in admin_tabs
 │   │       ├── roles/                            # Route: /admin/roles
 │   │       │   ├── page.tsx                      # Visual Role Hierarchy builder
 │   │       │   └── _components/
 │   │       │       ├── role-flow-tree.tsx        # React Flow canvas rendering hierarchy DAG
 │   │       │       ├── role-node.tsx             # Custom React Flow node displaying role & permissions
-│   │       │       └── create-role-dialog.tsx    # Dialog to add role and configure parent_role_id
+│   │       │       ├── create-role-dialog.tsx    # Dialog to add role and configure parent_role_id
+│   │       │       ├── edit-role-dialog.tsx      # Click a manageable role: edit name/description/parent/permissions, or Delete (added 2026-10-11)
+│   │       │       └── role-form-fields.tsx      # Fields shared by the create and edit dialogs (added 2026-10-11)
 │   │       ├── members/                          # Route: /admin/members (add_member; added 2026-10-09, trellis/12 D25)
 │   │       │   ├── page.tsx                      # Org members + pending invites
 │   │       │   └── _components/
 │   │       │       ├── members-table.tsx         # Name, email, org role, joined
 │   │       │       ├── invitations-table.tsx     # Pending invites with Cancel
-│   │       │       └── invite-member-dialog.tsx  # Email + role picker (assignable roles)
+│   │       │       ├── invite-member-dialog.tsx  # Email + role picker (assignable roles)
+│   │       │       ├── change-role-dialog.tsx    # Change a member's org role (rows with manageable: true; D38, 2026-10-11)
+│   │       │       └── remove-member-dialog.tsx  # Confirm + removeMember (rows with manageable: true; D38, 2026-10-11)
 │   │       │   (teams/ tab removed 2026-10-10, trellis/12 D28 → see /teams above)
-│   │       │   (documents/ tab removed 2026-10-11, trellis/12 D34 → uploads live on /organization above)
+│   │       ├── documents/                        # Route: /admin/documents (upload_document org-wide or on any team; back 2026-10-11, trellis/12 D37)
+│   │       │   ├── page.tsx                      # Documents you can see + Upload (if you can tag somewhere) + Delete (if deletable)
+│   │       │   └── _components/
+│   │       │       ├── documents-view.tsx        # Heading, Upload button, table, upload dialog
+│   │       │       ├── documents-table.tsx       # Rows: title, scope, status badge (polls while processing), Delete if deletable
+│   │       │       ├── doc-upload-dropzone.tsx   # Two-step dialog: Uploadthing dropzone → tag → createDocument
+│   │       │       ├── edit-document-dialog.tsx  # Edit title / description / who sees it (rows with deletable: true; D39, 2026-10-11)
+│   │       │       └── tag-scope-select.tsx      # Tag picker: whole org / a role / a team
 │   │       └── strikes/                          # Route: /admin/strikes
 │   │           ├── page.tsx                      # Strike appeal review & policy validation audit
 │   │           └── _components/

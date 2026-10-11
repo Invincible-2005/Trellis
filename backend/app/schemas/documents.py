@@ -35,6 +35,30 @@ class CreateDocumentRequest(BaseModel):
         return self
 
 
+class UpdateDocumentRequest(BaseModel):
+    """
+    Edit a document (D39). A missing field is left unchanged. To change who sees it,
+    send scope_type with the id it needs (role_id / team_id), exactly as on upload.
+    """
+    title: Optional[DocTitle] = None
+    description: Optional[str] = None   # "" clears it
+    scope_type: Optional[DocScopeType] = None
+    role_id: Optional[UUID] = None
+    team_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def _tag_matches_scope(self) -> "UpdateDocumentRequest":
+        if self.scope_type is None:
+            if self.role_id is not None or self.team_id is not None:
+                raise ValueError("Send scope_type together with role_id or team_id.")
+            return self
+        if (self.role_id is not None) != (self.scope_type == "role"):
+            raise ValueError("role_id is required for role documents and not allowed otherwise.")
+        if (self.team_id is not None) != (self.scope_type == "team"):
+            raise ValueError("team_id is required for team documents and not allowed otherwise.")
+        return self
+
+
 class DocumentResponse(AppBaseModel):
     id: UUID
     title: str

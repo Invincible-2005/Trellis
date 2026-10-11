@@ -25,6 +25,8 @@ interface DocUploadDropzoneProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tagOptions: DocumentTagOptions;
+  /** Pick this role in step 2 (from the Roles page's "Add a document for this role"). */
+  presetRoleId?: string;
 }
 
 type AllowedFileType = "pdf" | "docx" | "pptx" | "txt" | "md";
@@ -33,6 +35,7 @@ export function DocUploadDropzone({
   open,
   onOpenChange,
   tagOptions,
+  presetRoleId,
 }: DocUploadDropzoneProps) {
   const router = useRouter();
 
@@ -51,14 +54,13 @@ export function DocUploadDropzone({
   const [targetId, setTargetId] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const resetForm = () => {
-    setStep(1);
-    setFileUrl("");
-    setFileName("");
-    setFileType("pdf");
-    setTitle("");
-    setDescription("");
-    if (tagOptions.org) {
+  // Who the document is for, before the user changes it: the preset role, else the
+  // widest place this user may share to.
+  const applyDefaultScope = () => {
+    if (presetRoleId) {
+      setScopeType("role");
+      setTargetId(presetRoleId);
+    } else if (tagOptions.org) {
       setScopeType("org");
       setTargetId(undefined);
     } else if (tagOptions.roles.length > 0) {
@@ -68,6 +70,18 @@ export function DocUploadDropzone({
       setScopeType("team");
       setTargetId(tagOptions.teams[0]?.id);
     }
+  };
+
+  const presetRoleName = tagOptions.roles.find((r) => r.id === presetRoleId)?.name;
+
+  const resetForm = () => {
+    setStep(1);
+    setFileUrl("");
+    setFileName("");
+    setFileType("pdf");
+    setTitle("");
+    setDescription("");
+    applyDefaultScope();
   };
 
   const handleDialogChange = (isOpen: boolean) => {
@@ -103,17 +117,7 @@ export function DocUploadDropzone({
     setFileType(resolvedType);
     setTitle(name.replace(/\.[^/.]+$/, ""));
 
-    // Default scope from tag options
-    if (tagOptions.org) {
-      setScopeType("org");
-      setTargetId(undefined);
-    } else if (tagOptions.roles.length > 0) {
-      setScopeType("role");
-      setTargetId(tagOptions.roles[0]?.id);
-    } else if (tagOptions.teams.length > 0) {
-      setScopeType("team");
-      setTargetId(tagOptions.teams[0]?.id);
-    }
+    applyDefaultScope();
 
     setStep(2);
   };
@@ -168,10 +172,11 @@ export function DocUploadDropzone({
             <DialogHeader className="mb-4">
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5 text-primary" />
-                Upload Policy Document
+                {presetRoleName ? `Upload a document for ${presetRoleName}` : "Upload & share a document"}
               </DialogTitle>
               <DialogDescription>
-                Select a document to upload (PDF, DOCX, PPTX, TXT, or MD, max 16 MB).
+                Step 1 of 2: choose the file (PDF, DOCX, PPTX, TXT, or MD, max 16 MB). Next you
+                choose who should see it.
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
@@ -181,6 +186,9 @@ export function DocUploadDropzone({
                 onUploadError={(err) => {
                   toast.error(`Upload error: ${err.message}`);
                 }}
+                // UploadThing's default line lists raw MIME types and runs under the button
+                content={{ allowedContent: "PDF, DOCX, PPTX, TXT or MD · up to 16 MB" }}
+                appearance={{ allowedContent: "h-auto", button: "mt-4" }}
                 className="ut-label:text-primary ut-button:bg-primary ut-button:text-primary-foreground border-2 border-dashed border-input hover:border-primary transition-colors"
               />
             </div>
@@ -190,7 +198,7 @@ export function DocUploadDropzone({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5 text-primary" />
-                Document Metadata &amp; Tagging
+                Step 2 of 2: name it and choose who sees it
               </DialogTitle>
               <DialogDescription>
                 Uploaded file:{" "}

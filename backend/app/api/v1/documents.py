@@ -17,6 +17,7 @@ from app.schemas.documents import (
     DocumentListResponse,
     DocumentResponse,
     DocumentTagOptions,
+    UpdateDocumentRequest,
 )
 from app.scope.resolver import AccessScope
 from app.services import documents
@@ -86,6 +87,25 @@ async def get_document(
 ) -> DocumentResponse:
     """One document the caller may see (used to poll indexing status)."""
     return await documents.get_document(db, scope, document_id)
+
+
+@router.patch(
+    "/{document_id}",
+    response_model=DocumentResponse,
+    responses=error_responses(400, 401, 403, 404, 409, 503),
+)
+async def update_document(
+    document_id: uuid.UUID,
+    body: UpdateDocumentRequest,
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentResponse:
+    """
+    Change a document's title, description or who sees it (D39). Allowed for anyone
+    who could upload it where it is now, and to the new audience. The chat follows
+    the new audience at once.
+    """
+    return await documents.update_document(db, scope, document_id, body)
 
 
 @router.delete(

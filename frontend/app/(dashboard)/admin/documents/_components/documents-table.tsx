@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Pencil,
   Shield,
   Trash2,
   Users,
@@ -32,65 +33,45 @@ import {
 } from "@/components/ui/tooltip";
 import { deleteDocument, getDocumentStatus } from "@/lib/api/actions/documents";
 import type { Document, DocumentTagOptions } from "@/lib/api/queries/documents";
+import { EditDocumentDialog } from "./edit-document-dialog";
 
 interface DocumentsTableProps {
   documents: Document[];
   tagOptions: DocumentTagOptions;
 }
 
-export function DocumentsTable({ documents: initialDocuments, tagOptions }: DocumentsTableProps) {
+export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTableProps) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
-
-  const [docs, setDocs] = useState<Document[]>(initialDocuments);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [docToEdit, setDocToEdit] = useState<Document | null>(null);
 
-  // Sync state if initialDocuments changes from server
+  // While a document is still being indexed, check every 3 s; when one finishes,
+  // reload the page's data so the new status shows. (Ids joined into a string so the
+  // timer only restarts when the set of processing documents changes.)
+  const processingIds = docs
+    .filter((d) => d.status === "processing")
+    .map((d) => d.id)
+    .join(",");
+
   useEffect(() => {
-    setDocs(initialDocuments);
-  }, [initialDocuments]);
+    if (!processingIds) return;
 
-  // Polling for documents currently in 'processing' status
-  useEffect(() => {
-    const processingIds = docs.filter((d) => d.status === "processing").map((d) => d.id);
-    if (processingIds.length === 0) return;
-
-    let isMounted = true;
+    let cancelled = false;
     const interval = setInterval(async () => {
-      let anyStatusChanged = false;
-
-      const updates = await Promise.all(
-        processingIds.map(async (id) => {
-          const res = await getDocumentStatus(id);
-          if (res.ok && res.data.status !== "processing") {
-            anyStatusChanged = true;
-            return res.data;
-          }
-          return null;
-        })
+      const results = await Promise.all(
+        processingIds.split(",").map((id) => getDocumentStatus(id))
       );
-
-      if (!isMounted) return;
-
-      if (anyStatusChanged) {
-        setDocs((prev) =>
-          prev.map((doc) => {
-            const updated = updates.find((u) => u && u.id === doc.id);
-            return updated ?? doc;
-          })
-        );
-        startTransition(() => {
-          router.refresh();
-        });
+      if (!cancelled && results.some((r) => r.ok && r.data.status !== "processing")) {
+        router.refresh();
       }
     }, 3000);
 
     return () => {
-      isMounted = false;
+      cancelled = true;
       clearInterval(interval);
     };
-  }, [docs, router]);
+  }, [processingIds, router]);
 
   // Helpers
   const getScopeBadge = (doc: Document) => {
@@ -98,7 +79,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
           <Building2 className="h-3 w-3" />
-          Whole Organization
+          Everyone
         </span>
       );
     }
@@ -107,7 +88,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
           <Shield className="h-3 w-3" />
-          {roleName ? `Role: ${roleName}` : "Role"}
+          {roleName ? `${roleName} and above` : "A role and above"}
         </span>
       );
     }
@@ -116,7 +97,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
           <Users className="h-3 w-3" />
-          {teamName ? `Team: ${teamName}` : "Team"}
+          {teamName ? `Team ${teamName}` : "A team"}
         </span>
       );
     }
@@ -172,12 +153,9 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
         toast.error(res.message);
         return;
       }
-      toast.success("Document deleted successfully.");
-      setDocs((prev) => prev.filter((d) => d.id !== docToDelete.id));
+      // deleteDocument refreshes /admin/documents, so the row disappears by itself.
+      toast.success("Document deleted.");
       setDocToDelete(null);
-      startTransition(() => {
-        router.refresh();
-      });
     } catch {
       toast.error("Failed to delete document.");
     } finally {
@@ -189,9 +167,9 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
     return (
       <div className="flex min-h-[300px] w-full flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center bg-card/40">
         <FileText className="h-10 w-10 text-muted-foreground/50 mb-3" />
-        <h3 className="text-sm font-semibold text-foreground">No documents uploaded yet</h3>
+        <h3 className="text-sm font-semibold text-foreground">No documents shared yet</h3>
         <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-          Upload policy manuals, team guidelines, or SOPs so that the AI assistant can reference them.
+          Upload a policy and share it with everyone, a role (e.g. all Employees), or a team. The AI assistant answers people only from documents shared with them.
         </p>
       </div>
     );
@@ -205,7 +183,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
             <thead className="border-b bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5">Document</th>
-                <th className="px-5 py-3.5">Scope / Tag</th>
+                <th className="px-5 py-3.5">Shared with</th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5">Uploaded</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
@@ -243,7 +221,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
 
                   {/* Upload Date */}
                   <td className="px-5 py-4 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(doc.created_at).toLocaleDateString(undefined, {
+                    {new Date(doc.created_at).toLocaleDateString("en-GB", {
                       year: "numeric",
                       month: "short",
                       day: "numeric",
@@ -263,6 +241,18 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
+                      )}
+                      {/* Edit and Delete: whoever could upload it here (D23, D39) */}
+                      {doc.deletable && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDocToEdit(doc)}
+                          className="h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          title="Edit document"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       )}
                       {doc.deletable && (
                         <Button
@@ -284,6 +274,15 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
         </div>
       </div>
 
+      {docToEdit && (
+        <EditDocumentDialog
+          key={docToEdit.id}
+          document={docToEdit}
+          tagOptions={tagOptions}
+          onClose={() => setDocToEdit(null)}
+        />
+      )}
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
         <DialogContent className="sm:max-w-[420px]">
@@ -291,7 +290,7 @@ export function DocumentsTable({ documents: initialDocuments, tagOptions }: Docu
             <DialogTitle>Delete Document</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete{" "}
-              <strong className="text-foreground">{docToDelete?.title}</strong>? This will remove the document and all indexed vector embeddings.
+              <strong className="text-foreground">{docToDelete?.title}</strong>? It is removed for everyone, and the AI assistant stops answering from it.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

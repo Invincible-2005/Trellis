@@ -1,13 +1,24 @@
-﻿import React from "react";
-import { Shield, User, Users } from "lucide-react";
+"use client";
 
+import React, { useState } from "react";
+import { Shield, User, UserMinus, Users } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import type { Member } from "@/lib/api/queries/members";
+import type { Role } from "@/lib/api/queries/roles";
+import { ChangeRoleDialog } from "./change-role-dialog";
+import { RemoveMemberDialog } from "./remove-member-dialog";
 
 interface MembersTableProps {
   members: Member[];
+  /** Roles the user may give (for Change role). */
+  assignableRoles: Role[];
 }
 
-export function MembersTable({ members }: MembersTableProps) {
+export function MembersTable({ members, assignableRoles }: MembersTableProps) {
+  const [changingRoleOf, setChangingRoleOf] = useState<Member | null>(null);
+  const [removing, setRemoving] = useState<Member | null>(null);
+
   if (members.length === 0) {
     return (
       <div className="flex min-h-[220px] w-full flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center bg-card/40">
@@ -30,6 +41,7 @@ export function MembersTable({ members }: MembersTableProps) {
               <th className="px-5 py-3.5">Email</th>
               <th className="px-5 py-3.5">Org Role</th>
               <th className="px-5 py-3.5">Joined</th>
+              <th className="px-5 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -66,17 +78,61 @@ export function MembersTable({ members }: MembersTableProps) {
 
                 {/* Joined */}
                 <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                  {new Date(member.joined_at).toLocaleDateString(undefined, {
+                  {new Date(member.joined_at).toLocaleDateString("en-GB", {
                     year: "numeric",
                     month: "short",
                     day: "numeric",
                   })}
+                </td>
+
+                {/* Actions: only for people whose every role is below yours (D38) */}
+                <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                  {member.manageable ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setChangingRoleOf(member)}
+                        className="text-xs gap-1"
+                      >
+                        <Shield className="h-3.5 w-3.5" />
+                        Change role
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRemoving(member)}
+                        className="text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive gap-1"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {changingRoleOf && (
+        <ChangeRoleDialog
+          key={changingRoleOf.user_id}
+          member={changingRoleOf}
+          assignableRoles={assignableRoles}
+          onClose={() => setChangingRoleOf(null)}
+        />
+      )}
+      {removing && (
+        <RemoveMemberDialog
+          key={removing.user_id}
+          member={removing}
+          onClose={() => setRemoving(null)}
+        />
+      )}
     </div>
   );
 }

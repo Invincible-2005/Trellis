@@ -36,7 +36,7 @@ export function TagScopeSelect({
 
   return (
     <div className="space-y-3">
-      <Label className="text-sm font-medium">Visibility & Scope</Label>
+      <Label className="text-sm font-medium">Who should see this document?</Label>
 
       {/* Scope selector buttons */}
       <div className="grid grid-cols-3 gap-2">
@@ -52,13 +52,14 @@ export function TagScopeSelect({
           } ${!hasOrg ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <Building2 className="h-4 w-4" />
-          <span className="text-xs font-medium">Whole Org</span>
+          <span className="text-xs font-medium">Everyone</span>
         </button>
 
         {/* Role Option */}
         <button
           type="button"
           disabled={!hasRoles}
+          title={hasRoles ? undefined : 'Sharing with a role needs organization-wide upload permission'}
           onClick={() => handleScopeTypeClick('role')}
           className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-center transition-all ${
             scopeType === 'role'
@@ -67,7 +68,7 @@ export function TagScopeSelect({
           } ${!hasRoles ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <Shield className="h-4 w-4" />
-          <span className="text-xs font-medium">By Role</span>
+          <span className="text-xs font-medium">A role</span>
         </button>
 
         {/* Team Option */}
@@ -82,18 +83,18 @@ export function TagScopeSelect({
           } ${!hasTeams ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <Users className="h-4 w-4" />
-          <span className="text-xs font-medium">By Team</span>
+          <span className="text-xs font-medium">A team</span>
         </button>
       </div>
 
       {/* Scope helper text */}
       <p className="text-xs text-muted-foreground">
         {scopeType === 'org' &&
-          'Visible to every member of the organization.'}
+          'Everyone in the organization can see it.'}
         {scopeType === 'role' &&
-          'Visible to the selected role and all senior roles hierarchically above it.'}
+          'The chosen role and every role above it can see it (e.g. Employee → also Managers, HR, Admin). Only roles at or below yours can be chosen.'}
         {scopeType === 'team' &&
-          'Visible only to members of this specific team.'}
+          'Members of the chosen team can see it, plus people who oversee that team.'}
       </p>
 
       {/* Sub-picker: Specific Role */}

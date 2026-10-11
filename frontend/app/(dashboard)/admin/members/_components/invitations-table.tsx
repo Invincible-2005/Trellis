@@ -1,7 +1,6 @@
-﻿"use client";
+"use client";
 
-import React, { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
 import { toast } from "sonner";
 import { Clock, Shield, Trash2 } from "lucide-react";
 
@@ -21,17 +20,9 @@ interface InvitationsTableProps {
   invitations: Invitation[];
 }
 
-export function InvitationsTable({ invitations: initialInvitations }: InvitationsTableProps) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
-
-  const [invitations, setInvitations] = useState<Invitation[]>(initialInvitations);
+export function InvitationsTable({ invitations }: InvitationsTableProps) {
   const [inviteToCancel, setInviteToCancel] = useState<Invitation | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
-
-  React.useEffect(() => {
-    setInvitations(initialInvitations);
-  }, [initialInvitations]);
 
   const handleCancelInvite = async () => {
     if (!inviteToCancel) return;
@@ -44,12 +35,9 @@ export function InvitationsTable({ invitations: initialInvitations }: Invitation
         return;
       }
 
+      // cancelInvitation refreshes /admin/members, so the row disappears by itself.
       toast.success(`Invitation to ${inviteToCancel.email} cancelled.`);
-      setInvitations((prev) => prev.filter((inv) => inv.id !== inviteToCancel.id));
       setInviteToCancel(null);
-      startTransition(() => {
-        router.refresh();
-      });
     } catch {
       toast.error("Failed to cancel invitation.");
     } finally {
@@ -102,12 +90,12 @@ export function InvitationsTable({ invitations: initialInvitations }: Invitation
 
                   {/* Invited By */}
                   <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                    {inv.invited_by_name || "Admin"}
+                    {inv.invited_by_name || "—"}
                   </td>
 
                   {/* Sent Date */}
                   <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(inv.created_at).toLocaleDateString(undefined, {
+                    {new Date(inv.created_at).toLocaleDateString("en-GB", {
                       year: "numeric",
                       month: "short",
                       day: "numeric",

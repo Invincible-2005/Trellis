@@ -1,5 +1,5 @@
 'use server';
-// Document changes from the Documents page (trellis/12 D18, D23).
+// Document changes from Admin → Documents (trellis/12 D18, D23).
 // Expected failures come back as { ok: false, message } for a toast.
 import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
@@ -10,6 +10,7 @@ import type { ActionResult } from './roles';
 
 type Document = components['schemas']['DocumentResponse'];
 export type CreateDocumentInput = components['schemas']['CreateDocumentRequest'];
+export type UpdateDocumentInput = components['schemas']['UpdateDocumentRequest'];
 
 /**
  * Register a file already uploaded to UploadThing and start indexing it.
@@ -37,6 +38,31 @@ export async function getDocumentStatus(documentId: string): Promise<ActionResul
     const document = await unwrap(
       api.GET('/api/v1/documents/{document_id}', { params: { path: { document_id: documentId } } }),
     );
+    return { ok: true, data: document };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/**
+ * Change a document's title, description or who sees it (only when `deletable` is
+ * true; trellis/12 D39). Leave a field out to keep it; for a new audience send
+ * `scope_type` with its `role_id` / `team_id`, as on upload.
+ */
+export async function updateDocument(
+  documentId: string,
+  input: UpdateDocumentInput,
+): Promise<ActionResult<Document>> {
+  const blocked = await limit('write');
+  if (blocked) return blocked;
+  try {
+    const document = await unwrap(
+      api.PATCH('/api/v1/documents/{document_id}', {
+        params: { path: { document_id: documentId } },
+        body: input,
+      }),
+    );
+    revalidatePath('/admin/documents');
     return { ok: true, data: document };
   } catch (err) {
     return toFailure(err);

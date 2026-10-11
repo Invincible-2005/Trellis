@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
 import {
   ReactFlow,
   Controls,
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import type { Role } from '@/lib/api/queries/roles';
 import { RoleNode, type RoleNodeData } from './role-node';
 import { CreateRoleDialog } from './create-role-dialog';
+import { EditRoleDialog } from './edit-role-dialog';
 
 interface RoleFlowTreeProps {
   roles: Role[];
@@ -27,70 +29,76 @@ const nodeTypes: NodeTypes = {
   role: RoleNode,
 };
 
+const NODE_WIDTH = 270;
+const HORIZONTAL_GAP = 50;
+const VERTICAL_GAP = 180;
+
+/** Tree layout from the flat list: each role sits centred above its own sub-roles. */
+function layoutTree(roles: Role[]): { nodes: Node<RoleNodeData>[]; edges: Edge[] } {
+  const ids = new Set(roles.map((r) => r.id));
+  const children = new Map<string, Role[]>();
+  for (const role of roles) {
+    if (role.parent_role_id && ids.has(role.parent_role_id)) {
+      children.set(role.parent_role_id, [...(children.get(role.parent_role_id) ?? []), role]);
+    }
+  }
+  const roots = roles.filter((r) => !r.parent_role_id || !ids.has(r.parent_role_id));
+
+  const nodes: Node<RoleNodeData>[] = [];
+  const edges: Edge[] = [];
+  let nextColumn = 0;
+
+  // A role with no sub-roles takes the next free column; a parent sits midway over its children.
+  const place = (role: Role): number => {
+    const kids = children.get(role.id) ?? [];
+    const kidColumns = kids.map(place);
+    const column =
+      kids.length === 0 ? nextColumn++ : (kidColumns[0] + kidColumns[kidColumns.length - 1]) / 2;
+
+    nodes.push({
+      id: role.id,
+      type: 'role',
+      position: { x: column * (NODE_WIDTH + HORIZONTAL_GAP), y: role.depth * VERTICAL_GAP },
+      data: { role },
+    });
+    for (const kid of kids) {
+      edges.push({
+        id: `edge-${role.id}-${kid.id}`,
+        source: role.id,
+        target: kid.id,
+        type: 'smoothstep',
+        style: { stroke: 'var(--border)', strokeWidth: 2 },
+      });
+    }
+    return column;
+  };
+  roots.forEach(place);
+
+  return { nodes, edges };
+}
+
 export function RoleFlowTree({
   roles,
   callerOrgRoleId,
   callerOrgPermissions = [],
 }: RoleFlowTreeProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const { resolvedTheme } = useTheme();
 
-  // Can the user create roles? Gated by create_role permission or having org roles
-  const canCreateRole = callerOrgPermissions.includes('create_role');
+  // Hydration guard: next-themes can only read localStorage on the client.
+  // During SSR (and the first synchronous client render), resolvedTheme is
+  // always treated as "light" so the server HTML and the initial client tree
+  // are identical. After mount the real resolvedTheme takes over without a
+  // mismatch warning.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const flowColorMode = mounted && resolvedTheme === 'dark' ? 'dark' : 'light';
 
-  // Compute layout (Top-Down / hierarchical)
-  const { nodes, edges } = useMemo(() => {
-    if (!roles || roles.length === 0) {
-      return { nodes: [], edges: [] };
-    }
+  // Create, edit and delete all need org-wide create_role (the backend checks again).
+  const canManageRoles = callerOrgPermissions.includes('create_role');
 
-    // Group roles by depth
-    const depthGroups: Record<number, Role[]> = {};
-    for (const role of roles) {
-      const d = role.depth ?? 0;
-      if (!depthGroups[d]) depthGroups[d] = [];
-      depthGroups[d].push(role);
-    }
-
-    const NODE_WIDTH = 270;
-    const HORIZONTAL_GAP = 50;
-    const VERTICAL_GAP = 180;
-
-    const computedNodes: Node<RoleNodeData>[] = [];
-    const computedEdges: Edge[] = [];
-
-    // Assign positions by depth level
-    Object.entries(depthGroups).forEach(([depthStr, groupRoles]) => {
-      const depth = Number(depthStr);
-      const totalWidth = groupRoles.length * NODE_WIDTH + (groupRoles.length - 1) * HORIZONTAL_GAP;
-      const startX = -totalWidth / 2 + NODE_WIDTH / 2;
-
-      groupRoles.forEach((role, idx) => {
-        const x = startX + idx * (NODE_WIDTH + HORIZONTAL_GAP);
-        const y = depth * VERTICAL_GAP;
-
-        computedNodes.push({
-          id: role.id,
-          type: 'role',
-          position: { x, y },
-          data: { role },
-        });
-
-        // Edge from parent
-        if (role.parent_role_id) {
-          computedEdges.push({
-            id: `edge-${role.parent_role_id}-${role.id}`,
-            source: role.parent_role_id,
-            target: role.id,
-            type: 'smoothstep',
-            animated: false,
-            style: { stroke: 'var(--border)', strokeWidth: 2 },
-          });
-        }
-      });
-    });
-
-    return { nodes: computedNodes, edges: computedEdges };
-  }, [roles]);
+  const { nodes, edges } = useMemo(() => layoutTree(roles), [roles]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-14rem)] w-full rounded-xl border bg-background shadow-xs overflow-hidden">
@@ -104,11 +112,12 @@ export function RoleFlowTree({
             <h2 className="text-sm font-semibold text-foreground">Hierarchy Canvas</h2>
             <p className="text-xs text-muted-foreground">
               {roles.length} {roles.length === 1 ? 'role' : 'roles'} in organization
+              {canManageRoles && ' · click a role below yours to edit it'}
             </p>
           </div>
         </div>
 
-        {canCreateRole && (
+        {canManageRoles && (
           <Button
             size="sm"
             onClick={() => setCreateDialogOpen(true)}
@@ -133,6 +142,14 @@ export function RoleFlowTree({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            // View-only canvas: roles change through the dialogs (frontend ticket 06 §2)
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            onNodeClick={(_, node) => {
+              if (canManageRoles && node.data.role.manageable) setEditingRole(node.data.role);
+            }}
+            colorMode={flowColorMode}
             fitView
             fitViewOptions={{ padding: 0.3 }}
             minZoom={0.2}
@@ -145,7 +162,7 @@ export function RoleFlowTree({
         )}
       </div>
 
-      {/* ── Create Role Dialog ─────────────────────────────────── */}
+      {/* ── Dialogs ────────────────────────────────────────────── */}
       <CreateRoleDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
@@ -153,6 +170,16 @@ export function RoleFlowTree({
         callerOrgRoleId={callerOrgRoleId}
         callerOrgPermissions={callerOrgPermissions}
       />
+      {editingRole && (
+        <EditRoleDialog
+          key={editingRole.id}
+          role={editingRole}
+          roles={roles}
+          onClose={() => setEditingRole(null)}
+          callerOrgRoleId={callerOrgRoleId}
+          callerOrgPermissions={callerOrgPermissions}
+        />
+      )}
     </div>
   );
 }

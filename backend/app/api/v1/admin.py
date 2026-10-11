@@ -17,8 +17,10 @@ from app.schemas.admin import (
     AddMemberResponse,
     CreateRoleRequest,
     MemberListResponse,
+    MemberResponse,
     RoleListResponse,
     RoleResponse,
+    UpdateMemberRequest,
     UpdateRoleRequest,
 )
 from app.scope.resolver import AccessScope
@@ -125,6 +127,41 @@ async def add_member(
     `status` is "added" if they already use Trellis, "invited" if Clerk emailed them.
     """
     return await members.add_member(db, scope, body)
+
+
+@router.patch(
+    "/members/{user_id}",
+    response_model=MemberResponse,
+    responses=error_responses(400, 401, 403, 404, 409, 503),
+)
+async def update_member_role(
+    user_id: uuid.UUID,
+    body: UpdateMemberRequest,
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> MemberResponse:
+    """
+    Change someone's org-level role (`role_id: null` = no role). Only for people whose
+    every role is below yours (D38), and only to a role you could invite them with.
+    """
+    return await members.update_member_role(db, scope, user_id, body)
+
+
+@router.delete(
+    "/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(400, 401, 403, 404, 409, 503),
+)
+async def remove_member(
+    user_id: uuid.UUID,
+    scope: AccessScope = Depends(get_scope),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Remove someone from the org: out of the Clerk org, off every team, out of the
+    org (D10-C, D38). Their tasks, strikes and documents stay.
+    """
+    await members.remove_member(db, scope, user_id)
 
 
 @router.delete(
