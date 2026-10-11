@@ -8,7 +8,7 @@ export default function Features() {
                 <h2 className="text-muted-foreground max-w-4xl text-balance text-4xl font-medium tracking-tight lg:text-5xl">
                     <span className="text-foreground">Built for every level of your org.</span> <br /> Role-scoped views from Employee to Admin — one platform, one enforcement engine.
                 </h2>
-                
+
                 <div className="mt-8 grid gap-4 md:mt-16 md:grid-cols-2 lg:grid-cols-3">
                     {/* Card 1: Strike System */}
                     <Card className="p-8">
@@ -54,9 +54,9 @@ export default function Features() {
                 <div className="max-sm:*:not-last:border-b max-sm:*:not-last:pb-3 mt-12 grid gap-3 *:max-w-xs sm:grid-cols-2 md:mt-16 md:gap-y-6 lg:mt-24 lg:grid-cols-4 lg:gap-6">
                     <p className="text-muted-foreground text-balance text-sm leading-relaxed">
                         <span className="text-foreground mb-1.5 flex items-center gap-1.5 font-medium">
-                            <Shield className="size-4" /> Prompt Injection Defense
+                            <Shield className="size-4" /> Dynamic Access Scoping
                         </span>
-                        Guardrails AI validators screen every LLM input and output.
+                        Every query resolves the caller's exact role hierarchy before retrieval — preventing unauthorized document and task access at the source.
                     </p>
 
                     <p className="text-muted-foreground text-balance text-sm leading-relaxed">

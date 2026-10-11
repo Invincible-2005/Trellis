@@ -26,7 +26,7 @@ export default function HeroSection() {
                                     href="#link"
                                     className="group mx-auto flex w-fit items-center gap-3 rounded-full p-1 pl-4 transition-colors duration-300">
                                     <span className="text-sm font-medium">New:</span>
-                                    <span className="text-muted-foreground text-sm">Role-Aware Agentic RAG Workspace</span>
+                                    <span className="text-muted-foreground text-sm">Role-Aware AI Workspace for Organizations</span>
 
                                     <div className="size-6 overflow-hidden rounded-full duration-500">
                                         <div className="flex w-12 -translate-x-1/2 duration-500 ease-in-out group-hover:translate-x-0">
@@ -40,8 +40,12 @@ export default function HeroSection() {
                                     </div>
                                 </Link>
 
-                                <h1 className="mx-auto mt-8 max-w-4xl text-balance text-5xl font-medium tracking-tight md:text-6xl lg:mt-12 xl:text-7xl">Guardrails that support growth, not just block it.</h1>
-                                <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-balance md:text-lg">Trellis is the enterprise business workspace where strict hierarchical access control (RBAC) meets agentic RAG. Deliver role-scoped insights, automate policy-validated workflows, and prevent cross-team data leakage.</p>
+                                <h1 className="mx-auto mt-8 max-w-4xl text-balance text-5xl font-medium tracking-tight md:text-6xl lg:mt-12 xl:text-7xl">
+                                    Role-aware intelligence for every level of your organization.
+                                </h1>
+                                <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-balance md:text-lg">
+                                    Trellis is an intelligent organization workspace powered by strict hierarchical access control. Dynamically scope knowledge retrieval, team tasks, and AI assistance to each member's exact role tree with zero cross-team data leakage.
+                                </p>
 
                                 <div className="mt-6 flex flex-col items-center justify-center gap-2 md:flex-row">
                                     <Button key={1} asChild>
