@@ -45,10 +45,11 @@ export function AppHeader({ orgRoleName }: AppHeaderProps) {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 transition-[width,height] ease-linear">
-      {/* Left: Trigger + Separator + Breadcrumbs */}
+      {/* Left: Breadcrumbs. The collapse button lives in the sidebar's top-left corner;
+          on phones the sidebar is a hidden drawer, so the header keeps a button to open it. */}
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
+        <SidebarTrigger className="-ml-1 md:hidden" />
+        <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
         <Breadcrumb>
           <BreadcrumbList>
             {segments.map((segment, index) => {

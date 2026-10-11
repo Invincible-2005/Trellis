@@ -34,6 +34,7 @@ A complete, locked frontend architecture document: every route, layout boundary,
 
 - [Form writes (trellis/12 D18)](../trellis/issues/12-decision-reconciliation.md): **Server Actions** in `lib/api/actions/`, returning `{ ok, message }` for toasts; `revalidatePath` on success. Route Handlers only for streaming. *(Form-state library, e.g. react-hook-form, still open.)*
 - [Request protection (trellis/12 D27)](../trellis/issues/12-decision-reconciliation.md): Arcjet in `lib/middleware/`: `gate()` runs in `proxy.ts` (shield, bots, read limit); Server Actions start with `limit(tier)` (write / heavyRead / heavyWrite). No CORS.
+- [Policies page (trellis/12 D34)](../trellis/issues/12-decision-reconciliation.md): `/documents` → **`/organization`** (org description + policies you can see); Upload / Delete on that page for people allowed; no `/admin/documents`. Admin = Roles, Members, Strikes.
 
 ## Cross-map links (audit 2026-10-08)
 

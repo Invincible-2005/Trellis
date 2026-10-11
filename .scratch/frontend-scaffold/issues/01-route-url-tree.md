@@ -40,13 +40,13 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 | `/dashboard` | `app/(authenticated)/dashboard/page.tsx` | RSC + Client widgets | Authenticated shell (Sidebar + Header). Metrics & strike summary |
 | `/tasks` | `app/(authenticated)/tasks/page.tsx` | RSC + Client interactive | Authenticated shell. Full task management, filter by status/team |
 | `/chat` | `app/(authenticated)/chat/page.tsx` | RSC shell + Client SSE | Authenticated shell. Agentic RAG chat with streaming & citations |
-| `/documents` | `app/(authenticated)/documents/page.tsx` | RSC | Authenticated shell. Browse accessible SOPs / policies |
+| ~~`/documents`~~ `/organization` | `app/(dashboard)/organization/page.tsx` | RSC + Client dialogs | Org description + policies you can see; Upload / Delete for people allowed *(renamed 2026-10-11, trellis/12 D34)* |
 | `/admin` | `app/(admin)/admin/page.tsx` | RSC | Admin shell. Overview & quick admin navigation |
 | `/admin/roles` | `app/(admin)/admin/roles/page.tsx` | Client (React Flow) | Admin shell. Interactive role hierarchy tree & permissions |
 | `/teams` | `app/(dashboard)/teams/page.tsx` | RSC + Client dialogs | Teams you can see (D13); Create team if `can_org("create_team")` (added 2026-10-10, trellis/12 D28) |
 | `/teams/[teamId]` | `app/(dashboard)/teams/[teamId]/page.tsx` | RSC + Client dialogs | Members + tasks; Add member if `can("add_member", team)`, Create task if `can("assign_task", team)` (D28) |
 | ~~`/admin/teams`~~ | ~~`app/(admin)/admin/teams/page.tsx`~~ | | (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`) |
-| `/admin/documents` | `app/(admin)/admin/documents/page.tsx` | RSC + Uploadthing | Admin shell. Upload & tag SOPs to roles or teams |
+| ~~`/admin/documents`~~ | ~~`app/(admin)/admin/documents/page.tsx`~~ | | (superseded 2026-10-11 by trellis/12 D34: uploads moved to `/organization`) |
 | `/admin/strikes` | `app/(admin)/admin/strikes/page.tsx` | RSC + Client dialogs | Admin shell. Strike appeal review & policy validation log |
 | `/api/chat/sessions/[sessionId]/message` | `app/api/chat/sessions/[sessionId]/message/route.ts` | Route Handler (Node) | BFF SSE proxy to FastAPI `POST /api/v1/chat/sessions/{session_id}/message` *(path updated 2026-10-08, trellis/12 D2)* |
 

@@ -423,6 +423,20 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 
 ---
 
+### D34. Document uploads: an admin tab, or a button on the `/documents` page? (added 2026-10-11, raised by Piyush while fixing the sidebar) — ✅ RESOLVED 2026-10-11
+- **Today (ticket 06, D4 follow-up):** uploading, tagging and deleting documents live at `/admin/documents`, gated by `upload_document` (org-wide **or on any team**). `/documents` is the read-only browser for everyone. A team manager who may upload therefore opens "Admin" just to see one tab.
+- **Proposal (same reasoning as D28 for teams):** one `/documents` page for everyone; "Upload" shown when the user has somewhere to tag a document (`GET /documents/tag-options` not empty); "Delete" per row from `deletable`. Drop `documents` from `admin_tabs`; Admin = Roles, Members, Strikes. Backend data rules (D23) unchanged.
+- ✅ **RESOLVED 2026-10-11 (Piyush):** `/documents` becomes **`/organization`**: a short description of the org at the top, then the policy documents the user may see, grouped "Whole organization" / "Your role" / "Your team". **Upload policy** shows when tag-options is not empty; **Delete** per row from `deletable`. `/admin/documents` is dropped and `documents` leaves `admin_tabs` (Admin = Roles, Members, Strikes). Data rules (D23), UploadThing gate and endpoints unchanged.
+  - **Clarified:** task submissions (work handed in on a task, `task.py`) are a separate upload inside tasks, open to the task's assignees with no `upload_document` permission. Policy documents are the AI chat's knowledge base.
+  - **Follow-ups:** backend drops `documents` from `_admin_tabs()` (`api/v1/auth.py`) and the `admin_tabs` Literal; who may edit the org description (next question, D35).
+  - **Built 2026-10-11:** `documents` dropped from `_admin_tabs()` and the Literal; `GET`/`PATCH /api/v1/orgs/current` (`services/orgs.py::get_org_profile/update_org_description`, D35 check = caller's org-level role is the `is_system` role); `lib/api/queries/orgs.ts::getOrganization`, `lib/api/actions/orgs.ts::updateOrgDescription`. 58 tests pass; not yet called against the live DB.
+  - **Written into:** frontend-scaffold tickets 01 and 06, `spec.md`, both maps, `plans/documents/`.
+
+### D35. Who may edit the organization's description? (added 2026-10-11, follow-up to D34) — ✅ RESOLVED 2026-10-11
+- **Gap:** `/organization` shows `organizations.description` (column exists, nullable), but no endpoint reads or writes it and no permission covers it (`ROLE_PERMISSIONS` has none for org details).
+- **Proposal:** holders of the protected root `Admin` role (`is_system`) may edit it with an Edit button on `/organization`; everyone else reads. No new permission. Alternative: anyone with org-wide `create_role`.
+- ✅ **RESOLVED 2026-10-11 (Piyush):** only holders of the protected root `Admin` role (`is_system`) may edit the description (Edit button on `/organization`); everyone in the org reads it. No new permission.
+
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
 - Ticket 02: the wording for `scope_type='role'` visibility was inverted. It now says "role + ancestors"; the CTE was already correct.

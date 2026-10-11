@@ -34,3 +34,8 @@ Adopting colocation with Next.js private folders (`_components`):
 - Each feature route owns its own `_components/` folder for private UI components (e.g. `dashboard/_components/`, `tasks/_components/`, `chat/_components/`, `admin/_components/`).
 - Global, reusable primitives stay in `components/ui/` (shadcn) and `components/shared/`.
 
+### Changes after the first build (2026-10-11, Piyush)
+- The collapse button sits in the sidebar's top-left corner (the header keeps one only on phones, where the sidebar is a drawer).
+- Admin is a dropdown in the sidebar listing the admin sections the user may open (`active_org.admin_tabs`).
+- The footer's whole row (avatar, name, email) opens an account menu (Manage account via Clerk, Sign out) instead of only the `<UserButton />` avatar.
+- Landing-page Sign in / Sign up buttons always continue to `/dashboard`.
