@@ -1,7 +1,7 @@
 // Turns a backend response into data, a redirect, or an ApiError.
 // Every backend error has the shape { detail: { code, message } }.
 import 'server-only';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import type { components } from './v1';
 
 type ErrorBody = components['schemas']['ErrorResponse'];
@@ -23,6 +23,7 @@ const REDIRECTS: Record<string, string> = {
   invalid_token: '/sign-in',
   no_active_org: '/org-selection',
   org_not_provisioned: '/onboarding',
+  not_a_member: '/org-selection', // just removed from this org (D38)
 };
 
 function isErrorBody(value: unknown): value is ErrorBody {
@@ -42,7 +43,8 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   let result: Result<T>;
   try {
     result = await call;
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err); // Next's own signals (e.g. "render per request") are not network errors
     throw new ApiError(503, 'backend_unavailable', 'The server is unreachable. Please try again.');
   }
 

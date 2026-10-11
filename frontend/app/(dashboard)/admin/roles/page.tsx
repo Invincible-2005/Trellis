@@ -30,6 +30,7 @@ export default async function AdminRolesPage() {
         <h2 className="text-lg font-semibold tracking-tight">Role Hierarchy</h2>
         <p className="text-sm text-muted-foreground">
           View and manage organizational role structure, authority levels, and permissions.
+          Click a role below yours to edit it or to share a document with it.
         </p>
       </div>
 

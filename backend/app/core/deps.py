@@ -54,7 +54,7 @@ from app.core.errors import api_error
 from app.models.organization import Organization, OrgMember
 from app.models.user import User
 from app.scope.resolver import AccessScope, invalidate_scope, resolve_scope
-from app.services.members import apply_pending_invitations
+from app.services.members import apply_pending_invitations, was_removed
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,18 @@ async def ensure_org_member(db: AsyncSession, user: User, org_id: uuid.UUID) -> 
     the user is a member of this org in Clerk, and Trellis only adds people to
     Clerk orgs itself (or they created the org). A newly created membership picks
     up the user's pending invitations (org role / teams) in the same commit.
+
+    Raises:
+        403 not_a_member — removed from the org minutes ago; their old token still
+                           names it, but they must not be re-added (D38)
     """
+    if was_removed(user.id, org_id):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "not_a_member",
+            "You're no longer a member of this organization.",
+        )
+
     key = (user.id, org_id)
     if key in _known_members:
         return

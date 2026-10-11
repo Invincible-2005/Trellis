@@ -11,11 +11,17 @@ by email with an optional org-level role:
 Cancelling a pending invite revokes it in Clerk first (so the email link stops
 working), then deletes the Trellis row.
 
+Changing a member's org role and removing a member (D10-C, D38) only work on people
+whose every role (org-wide and in each team) is below the caller's org role.
+Removal takes them out of the Clerk org first, then off their teams and the org;
+their tasks, strikes and documents stay.
+
 Trellis is the only writer of memberships (D10): Clerk first, then the database.
 """
 import logging
 import uuid
 
+from cachetools import TTLCache
 from fastapi import status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -27,14 +33,29 @@ from app.core.errors import api_error
 from app.models.invitation import Invitation
 from app.models.organization import Organization, OrgMember
 from app.models.role import Role
-from app.models.team import TeamMember
+from app.models.team import Team, TeamMember
 from app.models.user import User
-from app.schemas.admin import AddMemberRequest, AddMemberResponse, MemberListResponse, MemberResponse
+from app.schemas.admin import (
+    AddMemberRequest,
+    AddMemberResponse,
+    MemberListResponse,
+    MemberResponse,
+    UpdateMemberRequest,
+)
 from app.schemas.auth import InvitationResponse
-from app.scope.resolver import AccessScope, invalidate_scope
+from app.scope.resolver import AccessScope, invalidate_org, invalidate_scope
 from app.services import clerk
 
 logger = logging.getLogger(__name__)
+
+# People removed from an org in the last 10 minutes. Their old session token can
+# still name the org for a short while; ensure_org_member refuses them instead of
+# re-adding them just-in-time (D38). Process-local, like the scope cache (D11).
+_recently_removed: TTLCache = TTLCache(maxsize=10_000, ttl=600)
+
+
+def was_removed(user_id: uuid.UUID, org_id: uuid.UUID) -> bool:
+    return (user_id, org_id) in _recently_removed
 
 
 async def list_members(db: AsyncSession, scope: AccessScope) -> MemberListResponse:
@@ -48,7 +69,18 @@ async def list_members(db: AsyncSession, scope: AccessScope) -> MemberListRespon
         .where(OrgMember.org_id == scope.org_id)
         .order_by(func.lower(User.name))
     )
-    members = [_member_response(row.OrgMember, row.User, row.role_name) for row in rows]
+    team_roles = await _team_role_ids(db, scope.org_id)
+    members = [
+        _member_response(
+            row.OrgMember,
+            row.User,
+            row.role_name,
+            manageable=_can_act_on(
+                scope, row.User.id, row.OrgMember.role_id, team_roles.get(row.User.id, set())
+            ),
+        )
+        for row in rows
+    ]
     return MemberListResponse(members=members, invitations=await _pending_invitations(db, scope.org_id))
 
 
@@ -173,6 +205,64 @@ async def cancel_invitation(db: AsyncSession, scope: AccessScope, invitation_id:
     logger.info("User %s cancelled invitation %s (%s) in org %s", scope.user_id, invite.id, invite.email, scope.org_id)
 
 
+async def update_member_role(
+    db: AsyncSession, scope: AccessScope, user_id: uuid.UUID, body: UpdateMemberRequest
+) -> MemberResponse:
+    """
+    Give a member another org-level role, or none (D38). Same role rules as inviting.
+
+    Raises:
+        403 forbidden        — no org-wide add_member, yourself, someone not below you
+                               (D38), or a role you can't give
+        404 member_not_found / role_not_found
+    """
+    _require_member_admin(scope)
+    membership, user = await _get_manageable_member(db, scope, user_id)
+    role = await _get_assignable_role(db, scope, body.role_id) if body.role_id is not None else None
+
+    membership.role_id = role.id if role else None
+    await db.commit()
+    # Their access changes, and so may who governs which team (D13).
+    invalidate_org(scope.org_id)
+    logger.info(
+        "User %s set the org role of user %s in org %s to %s",
+        scope.user_id, user.id, scope.org_id, role.id if role else None,
+    )
+    # Still manageable: the new role is below the caller and team roles are unchanged.
+    return _member_response(membership, user, role.name if role else None, manageable=True)
+
+
+async def remove_member(db: AsyncSession, scope: AccessScope, user_id: uuid.UUID) -> None:
+    """
+    Remove someone from the org (D10-C, D38): Clerk first, then their team and org
+    memberships. Their tasks, strikes and documents stay; managers reassign open tasks (D33).
+
+    Raises:
+        403 forbidden        — no org-wide add_member, yourself, or someone not below you (D38)
+        404 member_not_found — not in this org
+        400 clerk_rejected   — Clerk refused
+        503 auth_unavailable — Clerk unreachable
+    """
+    _require_member_admin(scope)
+    membership, user = await _get_manageable_member(db, scope, user_id)
+
+    clerk_org_id = await db.scalar(
+        select(Organization.clerk_org_id).where(Organization.id == scope.org_id)
+    )
+    await clerk.remove_org_membership(clerk_org_id, user.clerk_user_id)
+    # From here on, a stale token mustn't re-add them just-in-time.
+    _recently_removed[(user.id, scope.org_id)] = True
+
+    org_team_ids = select(Team.id).where(Team.org_id == scope.org_id)
+    await db.execute(
+        delete(TeamMember).where(TeamMember.user_id == user.id, TeamMember.team_id.in_(org_team_ids))
+    )
+    await db.execute(delete(OrgMember).where(OrgMember.id == membership.id))
+    await db.commit()
+    invalidate_org(scope.org_id)
+    logger.info("User %s removed user %s from org %s", scope.user_id, user.id, scope.org_id)
+
+
 # ── The two paths ─────────────────────────────────────────────────────────────
 
 async def _add_existing_user(
@@ -180,6 +270,7 @@ async def _add_existing_user(
 ) -> AddMemberResponse:
     """D26: has signed into Trellis before → Clerk membership, then org_members."""
     await clerk.add_org_membership(clerk_org_id, user.clerk_user_id)
+    _recently_removed.pop((user.id, scope.org_id), None)  # added back after a removal
 
     role_id = role.id if role else None
     # A conflict means their just-in-time row appeared in the meantime: give it the role.
@@ -197,7 +288,9 @@ async def _add_existing_user(
     logger.info("User %s added user %s to org %s", scope.user_id, user.id, scope.org_id)
 
     return AddMemberResponse(
-        status="added", member=_member_response(membership, user, role.name if role else None)
+        # Manageable: their role (if any) is one you may give, and they're on no team here yet.
+        status="added",
+        member=_member_response(membership, user, role.name if role else None, manageable=True),
     )
 
 
@@ -246,6 +339,45 @@ def _require_member_admin(scope: AccessScope) -> None:
             "forbidden",
             "You don't have permission to add members.",
         )
+
+
+def _can_act_on(
+    scope: AccessScope, user_id: uuid.UUID, org_role_id: uuid.UUID | None, team_role_ids: set[uuid.UUID]
+) -> bool:
+    """D38: never yourself; every role they hold, org-wide and in each team, is below yours."""
+    if user_id == scope.user_id:
+        return False
+    held = set(team_role_ids) | ({org_role_id} if org_role_id is not None else set())
+    return all(scope.can_manage_role(role_id) for role_id in held)
+
+
+async def _get_manageable_member(
+    db: AsyncSession, scope: AccessScope, user_id: uuid.UUID
+) -> tuple[OrgMember, User]:
+    """An org member the caller may re-role or remove (D38), or 404 / 403."""
+    row = (
+        await db.execute(
+            select(OrgMember, User)
+            .join(User, User.id == OrgMember.user_id)
+            .where(OrgMember.org_id == scope.org_id, OrgMember.user_id == user_id)
+        )
+    ).first()
+    if row is None:
+        raise api_error(
+            status.HTTP_404_NOT_FOUND, "member_not_found", "That person isn't in this organization."
+        )
+    if user_id == scope.user_id:
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "forbidden", "You can't change your own role or remove yourself."
+        )
+    team_roles = (await _team_role_ids(db, scope.org_id, user_id)).get(user_id, set())
+    if not _can_act_on(scope, user_id, row.OrgMember.role_id, team_roles):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "forbidden",
+            "You can only change or remove people whose roles, in the org and in every team, are below yours.",
+        )
+    return row.OrgMember, row.User
 
 
 async def _get_assignable_role(db: AsyncSession, scope: AccessScope, role_id: uuid.UUID) -> Role:
@@ -325,7 +457,26 @@ async def _pending_invitations(
     ]
 
 
-def _member_response(membership: OrgMember, user: User, role_name: str | None) -> MemberResponse:
+async def _team_role_ids(
+    db: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID | None = None
+) -> dict[uuid.UUID, set[uuid.UUID]]:
+    """Each member's roles in this org's teams (or just one member's)."""
+    query = (
+        select(TeamMember.user_id, TeamMember.role_id)
+        .join(Team, Team.id == TeamMember.team_id)
+        .where(Team.org_id == org_id)
+    )
+    if user_id is not None:
+        query = query.where(TeamMember.user_id == user_id)
+    roles: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for row in await db.execute(query):
+        roles.setdefault(row.user_id, set()).add(row.role_id)
+    return roles
+
+
+def _member_response(
+    membership: OrgMember, user: User, role_name: str | None, manageable: bool = False
+) -> MemberResponse:
     return MemberResponse(
         user_id=user.id,
         name=user.name,
@@ -333,4 +484,5 @@ def _member_response(membership: OrgMember, user: User, role_name: str | None) -
         org_role_id=membership.role_id,
         org_role_name=role_name,
         joined_at=membership.joined_at,
+        manageable=manageable,
     )

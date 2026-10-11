@@ -25,9 +25,9 @@ export default async function DashboardLayout({
   // Admin sections this user may open (backend decides, D4); empty = no Admin link
   const adminTabs = active_org.admin_tabs ?? []
 
-  // Restore sidebar persisted state
+  // Restore sidebar persisted state; open on a first visit (no cookie yet)
   const cookieStore = await cookies()
-  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
+  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>

@@ -70,6 +70,9 @@ class MemberResponse(AppBaseModel):
     org_role_id: Optional[UUID] = None     # org-level role (D9); null = no org role
     org_role_name: Optional[str] = None
     joined_at: datetime
+    # The caller may change this person's org role or remove them (D38): not the
+    # caller, and every role they hold (org-wide and in each team) is below the caller's.
+    manageable: bool = False
 
 
 class MemberListResponse(AppBaseModel):
@@ -80,6 +83,11 @@ class MemberListResponse(AppBaseModel):
 class AddMemberRequest(BaseModel):
     email: MemberEmail
     role_id: Optional[UUID] = None         # org-level role; must be assignable by the caller
+
+
+class UpdateMemberRequest(BaseModel):
+    # Required, may be null: null = no org-level role. Must be assignable by the caller.
+    role_id: Optional[UUID]
 
 
 class AddMemberResponse(AppBaseModel):

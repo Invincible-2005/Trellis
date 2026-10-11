@@ -2,8 +2,9 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Shield, ShieldAlert, Layers } from 'lucide-react';
-import type { Role } from '@/lib/api/queries/roles';
+import { Shield, ShieldAlert, Layers, Pencil } from 'lucide-react';
+import type { Permission, Role } from '@/lib/api/queries/roles';
+import { PERMISSION_LABELS } from './role-form-fields';
 
 export type RoleNodeData = {
   role: Role;
@@ -18,7 +19,11 @@ export const RoleNode = memo(function RoleNode({
   const role = data.role;
 
   return (
-    <div className="relative min-w-[240px] max-w-[280px] rounded-xl border bg-card p-3.5 shadow-sm transition-all hover:shadow-md">
+    <div
+      className={`relative min-w-[240px] max-w-[280px] rounded-xl border bg-card p-3.5 shadow-sm transition-all hover:shadow-md ${
+        role.manageable ? 'cursor-pointer hover:border-primary' : ''
+      }`}
+    >
       {/* Target handle at Top */}
       <Handle
         type="target"
@@ -43,6 +48,10 @@ export const RoleNode = memo(function RoleNode({
             System
           </span>
         )}
+        {/* Roles below the viewer can be clicked to edit */}
+        {role.manageable && (
+          <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Editable" />
+        )}
       </div>
 
       {/* Depth Badge */}
@@ -64,9 +73,9 @@ export const RoleNode = memo(function RoleNode({
           {role.permissions.map((perm) => (
             <span
               key={perm}
-              className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground font-mono"
+              className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
             >
-              {perm}
+              {PERMISSION_LABELS[perm as Permission] ?? perm}
             </span>
           ))}
         </div>

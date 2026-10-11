@@ -48,7 +48,7 @@ export function MembersView({
             Active Members ({members.length})
           </h3>
         </div>
-        <MembersTable members={members} />
+        <MembersTable members={members} assignableRoles={assignableRoles} />
       </div>
 
       {/* ── Pending Invitations Section ───────────────────────── */}

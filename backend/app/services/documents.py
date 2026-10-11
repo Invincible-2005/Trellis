@@ -24,7 +24,7 @@ import uuid
 from typing import Optional
 
 from fastapi import status
-from sqlalchemy import and_, delete, or_, select, text
+from sqlalchemy import and_, delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import TypedDict
 
@@ -32,7 +32,13 @@ from app.core.errors import api_error
 from app.models.document import Document, DocumentChunk
 from app.models.role import Role
 from app.models.team import Team
-from app.schemas.documents import CreateDocumentRequest, DocumentResponse, DocumentTagOptions, TagTarget
+from app.schemas.documents import (
+    CreateDocumentRequest,
+    DocumentResponse,
+    DocumentTagOptions,
+    TagTarget,
+    UpdateDocumentRequest,
+)
 from app.scope.resolver import AccessScope
 from app.services.embeddings import embed_query
 from app.services.ingestion import is_allowed_file_url
@@ -160,22 +166,7 @@ async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocu
             "The file must be uploaded through the app (UploadThing).",
         )
 
-    if body.role_id is not None:
-        found = await db.scalar(select(Role.id).where(Role.id == body.role_id, Role.org_id == scope.org_id))
-        if found is None:
-            raise api_error(status.HTTP_404_NOT_FOUND, "role_not_found", "That role doesn't exist.")
-    if body.team_id is not None:
-        found = await db.scalar(select(Team.id).where(Team.id == body.team_id, Team.org_id == scope.org_id))
-        if found is None:
-            raise api_error(status.HTTP_404_NOT_FOUND, "team_not_found", "That team doesn't exist.")
-
-    if not can_place(scope, body.scope_type, body.role_id, body.team_id):
-        messages = {
-            "org": "You don't have permission to upload documents for the whole organization.",
-            "role": "You can only tag documents to your own role or roles below it.",
-            "team": "You can only tag documents to teams you can upload to and see.",
-        }
-        raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", messages[body.scope_type])
+    await _check_tag(db, scope, body.scope_type, body.role_id, body.team_id)
 
     document = Document(
         org_id=scope.org_id,
@@ -198,6 +189,55 @@ async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocu
     return _to_response(document, scope)
 
 
+async def update_document(
+    db: AsyncSession, scope: AccessScope, document_id: uuid.UUID, body: UpdateDocumentRequest
+) -> DocumentResponse:
+    """
+    Rename, re-describe or change who sees a document (D39). Allowed when the caller
+    could upload it where it is now (like delete) and, for a new audience, there too.
+    The document's search pieces get the new audience in the same commit, so the chat
+    follows at once (no re-indexing).
+
+    Raises:
+        404 document_not_found / role_not_found / team_not_found
+        403 forbidden           — can't place it where it is now, or at the new audience
+        409 document_processing — changing the audience while it's still indexing
+                                  (ingestion copies the audience onto the pieces it writes)
+    """
+    document = await _get_visible(db, scope, document_id)
+    if not can_place(scope, document.scope_type, document.role_id, document.team_id):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "forbidden",
+            "You can only edit documents you could upload to the same place.",
+        )
+
+    new_tag = (body.scope_type, body.role_id, body.team_id)
+    if body.scope_type is not None and new_tag != (document.scope_type, document.role_id, document.team_id):
+        if document.status == "processing":
+            raise api_error(
+                status.HTTP_409_CONFLICT,
+                "document_processing",
+                "Wait until the document has finished indexing before changing who can see it.",
+            )
+        await _check_tag(db, scope, *new_tag)
+        document.scope_type, document.role_id, document.team_id = new_tag
+        await db.execute(
+            update(DocumentChunk)
+            .where(DocumentChunk.document_id == document.id)
+            .values(scope_type=body.scope_type, role_id=body.role_id, team_id=body.team_id)
+        )
+
+    if body.title is not None:
+        document.title = body.title
+    if body.description is not None:
+        document.description = body.description or None
+
+    await db.commit()
+    logger.info("User %s edited document %s in org %s", scope.user_id, document.id, scope.org_id)
+    return _to_response(document, scope)
+
+
 async def delete_document(db: AsyncSession, scope: AccessScope, document_id: uuid.UUID) -> None:
     """
     Delete a document and its chunks, so the agent stops citing it.
@@ -217,6 +257,32 @@ async def delete_document(db: AsyncSession, scope: AccessScope, document_id: uui
     await db.execute(delete(Document).where(Document.id == document.id))
     await db.commit()
     logger.info("User %s deleted document %s in org %s", scope.user_id, document_id, scope.org_id)
+
+
+async def _check_tag(
+    db: AsyncSession,
+    scope: AccessScope,
+    scope_type: str,
+    role_id: Optional[uuid.UUID],
+    team_id: Optional[uuid.UUID],
+) -> None:
+    """The tag names a role/team in this org that the caller may upload to (D23), or 404/403."""
+    if role_id is not None:
+        found = await db.scalar(select(Role.id).where(Role.id == role_id, Role.org_id == scope.org_id))
+        if found is None:
+            raise api_error(status.HTTP_404_NOT_FOUND, "role_not_found", "That role doesn't exist.")
+    if team_id is not None:
+        found = await db.scalar(select(Team.id).where(Team.id == team_id, Team.org_id == scope.org_id))
+        if found is None:
+            raise api_error(status.HTTP_404_NOT_FOUND, "team_not_found", "That team doesn't exist.")
+
+    if not can_place(scope, scope_type, role_id, team_id):
+        messages = {
+            "org": "You don't have permission to share documents with the whole organization.",
+            "role": "You can only share documents with your own role or roles below it.",
+            "team": "You can only share documents with teams you can upload to and see.",
+        }
+        raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", messages[scope_type])
 
 
 # ── Chunk search (chat agent) ─────────────────────────────────────────────────

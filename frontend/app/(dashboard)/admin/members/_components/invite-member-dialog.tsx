@@ -130,7 +130,7 @@ export function InviteMemberDialog({
                 ))}
               </select>
               <p className="text-[11px] text-muted-foreground">
-                Only roles at or below your authority that hold permissions you possess can be assigned.
+                You can give roles below your own, with permissions you hold.
               </p>
             </div>
 

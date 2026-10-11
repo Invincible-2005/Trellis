@@ -10,6 +10,7 @@ import {
   Network,
   UserPlus,
   Flag,
+  FileText,
   type LucideIcon,
 } from "lucide-react"
 
@@ -43,6 +44,7 @@ export type AdminTab = NonNullable<
 const ADMIN_TABS: Record<AdminTab, { label: string; icon: LucideIcon }> = {
   roles: { label: "Roles", icon: Network },
   members: { label: "Members", icon: UserPlus },
+  documents: { label: "Documents", icon: FileText },
   strikes: { label: "Strikes", icon: Flag },
 }
 

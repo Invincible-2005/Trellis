@@ -3,6 +3,7 @@
 // re-exports backend/openapi.json.
 import 'server-only';
 import createClient, { type Middleware } from 'openapi-fetch';
+import { unstable_rethrow } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import type { paths } from './v1';
 
@@ -16,8 +17,11 @@ const clerkToken: Middleware = {
       const { getToken } = await auth();
       const token = await getToken();
       if (token) request.headers.set('Authorization', `Bearer ${token}`);
-    } catch {
-      // No request context (e.g. build-time rendering): call goes out unauthenticated → 401.
+    } catch (err) {
+      // At build time auth() throws Next's "this page is per-request" signal: let it through,
+      // or the page is wrongly built as static.
+      unstable_rethrow(err);
+      // Any other failure: call goes out unauthenticated → 401.
     }
     return request;
   },

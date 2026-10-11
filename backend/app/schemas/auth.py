@@ -65,8 +65,8 @@ class ActiveOrgPermissions(BaseModel):
     # Admin console tabs this user may open (D4 follow-up, 2026-10-09). The layout
     # and sidebar show exactly these; can_open_admin = at least one tab.
     # No "teams" tab since D28 (2026-10-10): teams live at /teams.
-    # No "documents" tab since D34 (2026-10-11): policies are uploaded on /organization.
-    admin_tabs: List[Literal["roles", "members", "strikes"]] = Field(default_factory=list)
+    # "documents" is back since D37 (2026-10-11, replacing D34's /organization page).
+    admin_tabs: List[Literal["roles", "members", "documents", "strikes"]] = Field(default_factory=list)
     can_open_admin: bool
 
 

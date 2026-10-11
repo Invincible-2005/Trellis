@@ -109,6 +109,21 @@ async def add_org_membership(clerk_org_id: str, clerk_user_id: str) -> None:
     raise _rejected(resp, "POST", path)
 
 
+async def remove_org_membership(clerk_org_id: str, clerk_user_id: str) -> None:
+    """
+    Take a user out of the Clerk org (D10-C, D38), so their token stops naming it
+    and just-in-time membership can't add them back. Not a member (404) counts as success.
+    """
+    path = f"/organizations/{clerk_org_id}/memberships/{clerk_user_id}"
+    resp = await _request("DELETE", path)
+    if resp.status_code == 200:
+        return
+    if resp.status_code == 404:
+        logger.info("Clerk user %s was not in org %s", clerk_user_id, clerk_org_id)
+        return
+    raise _rejected(resp, "DELETE", path)
+
+
 async def create_org_invitation(clerk_org_id: str, email: str, inviter_clerk_user_id: str) -> str:
     """
     Send a Clerk org invitation email (D10: Clerk only delivers it; the Trellis
