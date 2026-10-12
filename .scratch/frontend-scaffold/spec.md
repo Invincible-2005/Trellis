@@ -82,13 +82,25 @@ frontend/
 │   │   │       └── edit-task-dialog.tsx          # Same fields prefilled; only for can_edit
 │   │   │       Data: lib/api/queries/tasks.ts, lib/api/actions/tasks.ts (added 2026-10-10)
 │   │   │
-│   │   ├── chat/                                 # Route: /chat
-│   │   │   ├── page.tsx                          # Role-aware Agentic RAG chat interface
+│   │   ├── chat/                                 # Route: /chat (agent chat; task discussions are "Comments" inside a task, trellis/12 D41)
+│   │   │   ├── layout.tsx                        # Chat-list panel + chat area, full height under the header (D41, 2026-10-12)
+│   │   │   ├── page.tsx                          # /chat: new chat (empty screen + input)
+│   │   │   ├── [sessionId]/
+│   │   │   │   ├── page.tsx                      # /chat/[sessionId]: an existing chat (history loaded on open)
+│   │   │   │   └── not-found.tsx                 # "Chat not found" (deleted, someone else's) + New chat (2026-10-12)
 │   │   │   └── _components/
+│   │   │       ├── use-chat-stream.ts            # Client hook: POST to the stream route, read SSE → messages / current step (built 2026-10-12)
+│   │   │       ├── chat-conversation.tsx         # One chat: messages + input; a new chat is created on its first message (D42) (2026-10-12)
+│   │   │       ├── chat-session-list.tsx         # New chat + your chats, rename/delete; hideable panel, drawer on phones (plain panel, not a shadcn Sidebar)
+│   │   │       ├── rename-chat-dialog.tsx        # Rename (2026-10-12)
+│   │   │       ├── delete-chat-dialog.tsx        # Delete with confirmation (2026-10-12)
+│   │   │       ├── mention-popover.tsx           # The @ people / / teams list above the input (D43, 2026-10-12)
+│   │   │       ├── mentions.ts                   # Mention tokens: chips in sent messages, display → token on send (D43)
 │   │   │       ├── chat-message-list.tsx         # Message bubbles with markdown rendering
-│   │   │       ├── chat-input-box.tsx            # Input area with file context toggle
+│   │   │       ├── chat-input-box.tsx            # Input: Enter sends, @ / mentions, 4,000-char counter (file context toggle dropped 2026-10-12)
 │   │   │       ├── citation-badge.tsx            # Clickable SOP source references
-│   │   │       └── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
+│   │   │       ├── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
+│   │   │       └── confirm-action-card.tsx       # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
 │   │   │
 │   │   │   (organization/ (D34) dropped 2026-10-11 by trellis/12 D37: no documents page outside Admin)
 │   │   │
@@ -146,6 +158,7 @@ frontend/
 │   │   ├── client.ts                             # Singleton openapi-fetch client with Clerk auth middleware
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
+│   │       (chat: queries/chat.ts getChats/getChat/getMentions, actions/chat.ts createChat/renameChat/deleteChat, 2026-10-12)
 │   ├── middleware/                               # Arcjet request protection (trellis/12 D27, added 2026-10-10)
 │   │   ├── arcjet.ts                             # All rules + per-user limits (read, write, heavyRead, heavyWrite)
 │   │   ├── gate.ts                               # gate(): front gate run by proxy.ts (shield, bots, read limit)

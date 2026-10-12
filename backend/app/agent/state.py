@@ -12,7 +12,7 @@ Message flow (D19, lean graph):
 
 Architectural invariant (Ticket 03 §6 / Ticket 12 D1):
     AccessScope is NEVER stored in AgentState. AgentState is checkpointed
-    (SQLite locally), so a stored scope would be persisted and reused stale.
+    (Postgres, D11), so a stored scope would be persisted and reused stale.
     FastAPI resolves it via Depends(get_scope) and passes it per request through
     LangGraph runtime context (context_schema=AgentContext, invoked with
     context=AgentContext(scope=..., audit_id=...)). Nodes and tools read it from

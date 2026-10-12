@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  Bot,
   LayoutDashboard,
   Users,
   ShieldCheck,
@@ -51,6 +52,7 @@ const ADMIN_TABS: Record<AdminTab, { label: string; icon: LucideIcon }> = {
 const ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Teams", href: "/teams", icon: Users },
+  { label: "Chat", href: "/chat", icon: Bot },
 ]
 
 interface NavItemsProps {

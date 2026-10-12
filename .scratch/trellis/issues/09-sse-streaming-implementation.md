@@ -11,6 +11,12 @@
 > `status` step names (2026-10-09): `checking_input`, `routing`, `searching_documents`, `looking_up_tasks`, `grading_relevance`, `rewriting_query`, `preparing_action`, `writing_answer`, `verifying_citations`.
 > Endpoint decided (ticket 12 D2): `POST /api/v1/chat/sessions/{session_id}/message` returns the SSE stream.
 
+## Backend built 2026-10-12 (chat effort slice C)
+- `POST /api/v1/chat/sessions/{session_id}/message`, body `{"message"}`, FastAPI `EventSourceResponse` (`app/api/v1/chat.py`, `app/services/chat.py::stream_turn`). Checks before the stream (normal JSON errors): 404 `chat_not_found`, 400 `message_too_long`, 409 `chat_busy`, 422 empty.
+- Events, in order: `status {step}` · `tool_call {tool, status: start|end}` · `token {content}` · `citations [{tag, document_id, title, chunk_index, excerpt}]` · `token` (note, only if a citation was dropped) · `done {audit_id}`. On failure: `error {message}` and the stream ends.
+- `status` steps sent: `routing`, `thinking` (new), `searching_documents`, `looking_up_tasks`, `looking_up_teams` (new), `grading_relevance`, `rewriting_query`, `writing_answer`, `verifying_citations`. Not sent: `checking_input` (the checks happen before the stream opens), `preparing_action` (comes with D22).
+- Frontend half (BFF route, browser reader, thinking stepper) still open: chat slice D/E.
+
 ## Question
 
 How is the SSE streaming pipeline implemented end-to-end, from LangGraph node emissions in FastAPI to incremental UI updates in the Next.js chat interface?

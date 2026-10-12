@@ -30,7 +30,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **What follows from it:**
   - Session ownership (`session.user_id` and `org_id` match the JWT) is checked before the graph runs; on mismatch it returns 404.
   - The BFF has one proxy route: `app/api/chat/sessions/[sessionId]/message/route.ts`.
-- **Default, not yet confirmed:** the frontend creates a session first (`POST /api/v1/chat/sessions`), then sends the first message, so the sidebar shows the new chat immediately. The alternative is auto-creating the session on the first message.
+- ~~**Default, not yet confirmed:** the frontend creates a session first (`POST /api/v1/chat/sessions`), then sends the first message, so the sidebar shows the new chat immediately. The alternative is auto-creating the session on the first message.~~ Confirmed 2026-10-12 by D42: create, then send, both at the moment the first message is sent; "New chat" itself creates nothing.
 - **Written into:** ticket 04 (diagram), ticket 08 (endpoint table), ticket 09 (question and Blocked by), frontend ticket 01 (route table), frontend ticket 03 (Route Handler sample), `spec.md` (file tree).
 
 ### D3. Global API prefix — ✅ RESOLVED 2026-10-08
@@ -92,6 +92,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - **Consequence for the admin console (D4):** the Strikes tab opens for `can_org("review_strike")` **or `review_strike` on any team** (same pattern as the Documents tab), and lists only appeals the viewer may review.
 
 ### D7. Chat LLM provider — ✅ RESOLVED 2026-10-09
+- ⚠️ **Superseded in part 2026-10-12 by D44:** the agents use **Flash-Lite** too (Flash's free tier allows ~20 requests a day).
 - **Decision (Piyush): Gemini Flash on Google's free tier** via the already-installed `langchain-google-genai`.
   - Two settings: `CHAT_MODEL` (read + write agents) and `ROUTER_MODEL` (Flash-Lite, higher free limits). Key in `GOOGLE_API_KEY`. Models are created with LangChain `init_chat_model`, so switching provider later is a settings change.
   - **Checked by Piyush in AI Studio (2026-10-09): Flash-Lite free tier ≈ 15 RPM, 250k TPM, 500–1,000 RPD.** Enough for development (the router makes one call per message).
@@ -345,7 +346,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Written into:** ticket 03 (permission table note), map, `plans/documents/backend.md` slice C.
 
 ### Small agent gaps written in directly (2026-10-09, agent design review, no decision needed)
-- `give_strike` / `give_commendation` take `team_id` as well as `to_user_id` (a person can be on two teams; the hierarchy check is per team). Filled from the `@team` mention or asked for by the agent.
+- `give_strike` / `give_commendation` take `team_id` as well as `to_user_id` (a person can be on two teams; the hierarchy check is per team). Filled from the `@team` mention or asked for by the agent. *(2026-10-12, D43: teams are picked with `/`, people with `@`.)*
 - Each graph step gets an SSE `status` name, defined in ticket 09: `checking_input`, `routing`, `searching_documents`, `looking_up_tasks`, `grading_relevance`, `rewriting_query`, `preparing_action`, `writing_answer`, `verifying_citations`.
 - Task/summary tool results are not "chunks": they go to the agent as tool messages and are never put in `retrieved_chunk_ids` or cited.
 
@@ -475,6 +476,37 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - `actions/documents.ts::deleteDocument` reads the document, deletes it in the backend, then calls `UTApi().deleteFiles(<key>)` with the key from the `/f/<key>` link. A failed file delete is only logged: the document is already gone from Trellis.
 - **Built 2026-10-11 (not yet live-tested):** 58 backend tests pass; `tsc` and lint pass.
 
+### D41. Chat screen: what is it called, and where does it live in the frontend? (added 2026-10-12, chat effort, raised by Piyush) — ✅ RESOLVED 2026-10-12
+- **Gap:** task discussions (`task_comments`, ticket 02) are also "threads", so "chat" could mean two things; and the spec had only `chat/page.tsx`, with no place for the list of a user's chats or for opening one chat by URL.
+- ✅ **Decision (Piyush):**
+  - **Names:** the agent screen stays **Chat** (`/chat`, matching D2's `/api/v1/chat/...` and `chat_sessions`). Task discussions are **Comments**, shown inside a task, never a page of their own. The word "thread" is not used in the UI: in the backend it already means one chat (LangGraph `thread_id`).
+  - **Layout:** stays inside `(dashboard)` (same sign-in check, onboarding redirect and app sidebar). `chat/layout.tsx` adds a hideable chat-list panel (New chat, past chats with rename/delete; a drawer on phones) beside the conversation and fills the height under the header. It is a plain panel, not a second shadcn `Sidebar` (both would share the `sidebar_state` cookie). Routes: `/chat` = new chat, `/chat/[sessionId]` = an existing chat.
+  - **Rejected:** chats inside the app sidebar (ChatGPT style; would fetch the chat list on every page and hide it when the sidebar is collapsed) and a separate route group (copies the shell, loses the nav).
+- **Written into:** frontend-scaffold spec (chat tree), frontend-scaffold/07, map.
+
+### D42. When is a new chat created? (added 2026-10-12, chat effort; D2's "default, not yet confirmed") — ✅ RESOLVED 2026-10-12
+- **Gap:** D2 left open whether the frontend creates the chat first (`POST /api/v1/chat/sessions`) or the chat is created by the first message. With D41's screen, "New chat" opens `/chat`; creating a row on that click would leave empty "New chat" rows in the list whenever someone clicks it and leaves.
+- ✅ **Decision (Piyush): on the first message.** "New chat" creates nothing. The row is created when the first message is sent (frontend calls create, then sends, and the URL becomes `/chat/<id>` without a reload). D2's two-call shape stays; only the timing is fixed.
+- **Built 2026-10-12 (chat slice E):** the address changes to `/chat/<id>` once the first answer has finished, not while it streams (changing the URL mid-answer re-rendered the page and cut the stream off).
+- **Written into:** D2 (default now confirmed), ticket 08 §4, map. Plan: `plans/chat/` (local).
+
+### D43. Mentions in the chat box: what do `@` and `/` open, and who is listed? (added 2026-10-12, raised by Piyush during chat slice A) — ✅ RESOLVED 2026-10-12
+- **Gap:** ticket 10 (write node) says the chat UI supports `@user` / `@team` mention tokens carrying exact ids so the agent never guesses a name, and D22 says `give_strike` / `give_commendation` take `team_id` "from the `@team` mention". Nothing says which key opens which list, who appears in it, or how the token reaches the agent. `plans/chat/` didn't include it.
+- **Follows from existing rules (no decision needed):** the lists show only people and teams the user can already see (D13: teams you're on or oversee, and the members of those teams); the token is a hint, not a permission: the tools still check `AccessScope` (D1), so a forged id finds nothing.
+- ✅ **Decision (Piyush):**
+  - **`@` = a person, shown by email** (unique and recognisable). The pop-up lists "name · email", filters on either, and the chip shows the email. People listed = members of the teams you can see (D13), yourself included.
+  - **`/` = a team**, only teams you can see (D13).
+  - The pop-up opens only at the start of a word (so "and/or" doesn't trigger it).
+  - **Sent to the backend** as `@[karan@acme.com](user:<uuid>)` / `/[Alpha](team:<uuid>)`; the agent prompt explains the tokens and uses the ids in tool calls (`get_tasks` gains an assignee filter so "@Karan's tasks" works). The ids are hints; scope still decides (D1).
+  - Backend: `GET /api/v1/chat/mentions` → `{ people: [{id, name, email}], teams: [{id, name}] }` (chat slice B).
+- **Written into:** ticket 10 (write node note), D22 note (`@team` → `/team`), map. Plan: `plans/chat/`.
+
+### D44. Gemini Flash's free tier is ~20 requests a day: which model answers chat? (added 2026-10-12, chat slice C live test) — ✅ RESOLVED 2026-10-12
+- **Gap:** D7 picked Gemini Flash (`CHAT_MODEL=google_genai:gemini-flash-latest`) for the agents and Flash-Lite for the router, on the free tier. During the slice C test, Flash returned 429 `RESOURCE_EXHAUSTED` after ~20 requests: `generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash` (per day, per project; reset in ~15 h). A chat message uses 2–4 LLM calls, so the whole team gets ~5–10 answers a day. Flash-Lite (router) was not limited. Unofficial 2026 guides put Flash-Lite at ~500 requests/day free; Google no longer publishes a fixed table (the live quota is in AI Studio).
+- **Already handled in code (no decision needed):** LLM retries cut from 6 to 2 (a quota error reaches the user in seconds, not ~45 s); the error event says "reached its free usage limit for now. Please try again later."
+- ✅ **Decision (Piyush): Flash-Lite for everything.** `CHAT_MODEL` default is now `google_genai:gemini-flash-lite-latest` (same as `ROUTER_MODEL`; `.env` has no override). Re-tested the same day: document answer with 2 verified badges, `/team` and `@person` mentions with exact ids, small talk, injection attempt (answered within access, flagged) all pass; answers in 7–11 s (27 s for the first, document search + grading). Billing can still be turned on later by setting `CHAT_MODEL` back to Flash; no code change.
+- **Written into:** D7 (superseded note), `app/core/config.py`, map.
+
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
 - Ticket 02: the wording for `scope_type='role'` visibility was inverted. It now says "role + ancestors"; the CTE was already correct.
@@ -495,6 +527,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - ~~`backend/app/core/config.py` `async_migrations_url` and `alembic/env.py`: both use the **pooled** URL.~~ Fixed 2026-10-08: `async_migrations_url` now always uses the direct `DATABASE_URL`.
 - Migrations: **document search indexes added 2026-10-09** (`a7c2e9f4b310`: `CREATE EXTENSION IF NOT EXISTS vector`, HNSW `vector_cosine_ops`, chunk scope indexes, `documents (org_id, created_at)`); task, comment, chat-session and audit indexes still come with those features. Earlier: **partly fixed 2026-10-08.** `d4e8b2a61f07` adds `idx_org_members_role`, `idx_invitations_pending`, `idx_team_members_user` and `idx_roles_org_parent`. Still missing: the remaining ticket 02 indexes (HNSW `vector_cosine_ops`, chunk scope indexes, tasks, comments, chat sessions, audit), planned as ticket 11's indexes migration. There is also no `CREATE EXTENSION IF NOT EXISTS vector`.
 - ~~`backend/app/services/ingestion.py`: no retry, no failure reason, reuses the request's session.~~ **Fixed 2026-10-08.** The rework also covers the SSRF guard, the atomic commit, extraction off the event loop, and the stale-job sweep (see ticket 11 §7a). ⚠️ Migration `c3f1a9d27e54` must be applied.
+- ~~`backend/app/main.py`: still opened the SQLite checkpointer (`AsyncSqliteSaver`, `CHECKPOINTS_DB_PATH`) after D11.~~ Fixed 2026-10-12 (chat effort slice A): `AsyncPostgresSaver` on a psycopg pool (direct URL), `setup()` at startup, agent built once on `app.state.agent`; `langgraph-checkpoint-sqlite` and `checkpoints.db` removed. Migration `e2a7c4d9b613` adds `audit_log.injection_suspected` (D21) and the chat-list / audit indexes from ticket 02.
 - Scope cache: no invalidation on re-parenting yet (nothing is implemented yet).
 - Repo hygiene:
   - ~~`backend/**/__pycache__/*.pyc` files are tracked in git.~~ Fixed 2026-10-08: they are untracked, and `backend/.gitignore` is corrected (its paths were prefixed with `backend/`, so nothing matched).

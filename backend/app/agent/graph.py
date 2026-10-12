@@ -40,19 +40,24 @@ from app.core.config import settings
 MAX_STEPS = 8        # tool calls per message (ticket 04)
 MAX_REWRITES = 2     # query rewrites per message (ticket 04)
 HISTORY_TURNS = 10   # user turns the LLM sees (D19)
+# 1 try + 2 retries. The SDK default (6) keeps a user waiting ~45 s when the free
+# daily quota is used up, which no retry can fix.
+LLM_MAX_RETRIES = 3
 
 
 # ── Models (created on first use, so importing doesn't need the API key) ─────
 
 @cache
 def _chat_model():
-    return init_chat_model(settings.CHAT_MODEL, api_key=settings.GOOGLE_API_KEY)
+    return init_chat_model(settings.CHAT_MODEL, api_key=settings.GOOGLE_API_KEY, max_retries=LLM_MAX_RETRIES)
 
 
 @cache
 def _router_model():
     """Flash-Lite: routing, grading and rewriting (cheap, higher free limits)."""
-    return init_chat_model(settings.ROUTER_MODEL, api_key=settings.GOOGLE_API_KEY, temperature=0)
+    return init_chat_model(
+        settings.ROUTER_MODEL, api_key=settings.GOOGLE_API_KEY, temperature=0, max_retries=LLM_MAX_RETRIES
+    )
 
 
 class RouteDecision(BaseModel):
@@ -230,14 +235,31 @@ _TAG = re.compile(r"\[([^\[\]]+)\]")
 _HEX8 = re.compile(r"^[0-9a-f]{8}$")
 
 
+CITATION_EXCERPT_CHARS = 300
+
+
+def citation_note(dropped: int) -> str:
+    """Appended to an answer that cited sources it didn't retrieve (D20)."""
+    if not dropped:
+        return ""
+    sources = "1 source" if dropped == 1 else f"{dropped} sources"
+    return f"\n\n_({sources} couldn't be verified.)_"
+
+
 async def check_citations(state: AgentState) -> dict:
     """
     Code citation check (D19/D20): keep only cited chunks that were retrieved
-    this turn. The answer has already streamed; the SSE layer sends only
-    verified_citation_ids and a note when dropped_citation_count > 0.
+    this turn. The answer has already streamed; the SSE layer then sends the
+    verified citations and, if any were dropped, citation_note().
+
+    The verified citations (badge data) and the note are also saved on the
+    answer message itself (same id, so add_messages replaces it), so a reopened
+    chat shows the same badges without searching again.
     """
-    answer = state["messages"][-1].text if state["messages"] else ""
-    by_tag = {citation_tag(c["chunk_id"]): c["chunk_id"] for c in state["retrieved_chunks"]}
+    last = state["messages"][-1] if state["messages"] else None
+    answer = last.text if last else ""
+    chunks = {c["chunk_id"]: c for c in state["retrieved_chunks"]}
+    by_tag = {citation_tag(chunk_id): chunk_id for chunk_id in chunks}
 
     cited: list[str] = []
     for group in _TAG.findall(answer):
@@ -246,10 +268,27 @@ async def check_citations(state: AgentState) -> dict:
                 cited.append(token)
 
     verified = [by_tag[tag] for tag in cited if tag in by_tag]
-    return {
-        "verified_citation_ids": verified,
-        "dropped_citation_count": len(cited) - len(verified),
-    }
+    dropped = len(cited) - len(verified)
+    update: dict = {"verified_citation_ids": verified, "dropped_citation_count": dropped}
+
+    if isinstance(last, AIMessage) and answer:
+        citations = [
+            {
+                "tag": citation_tag(chunk_id),
+                "document_id": chunks[chunk_id]["document_id"],
+                "title": chunks[chunk_id]["title"],
+                "chunk_index": chunks[chunk_id]["chunk_index"],
+                "excerpt": chunks[chunk_id]["text"][:CITATION_EXCERPT_CHARS],
+            }
+            for chunk_id in verified
+        ]
+        update["messages"] = [
+            last.model_copy(update={
+                "content": answer + citation_note(dropped),
+                "additional_kwargs": {**last.additional_kwargs, "citations": citations},
+            })
+        ]
+    return update
 
 
 async def write_not_ready(state: AgentState) -> dict:

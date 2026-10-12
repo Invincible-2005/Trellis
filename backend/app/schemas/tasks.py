@@ -19,6 +19,7 @@ class TaskFilters(BaseModel):
     """Optional filters for list_tasks. Leaving all of them out lists every visible task."""
 
     assigned_to_me: bool = False
+    assigned_to_user_id: Optional[UUID] = None   # one person's tasks (the chat's @ mentions, D43)
     team_id: Optional[UUID] = None
     status: Optional[TaskStatus] = None
     overdue_only: bool = False      # deadline passed and not done

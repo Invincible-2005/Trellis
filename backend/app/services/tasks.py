@@ -73,6 +73,8 @@ async def list_tasks(db: AsyncSession, scope: AccessScope, filters: TaskFilters)
     stmt = _task_query(scope).where(Task.team_id.in_(team_ids))
     if filters.assigned_to_me:
         stmt = stmt.where(Task.assigned_to_user_id == scope.user_id)
+    if filters.assigned_to_user_id is not None:
+        stmt = stmt.where(Task.assigned_to_user_id == filters.assigned_to_user_id)
     if filters.status is not None:
         stmt = stmt.where(Task.status == filters.status)
     if filters.overdue_only:
