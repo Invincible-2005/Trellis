@@ -158,7 +158,7 @@ installed LangGraph 1.2.11 at implementation time.
 | `status` | `{"step": "classifying_intent" \| "searching_documents" \| "grading_relevance" \| "rewriting_query" \| "synthesizing"}` | Feeds `thinking-stepper.tsx` |
 | `tool_call` | `{"tool": "search_documents", "status": "start" \| "end"}` | Shows active tool |
 | `token` | `{"content": "..."}` | Incremental answer tokens |
-| `citations` | `[{"doc_id": "...", "title": "...", "chunk_index": 1}]` | Feeds `citation-badge.tsx` |
+| `citations` | `[{"doc_id": "...", "title": "...", "chunk_index": 1}]` *(built 2026-10-12 as `[{tag, document_id, title, chunk_index, excerpt}]`, ticket 09)* | Feeds `citation-badge.tsx` |
 | `error` | `{"message": "..."}` | Graceful error display |
 | `confirm` | `{"action": "give_strike", "summary": "...", "policy": {...}}` | Write action waiting for the user's Confirm/Cancel click (added 2026-10-09, ticket 12 D22) |
 | `done` | `{"audit_id": "..."}` | Stream end + audit trace ID |

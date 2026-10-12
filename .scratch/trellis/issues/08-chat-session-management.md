@@ -1,5 +1,9 @@
 # 08 - Chat Session Management & SQLite Checkpointer
 
+> **Built 2026-10-12 (chat effort slice B):** the session endpoints below, plus "open one chat" and the mentions list; code in `app/api/v1/chat.py` / `app/services/chat.py`.
+
+> **Built 2026-10-12 (chat effort slice A):** `main.py` opens `AsyncPostgresSaver` on a psycopg pool (direct Neon URL) and runs `setup()` at startup; the SQLite saver is gone.
+
 > **Superseded in part 2026-10-10 (ticket 12 D11):** the checkpointer is `AsyncPostgresSaver` on NeonDB in **every** environment, local dev included. Read "SQLite" / `checkpoints.db` / `AsyncSqliteSaver` below as the Postgres saver (§7 is now the only setup); thread deletion uses the checkpointer's own thread-delete method.
 
 - **Type**: `task`
@@ -73,10 +77,12 @@ All endpoints are scoped strictly to the authenticated user's `user_id` + `org_i
 
 | Method | Endpoint | Action |
 |---|---|---|
-| `POST` | `/api/v1/chat/sessions` | Create a new empty session, return `session_id` |
+| `POST` | `/api/v1/chat/sessions` | Create a new empty session, return `session_id`. Called when the first message is sent, not when "New chat" is clicked (ticket 12 D42) |
 | `GET` | `/api/v1/chat/sessions` | List sessions for this user in this org (ordered by `last_active_at DESC`) |
-| `PATCH` | `/api/v1/chat/sessions/{session_id}` | Rename session (update `title`) |
+| `GET` | `/api/v1/chat/sessions/{session_id}` | One chat with its messages (questions + final answers with citations), read from the checkpoint *(added 2026-10-12, chat effort slice B)* |
+| `PATCH` | `/api/v1/chat/sessions/{session_id}` | Rename session (update `title`; doesn't change `last_active_at`) |
 | `DELETE` | `/api/v1/chat/sessions/{session_id}` | Hard delete — NeonDB row + SQLite checkpoint blob |
+| `GET` | `/api/v1/chat/mentions` | People and teams for the `@` / `/` pop-up (ticket 12 D43) *(added 2026-10-12)* |
 | `POST` | `/api/v1/chat/sessions/{session_id}/message` | Send a message → invokes LangGraph graph, responds with **SSE stream** (`text/event-stream`). **The single chat endpoint** (ticket 12 D2) |
 
 ---

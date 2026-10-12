@@ -113,7 +113,7 @@ The graph operates as an intentional hybrid: a **ReAct execution engine bounded 
 * **400 Error Prevention:** Transitioning to a plain LLM prevents dangling `tool_calls` without matching `ToolMessage`s, avoiding API provider 400 Bad Request errors.
 
 #### Node 5: Write Node (`write_action`)
-* **Entity Disambiguation:** Chat UI supports `@user` / `@team` mention tokens providing exact UUIDs (`user:c4a8...`) to prevent name hallucination.
+* **Entity Disambiguation:** Chat UI supports `@user` / `@team` mention tokens providing exact UUIDs (`user:c4a8...`) to prevent name hallucination. *(Settled 2026-10-12, ticket 12 D43: `@` picks a person by email, `/` picks a team; tokens `@[email](user:<uuid>)` / `/[Team](team:<uuid>)`; lists limited to what the user can see.)*
 * **Slot Filling:** If parameters are missing (e.g., no deadline specified), the LLM responds conversationally without invoking DB mutations.
 * **Tools:**
   * `create_task(...)`: Verifies `scope.has_permission("assign_task")` for target team.

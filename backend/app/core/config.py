@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     # GOOGLE_API_KEY is used for both chat and embeddings, and is passed explicitly
     # (Settings doesn't export to os.environ).
     GOOGLE_API_KEY: str = ""  # Google AI Studio → Get API key
-    CHAT_MODEL: str = "google_genai:gemini-flash-latest"
+    # Flash-Lite for both (D44): Flash's free tier allows only ~20 requests a day.
+    CHAT_MODEL: str = "google_genai:gemini-flash-lite-latest"
     ROUTER_MODEL: str = "google_genai:gemini-flash-lite-latest"
 
     # Chat input check (ticket 12 D21): longer messages get 400 message_too_long
@@ -51,9 +52,6 @@ class Settings(BaseSettings):
     # Set as JSON in .env, e.g. INGESTION_ALLOWED_HOSTS='["utfs.io", ".ufs.sh"]'
     INGESTION_ALLOWED_HOSTS: list[str] = ["utfs.io", ".ufs.sh"]
     INGESTION_MAX_FILE_BYTES: int = 25 * 1024 * 1024
-
-    # LangGraph SQLite checkpointer path (dev only; swapped for Postgres in prod)
-    CHECKPOINTS_DB_PATH: str = "checkpoints.db"
 
     # LangSmith tracing of agent runs (optional, dev/demo data only: traces contain
     # prompts, document text and names). Off unless LANGSMITH_TRACING=true.
@@ -125,8 +123,8 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         """
-        Returns a sync connection string using psycopg2 for Alembic migrations if running sync.
-        Always uses the direct (unpooled) DATABASE_URL.
+        Plain libpq connection string on the direct (unpooled) DATABASE_URL.
+        Used by the chat memory pool (psycopg 3, main.py lifespan) and by sync tools.
         """
         raw_url = self.DATABASE_URL
         if raw_url.startswith("postgresql+asyncpg://"):

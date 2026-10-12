@@ -1,10 +1,11 @@
 """
 Trellis FastAPI application entry point.
 
-Lifespan (Ticket 08):
-    Opens the LangGraph SQLite checkpointer once at startup and stores it on
-    app.state.checkpointer. Every route that invokes the agent graph reads it
-    from there. Closes cleanly on shutdown — no data loss.
+Lifespan (Ticket 08, Ticket 12 D11):
+    Opens the LangGraph Postgres checkpointer (chat memory in Neon) once at
+    startup, builds the agent with it, and stores both on app.state
+    (app.state.checkpointer, app.state.agent). Chat routes use them from there.
+    The connection pool closes cleanly on shutdown.
 
 Pattern reference:
     https://fastapi.tiangolo.com/advanced/events/
@@ -13,8 +14,10 @@ Pattern reference:
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 
+from app.agent.graph import build_graph
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.services.ingestion import fail_stale_ingestions
@@ -34,12 +37,27 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Stale-ingestion sweep failed; continuing startup")
 
-    # Open SQLite checkpointer — this is the LangGraph conversation memory store.
+    # Chat memory (LangGraph checkpointer) lives in Neon in every environment (D11).
     # thread_id format: "{org_id}:{user_id}:{session_id}" (Ticket 08 invariant)
-    async with AsyncSqliteSaver.from_conn_string(settings.CHECKPOINTS_DB_PATH) as saver:
-        app.state.checkpointer = saver
+    # - direct (unpooled) URL: setup() runs LangGraph's own table migrations;
+    # - check: Neon closes idle connections when it sleeps, so test each one on borrow;
+    # - prepare_threshold=None: no server-side prepared statements (safe behind any pooler).
+    # On Windows, psycopg's async mode needs the selector event loop: start the
+    # backend with `uvicorn app.main:app --reload` or `fastapi dev`.
+    async with AsyncConnectionPool(
+        settings.sync_database_url,
+        min_size=1,
+        max_size=5,
+        open=False,
+        check=AsyncConnectionPool.check_connection,
+        kwargs={"autocommit": True, "prepare_threshold": None},
+    ) as pool:
+        checkpointer = AsyncPostgresSaver(pool)
+        await checkpointer.setup()  # creates/updates LangGraph's checkpoint tables; safe to repeat
+        app.state.checkpointer = checkpointer
+        app.state.agent = build_graph(checkpointer)
         yield
-    # saver closes here automatically — WAL checkpoint, connection closed.
+    # pool closes here: every connection returned and closed.
 
 
 app = FastAPI(

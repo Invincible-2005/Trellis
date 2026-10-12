@@ -85,24 +85,27 @@ async def search_documents(query: str) -> tuple[str, list[RetrievedChunk]]:
 @tool
 async def get_tasks(
     assigned_to_me: bool = False,
+    assigned_to_user_id: Optional[str] = None,
     team_id: Optional[str] = None,
     status: Optional[Literal["todo", "in_progress", "done", "blocked"]] = None,
     overdue_only: bool = False,
 ) -> str:
     """
     List tasks the user can see. Filters: only tasks assigned to the user,
-    one team (team_id from an @team mention or from get_team_summary), a
-    status, or only overdue tasks. An empty list is a valid answer.
+    one person's tasks (assigned_to_user_id from an @ mention), one team
+    (team_id from a / mention or from get_team_summary), a status, or only
+    overdue tasks. An empty list is a valid answer.
     """
     try:
         filters = TaskFilters(
             assigned_to_me=assigned_to_me,
+            assigned_to_user_id=uuid.UUID(assigned_to_user_id) if assigned_to_user_id else None,
             team_id=uuid.UUID(team_id) if team_id else None,
             status=status,
             overdue_only=overdue_only,
         )
     except ValueError:
-        return "That team id isn't valid."
+        return "That person or team id isn't valid."
     try:
         async with async_session() as db:
             tasks = await list_tasks(db, _scope(), filters)
