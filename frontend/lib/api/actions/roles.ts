@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zCreateRoleRequest, zUpdateRoleRequest } from '../schemas/roles';
 import type { components } from '../v1';
 
 type Role = components['schemas']['RoleResponse'];
@@ -23,8 +24,11 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
 export async function createRole(input: CreateRoleInput): Promise<ActionResult<Role>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  // Same generated schema as the dialog: a Server Action is a public endpoint (D49).
+  const parsed = zCreateRoleRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const role = await unwrap(api.POST('/api/v1/admin/roles', { body: input }));
+    const role = await unwrap(api.POST('/api/v1/admin/roles', { body: parsed.data }));
     revalidatePath('/admin/roles');
     return { ok: true, data: role };
   } catch (err) {
@@ -39,9 +43,14 @@ export async function createRole(input: CreateRoleInput): Promise<ActionResult<R
 export async function updateRole(roleId: string, input: UpdateRoleInput): Promise<ActionResult<Role>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zUpdateRoleRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const role = await unwrap(
-      api.PATCH('/api/v1/admin/roles/{role_id}', { params: { path: { role_id: roleId } }, body: input }),
+      api.PATCH('/api/v1/admin/roles/{role_id}', {
+        params: { path: { role_id: roleId } },
+        body: parsed.data,
+      }),
     );
     revalidatePath('/admin/roles');
     return { ok: true, data: role };

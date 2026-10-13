@@ -17,10 +17,12 @@ The canonical file tree is [`.scratch/frontend-scaffold/spec.md`](../.scratch/fr
 | Chat stream proxy | `app/api/chat/sessions/[sessionId]/message/route.ts` |
 | Small helpers | `lib/utils.ts` |
 | Route protection | `proxy.ts` (Next.js 16's name for middleware) |
+| Form input checks | zod schemas are **generated** from the backend: `pnpm api:generate` writes `lib/api/schemas/zod.gen.ts` (never edit or import it directly). Import from the area file, e.g. `@/lib/api/schemas/roles` (`members`, `teams`, `tasks`, `documents`, `chat`, `orgs`). The dialog uses `useForm({ resolver: zodResolver(zXxxRequest) })` with shadcn `Field` / `FieldError` (`components/ui/field.tsx`) so errors show under the field; see the Roles dialogs for the pattern; the Server Action runs the same schema's `safeParse(input)` first and returns `{ ok: false, message }` if it fails. Need a frontend-only tweak (trim, a picker's "None" = `""` → `emptyAsNull()`, a cross-field rule)? Add a form version in the area file by `.extend()`-ing the generated schema; never retype backend rules by hand (trellis/12 D49). |
 | Rate limits and bot protection | `lib/middleware/` (Arcjet). New Server Actions that change data start with `const blocked = await limit('write'); if (blocked) return blocked;` (`heavyWrite` for uploads/invites, `heavyRead` for chat). |
 
 ## Rules of thumb
-- `lib/api/v1.d.ts` is generated from the backend's `openapi.json`. Never edit it by hand.
+- `lib/api/v1.d.ts` and `lib/api/schemas/zod.gen.ts` are generated from the backend's `openapi.json` (`pnpm api:generate`). Never edit them by hand; rerun the command after a backend change.
+- **Never call `router.refresh()` after a Server Action.** The action's `revalidatePath` / `refresh()` already updates the page; a client refresh on top collides with that update and freezes the page's router (found 2026-10-13 on Admin → Documents). Polling: let a Server Action call `refresh()` from `next/cache` when something changed (see `checkProcessingDocuments`).
 - Show or hide navigation and admin pages using the permissions from `GET /api/v1/auth/context`, never a Clerk role.
 - Check `node_modules/next/dist/docs/` before using a Next.js feature (see the block above).
 

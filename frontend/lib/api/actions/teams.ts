@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zAddTeamMemberRequest, zCreateTeamRequest } from '../schemas/teams';
 import type { components } from '../v1';
 
 type Team = components['schemas']['TeamResponse'];
@@ -24,8 +25,10 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
 export async function createTeam(input: CreateTeamInput): Promise<ActionResult<Team>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zCreateTeamRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const team = await unwrap(api.POST('/api/v1/teams', { body: input }));
+    const team = await unwrap(api.POST('/api/v1/teams', { body: parsed.data }));
     revalidatePath('/teams');
     return { ok: true, data: team };
   } catch (err) {
@@ -59,11 +62,13 @@ export async function addTeamMember(
 ): Promise<ActionResult<TeamMember>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zAddTeamMemberRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const member = await unwrap(
       api.POST('/api/v1/teams/{team_id}/members', {
         params: { path: { team_id: teamId } },
-        body: input,
+        body: parsed.data,
       }),
     );
     revalidatePath('/teams');

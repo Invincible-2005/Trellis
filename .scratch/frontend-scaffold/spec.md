@@ -53,11 +53,14 @@ frontend/
 │   │   │   └── command-menu.tsx                  # Cmd+K quick search modal (optional)
 │   │   │
 │   │   ├── dashboard/                            # Route: /dashboard
-│   │   │   ├── page.tsx                          # Role-scoped summary view (Recharts metrics, deadlines)
+│   │   │   ├── page.tsx                          # Server Component: getDashboard() on open, no polling (trellis/12 D47/D48, 2026-10-13)
 │   │   │   └── _components/
-│   │   │       ├── role-metrics-cards.tsx        # High-level KPIs based on user scope
-│   │   │       ├── deadline-tracker.tsx          # Upcoming task deadlines widget
-│   │   │       └── personal-strikes-card.tsx     # Current user strike summary
+│   │   │       ├── task-status-chart.tsx         # Client: the one Recharts bar chart (my tasks by status)
+│   │   │       ├── role-metrics-cards.tsx        # Team cards (D24) + org totals (view_aggregate only)
+│   │   │       ├── deadline-tracker.tsx          # Next 5 deadlines
+│   │   │       ├── personal-strikes-card.tsx     # My strikes (read-only; Appeal comes with /admin/strikes)
+│   │   │       └── commendations-card.tsx        # My latest 5 commendations
+│   │   │       Data: lib/api/queries/dashboard.ts (getDashboard, added 2026-10-13)
 │   │   │
 │   │   ├── teams/                                # Route: /teams (added 2026-10-10, trellis/12 D28)
 │   │   │   ├── page.tsx                          # Teams you can see (D13); Create team if can_org(create_team)
@@ -159,6 +162,10 @@ frontend/
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
 │   │       (chat: queries/chat.ts getChats/getChat/getMentions, actions/chat.ts createChat/renameChat/deleteChat, 2026-10-12)
+│   │   └── schemas/                              # zod schemas for forms, one file per area (trellis/12 D49)
+│   │       ├── zod.gen.ts                        # Auto-generated from openapi.json by `pnpm api:generate`; never edit, never import directly
+│   │       ├── shared.ts                         # Friendly error wording (z.config), firstError() for toasts, emptyAsNull() for "None" pickers
+│   │       └── roles.ts, members.ts, teams.ts, tasks.ts, documents.ts, chat.ts, orgs.ts  # that area's generated schemas + form versions (e.g. zInviteMemberForm)
 │   ├── middleware/                               # Arcjet request protection (trellis/12 D27, added 2026-10-10)
 │   │   ├── arcjet.ts                             # All rules + per-user limits (read, write, heavyRead, heavyWrite)
 │   │   ├── gate.ts                               # gate(): front gate run by proxy.ts (shield, bots, read limit)

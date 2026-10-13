@@ -19,6 +19,7 @@ import uuid
 from fastapi import status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.errors import api_error
 from app.models.strike import Strike
@@ -132,3 +133,42 @@ async def give_strike(
         escalated=strike.escalated,
         created_at=strike.created_at,
     )
+
+
+async def list_my_strikes(db: AsyncSession, scope: AccessScope) -> list[StrikeResponse]:
+    """Strikes given to the user in this org, newest first; dismissed ones left out (D6, D47)."""
+    Giver = aliased(User)
+    Receiver = aliased(User)
+    rows = await db.execute(
+        select(
+            Strike,
+            Team.name.label("team_name"),
+            Giver.name.label("giver_name"),
+            Receiver.name.label("receiver_name"),
+        )
+        .join(Team, Team.id == Strike.team_id)
+        .join(Giver, Giver.id == Strike.given_by_user_id)
+        .join(Receiver, Receiver.id == Strike.given_to_user_id)
+        .where(
+            Strike.org_id == scope.org_id,
+            Strike.given_to_user_id == scope.user_id,
+            Strike.status != "dismissed",
+        )
+        .order_by(Strike.created_at.desc())
+    )
+    return [
+        StrikeResponse(
+            id=row.Strike.id,
+            team_id=row.Strike.team_id,
+            team_name=row.team_name,
+            given_by_user_id=row.Strike.given_by_user_id,
+            given_by_name=row.giver_name or "",
+            given_to_user_id=row.Strike.given_to_user_id,
+            given_to_name=row.receiver_name or "",
+            reason=row.Strike.reason,
+            status=row.Strike.status,
+            escalated=row.Strike.escalated,
+            created_at=row.Strike.created_at,
+        )
+        for row in rows.all()
+    ]

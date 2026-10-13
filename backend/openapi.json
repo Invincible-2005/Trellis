@@ -3652,6 +3652,73 @@
         }
       }
     },
+    "/api/v1/dashboard": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Dashboard",
+        "description": "Everything /dashboard shows: my task counts, next 5 deadlines, my strikes and\nlatest 5 commendations (D47); a card per team I can view (D24); org totals\nonly with org-level view_aggregate.",
+        "operationId": "get_dashboard_api_v1_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -4146,6 +4213,64 @@
         "title": "Citation",
         "description": "A source badge under an answer (D20: only citations the agent really retrieved).\n`tag` is the 8-character label the answer cites, e.g. [3f9a12bc]."
       },
+      "CommendationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "given_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given By User Id"
+          },
+          "given_by_name": {
+            "type": "string",
+            "title": "Given By Name"
+          },
+          "given_to_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given To User Id"
+          },
+          "given_to_name": {
+            "type": "string",
+            "title": "Given To Name"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id",
+          "team_name",
+          "given_by_user_id",
+          "given_by_name",
+          "given_to_user_id",
+          "given_to_name",
+          "reason",
+          "created_at"
+        ],
+        "title": "CommendationResponse"
+      },
       "ConfirmCard": {
         "properties": {
           "action": {
@@ -4379,6 +4504,60 @@
           "name"
         ],
         "title": "CreateTeamRequest"
+      },
+      "DashboardResponse": {
+        "properties": {
+          "my_tasks": {
+            "$ref": "#/components/schemas/TaskSummary"
+          },
+          "upcoming_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskResult"
+            },
+            "type": "array",
+            "title": "Upcoming Tasks"
+          },
+          "my_strikes": {
+            "items": {
+              "$ref": "#/components/schemas/StrikeResponse"
+            },
+            "type": "array",
+            "title": "My Strikes"
+          },
+          "recent_commendations": {
+            "items": {
+              "$ref": "#/components/schemas/CommendationResponse"
+            },
+            "type": "array",
+            "title": "Recent Commendations"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/TeamOverview"
+            },
+            "type": "array",
+            "title": "Teams"
+          },
+          "org_overview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrgOverview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "my_tasks",
+          "upcoming_tasks",
+          "my_strikes",
+          "recent_commendations",
+          "teams"
+        ],
+        "title": "DashboardResponse"
       },
       "DocumentListResponse": {
         "properties": {
@@ -4852,6 +5031,39 @@
         "title": "MentionsResponse",
         "description": "Only teams the user can see (D13) and the people on them."
       },
+      "OrgOverview": {
+        "properties": {
+          "total_users": {
+            "type": "integer",
+            "title": "Total Users"
+          },
+          "total_teams": {
+            "type": "integer",
+            "title": "Total Teams"
+          },
+          "total_roles": {
+            "type": "integer",
+            "title": "Total Roles"
+          },
+          "total_documents": {
+            "type": "integer",
+            "title": "Total Documents"
+          },
+          "active_strikes": {
+            "type": "integer",
+            "title": "Active Strikes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_users",
+          "total_teams",
+          "total_roles",
+          "total_documents",
+          "active_strikes"
+        ],
+        "title": "OrgOverview"
+      },
       "OrgProfileResponse": {
         "properties": {
           "id": {
@@ -5125,6 +5337,80 @@
         "title": "SendMessageRequest",
         "description": "Send exactly one of:\n- `message`: a new message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long\n  (D21). People and teams picked in the chat box arrive as `@[email](user:<id>)`\n  and `/[Team](team:<id>)` (D43). If a Confirm card is waiting, it is cancelled first.\n- `resume`: the click on a Confirm card (D22). 409 nothing_to_confirm when no\n  card is waiting (e.g. a second click, D45)."
       },
+      "StrikeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "given_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given By User Id"
+          },
+          "given_by_name": {
+            "type": "string",
+            "title": "Given By Name"
+          },
+          "given_to_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given To User Id"
+          },
+          "given_to_name": {
+            "type": "string",
+            "title": "Given To Name"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_agent_review",
+              "confirmed",
+              "appealed",
+              "dismissed"
+            ],
+            "title": "Status"
+          },
+          "escalated": {
+            "type": "boolean",
+            "title": "Escalated"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id",
+          "team_name",
+          "given_by_user_id",
+          "given_by_name",
+          "given_to_user_id",
+          "given_to_name",
+          "reason",
+          "status",
+          "escalated",
+          "created_at"
+        ],
+        "title": "StrikeResponse"
+      },
       "TagTarget": {
         "properties": {
           "id": {
@@ -5272,6 +5558,37 @@
           "overdue"
         ],
         "title": "TaskResult"
+      },
+      "TaskSummary": {
+        "properties": {
+          "todo": {
+            "type": "integer",
+            "title": "Todo",
+            "default": 0
+          },
+          "in_progress": {
+            "type": "integer",
+            "title": "In Progress",
+            "default": 0
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked",
+            "default": 0
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "TaskSummary"
       },
       "TeamCandidatesResponse": {
         "properties": {
@@ -5438,6 +5755,45 @@
           "assignable"
         ],
         "title": "TeamMemberResponse"
+      },
+      "TeamOverview": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "task_summary": {
+            "$ref": "#/components/schemas/TaskSummary"
+          },
+          "active_strikes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Strikes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "team_name",
+          "member_count",
+          "task_summary"
+        ],
+        "title": "TeamOverview"
       },
       "TeamResponse": {
         "properties": {

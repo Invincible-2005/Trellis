@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Shield } from "lucide-react";
 
@@ -13,10 +15,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { updateMemberRole } from "@/lib/api/actions/members";
 import type { Member } from "@/lib/api/queries/members";
 import type { Role } from "@/lib/api/queries/roles";
+import { zChangeMemberRoleForm } from "@/lib/api/schemas/members";
 
 interface ChangeRoleDialogProps {
   /** A row with manageable: true (trellis/12 D38). */
@@ -27,19 +30,23 @@ interface ChangeRoleDialogProps {
 
 export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRoleDialogProps) {
   const currentRoleId = member.org_role_id ?? "";
-  const [roleId, setRoleId] = useState(currentRoleId);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
+  const form = useForm({
+    resolver: zodResolver(zChangeMemberRoleForm),
+    defaultValues: { role_id: currentRoleId },
+  });
+  const isSubmitting = form.formState.isSubmitting;
+  const roleId = useWatch({ control: form.control, name: "role_id" }) ?? "";
 
   // Their current role may hold a permission you lack, so it isn't always in the
   // assignable list: keep it visible as "(current)" so nothing changes by accident.
   const currentIsListed = !member.org_role_id || assignableRoles.some((r) => r.id === currentRoleId);
   const selectedRole = assignableRoles.find((r) => r.id === roleId);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  // `values.role_id` is already checked: "No role" is null.
+  const handleSave = form.handleSubmit(async (values) => {
     try {
-      const res = await updateMemberRole(member.user_id, roleId || null);
+      const res = await updateMemberRole(member.user_id, values.role_id);
       if (!res.ok) {
         toast.error(res.message);
         return;
@@ -50,15 +57,13 @@ export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRol
       onClose();
     } catch {
       toast.error("An unexpected error occurred while changing the role.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[440px]">
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-primary" />
@@ -71,28 +76,36 @@ export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRol
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="member-new-role">Org Role</Label>
-            <select
-              id="member-new-role"
-              value={roleId}
-              onChange={(e) => setRoleId(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              <option value="">No role{!member.org_role_id ? " (current)" : ""}</option>
-              {!currentIsListed && (
-                <option value={currentRoleId}>{member.org_role_name} (current)</option>
-              )}
-              {assignableRoles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name} (Level {role.depth}){role.id === currentRoleId ? " (current)" : ""}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-muted-foreground">
-              You can give roles below your own, with permissions you hold.
-            </p>
-          </div>
+          <Controller
+            name="role_id"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid} className="gap-1.5">
+                <FieldLabel htmlFor="member-new-role">Org Role</FieldLabel>
+                <select
+                  {...field}
+                  value={field.value ?? ""}
+                  id="member-new-role"
+                  aria-invalid={fieldState.invalid}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="">No role{!member.org_role_id ? " (current)" : ""}</option>
+                  {!currentIsListed && (
+                    <option value={currentRoleId}>{member.org_role_name} (current)</option>
+                  )}
+                  {assignableRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name} (Level {role.depth}){role.id === currentRoleId ? " (current)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <FieldDescription className="text-[11px]">
+                  You can give roles below your own, with permissions you hold.
+                </FieldDescription>
+                <FieldError errors={[fieldState.error]} />
+              </Field>
+            )}
+          />
 
           {/* Permission preview for the chosen role */}
           {selectedRole && selectedRole.permissions && selectedRole.permissions.length > 0 && (

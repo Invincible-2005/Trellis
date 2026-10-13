@@ -15,6 +15,7 @@ import uuid
 from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.errors import api_error
 from app.models.commendation import Commendation
@@ -103,3 +104,42 @@ async def give_commendation(
         reason=commendation.reason,
         created_at=commendation.created_at,
     )
+
+
+async def list_my_commendations(
+    db: AsyncSession, scope: AccessScope, limit: int = 5
+) -> list[CommendationResponse]:
+    """The latest commendations given to the user in this org, newest first (D47)."""
+    Giver = aliased(User)
+    Receiver = aliased(User)
+    rows = await db.execute(
+        select(
+            Commendation,
+            Team.name.label("team_name"),
+            Giver.name.label("giver_name"),
+            Receiver.name.label("receiver_name"),
+        )
+        .join(Team, Team.id == Commendation.team_id)
+        .join(Giver, Giver.id == Commendation.given_by_user_id)
+        .join(Receiver, Receiver.id == Commendation.given_to_user_id)
+        .where(
+            Commendation.org_id == scope.org_id,
+            Commendation.given_to_user_id == scope.user_id,
+        )
+        .order_by(Commendation.created_at.desc())
+        .limit(limit)
+    )
+    return [
+        CommendationResponse(
+            id=row.Commendation.id,
+            team_id=row.Commendation.team_id,
+            team_name=row.team_name,
+            given_by_user_id=row.Commendation.given_by_user_id,
+            given_by_name=row.giver_name or "",
+            given_to_user_id=row.Commendation.given_to_user_id,
+            given_to_name=row.receiver_name or "",
+            reason=row.Commendation.reason,
+            created_at=row.Commendation.created_at,
+        )
+        for row in rows.all()
+    ]

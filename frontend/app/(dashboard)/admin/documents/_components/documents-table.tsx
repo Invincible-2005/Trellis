@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -31,7 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { deleteDocument, getDocumentStatus } from "@/lib/api/actions/documents";
+import { checkProcessingDocuments, deleteDocument } from "@/lib/api/actions/documents";
 import type { Document, DocumentTagOptions } from "@/lib/api/queries/documents";
 import { EditDocumentDialog } from "./edit-document-dialog";
 
@@ -41,14 +40,14 @@ interface DocumentsTableProps {
 }
 
 export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTableProps) {
-  const router = useRouter();
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [docToEdit, setDocToEdit] = useState<Document | null>(null);
 
-  // While a document is still being indexed, check every 3 s; when one finishes,
-  // reload the page's data so the new status shows. (Ids joined into a string so the
-  // timer only restarts when the set of processing documents changes.)
+  // While a document is still being indexed, check every 5 s with ONE request. When one
+  // has finished, the Server Action refreshes the page itself, so the new status arrives in
+  // its reply; no router.refresh() here (it collides with Server Action updates and freezes
+  // the router). Ids joined into a string so the timer only restarts when the set changes.
   const processingIds = docs
     .filter((d) => d.status === "processing")
     .map((d) => d.id)
@@ -57,21 +56,10 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
   useEffect(() => {
     if (!processingIds) return;
 
-    let cancelled = false;
-    const interval = setInterval(async () => {
-      const results = await Promise.all(
-        processingIds.split(",").map((id) => getDocumentStatus(id))
-      );
-      if (!cancelled && results.some((r) => r.ok && r.data.status !== "processing")) {
-        router.refresh();
-      }
-    }, 3000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [processingIds, router]);
+    const ids = processingIds.split(",");
+    const interval = setInterval(() => void checkProcessingDocuments(ids), 5000);
+    return () => clearInterval(interval);
+  }, [processingIds]);
 
   // Helpers
   const getScopeBadge = (doc: Document) => {

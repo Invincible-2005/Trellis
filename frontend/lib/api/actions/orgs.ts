@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zUpdateOrgDescriptionRequest } from '../schemas/orgs';
 import type { components } from '../v1';
 
 type OrgProfile = components['schemas']['OrgProfileResponse'];
@@ -21,8 +22,10 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
 export async function updateOrgDescription(description: string): Promise<ActionResult<OrgProfile>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zUpdateOrgDescriptionRequest.safeParse({ description });
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const org = await unwrap(api.PATCH('/api/v1/orgs/current', { body: { description } }));
+    const org = await unwrap(api.PATCH('/api/v1/orgs/current', { body: parsed.data }));
     revalidatePath('/organization');
     return { ok: true, data: org };
   } catch (err) {

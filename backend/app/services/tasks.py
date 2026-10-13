@@ -290,6 +290,43 @@ async def team_summary(
     ]
 
 
+async def my_task_summary(db: AsyncSession, scope: AccessScope) -> TaskSummary:
+    """The user's own tasks (in teams they can view), counted by status, plus overdue (D47)."""
+    summary = TaskSummary()
+    team_ids = list(scope.viewable_team_ids)
+    if not team_ids:
+        return summary
+    mine = and_(Task.team_id.in_(team_ids), Task.assigned_to_user_id == scope.user_id)
+    status_counts = await db.execute(
+        select(Task.status, func.count()).where(mine).group_by(Task.status)
+    )
+    for task_status, count in status_counts.all():
+        setattr(summary, task_status, count)
+    summary.overdue = await db.scalar(
+        select(func.count()).select_from(Task).where(mine, _overdue(_now()))
+    ) or 0
+    return summary
+
+
+async def upcoming_tasks(db: AsyncSession, scope: AccessScope, limit: int = 5) -> list[TaskResult]:
+    """The user's unfinished tasks, soonest deadline first (tasks without one last) (D47)."""
+    team_ids = list(scope.viewable_team_ids)
+    if not team_ids:
+        return []
+    now = _now()
+    stmt = (
+        _task_query(scope)
+        .where(
+            Task.team_id.in_(team_ids),
+            Task.assigned_to_user_id == scope.user_id,
+            Task.status != "done",
+        )
+        .order_by(Task.deadline.asc().nulls_last(), Task.created_at.desc())
+        .limit(limit)
+    )
+    return [_task_result(scope, row, now) for row in (await db.execute(stmt)).all()]
+
+
 # ── task helpers ──────────────────────────────────────────────────────────────
 
 async def _get_task_row(db: AsyncSession, scope: AccessScope, task_id: uuid.UUID):

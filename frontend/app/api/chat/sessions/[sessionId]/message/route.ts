@@ -8,6 +8,7 @@ import type { NextRequest } from 'next/server';
 import { api } from '@/lib/api/client';
 import { limit } from '@/lib/middleware/limit';
 import { apiError } from '@/lib/middleware/gate';
+import { firstError, zSendMessageRequest } from '@/lib/api/schemas/chat';
 
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/chat/sessions/[sessionId]/message'>) {
   // Each message costs 2–4 AI calls: 5 per minute per user (D27)
@@ -15,10 +16,11 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/chat/sessio
   if (blocked) return apiError(429, 'rate_limited', blocked.message);
 
   const { sessionId } = await ctx.params;
-  const body = (await req.json().catch(() => null)) as { message?: unknown; resume?: unknown } | null;
-  const message = typeof body?.message === 'string' ? body.message : undefined;
-  const resume = body?.resume === 'confirm' || body?.resume === 'cancel' ? body.resume : undefined;
-  if ((message === undefined) === (resume === undefined)) {
+  // Same generated schema as the backend's SendMessageRequest (trellis/12 D49)
+  const parsed = zSendMessageRequest.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return apiError(400, 'bad_request', firstError(parsed.error));
+  const { message, resume } = parsed.data;
+  if ((message == null) === (resume == null)) {
     return apiError(400, 'bad_request', 'Send { "message": "..." } or { "resume": "confirm" | "cancel" }.');
   }
 
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/chat/sessio
   try {
     result = await api.POST('/api/v1/chat/sessions/{session_id}/message', {
       params: { path: { session_id: sessionId } },
-      body: message !== undefined ? { message } : { resume },
+      body: message != null ? { message } : { resume },
       parseAs: 'stream',
       signal: req.signal, // the user leaves the page → FastAPI stops answering too
     });

@@ -550,6 +550,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard
+         * @description Everything /dashboard shows: my task counts, next 5 deadlines, my strikes and
+         *     latest 5 commendations (D47); a card per team I can view (D24); org totals
+         *     only with org-level view_aggregate.
+         */
+        get: operations["get_dashboard_api_v1_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -769,6 +791,42 @@ export interface components {
             /** Excerpt */
             excerpt: string;
         };
+        /** CommendationResponse */
+        CommendationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
+            /**
+             * Given By User Id
+             * Format: uuid
+             */
+            given_by_user_id: string;
+            /** Given By Name */
+            given_by_name: string;
+            /**
+             * Given To User Id
+             * Format: uuid
+             */
+            given_to_user_id: string;
+            /** Given To Name */
+            given_to_name: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /**
          * ConfirmCard
          * @description A change the assistant prepared and is waiting to save (D22). The text is
@@ -850,6 +908,19 @@ export interface components {
         CreateTeamRequest: {
             /** Name */
             name: string;
+        };
+        /** DashboardResponse */
+        DashboardResponse: {
+            my_tasks: components["schemas"]["TaskSummary"];
+            /** Upcoming Tasks */
+            upcoming_tasks: components["schemas"]["TaskResult"][];
+            /** My Strikes */
+            my_strikes: components["schemas"]["StrikeResponse"][];
+            /** Recent Commendations */
+            recent_commendations: components["schemas"]["CommendationResponse"][];
+            /** Teams */
+            teams: components["schemas"]["TeamOverview"][];
+            org_overview?: components["schemas"]["OrgOverview"] | null;
         };
         /** DocumentListResponse */
         DocumentListResponse: {
@@ -1048,6 +1119,19 @@ export interface components {
             /** Teams */
             teams: components["schemas"]["MentionTeam"][];
         };
+        /** OrgOverview */
+        OrgOverview: {
+            /** Total Users */
+            total_users: number;
+            /** Total Teams */
+            total_teams: number;
+            /** Total Roles */
+            total_roles: number;
+            /** Total Documents */
+            total_documents: number;
+            /** Active Strikes */
+            active_strikes: number;
+        };
         /** OrgProfileResponse */
         OrgProfileResponse: {
             /**
@@ -1181,6 +1265,49 @@ export interface components {
             /** Resume */
             resume?: ("confirm" | "cancel") | null;
         };
+        /** StrikeResponse */
+        StrikeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
+            /**
+             * Given By User Id
+             * Format: uuid
+             */
+            given_by_user_id: string;
+            /** Given By Name */
+            given_by_name: string;
+            /**
+             * Given To User Id
+             * Format: uuid
+             */
+            given_to_user_id: string;
+            /** Given To Name */
+            given_to_name: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending_agent_review" | "confirmed" | "appealed" | "dismissed";
+            /** Escalated */
+            escalated: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** TagTarget */
         TagTarget: {
             /**
@@ -1239,6 +1366,34 @@ export interface components {
              * @default false
              */
             can_change_status: boolean;
+        };
+        /** TaskSummary */
+        TaskSummary: {
+            /**
+             * Todo
+             * @default 0
+             */
+            todo: number;
+            /**
+             * In Progress
+             * @default 0
+             */
+            in_progress: number;
+            /**
+             * Done
+             * @default 0
+             */
+            done: number;
+            /**
+             * Blocked
+             * @default 0
+             */
+            blocked: number;
+            /**
+             * Overdue
+             * @default 0
+             */
+            overdue: number;
         };
         /**
          * TeamCandidatesResponse
@@ -1313,6 +1468,21 @@ export interface components {
             removable: boolean;
             /** Assignable */
             assignable: boolean;
+        };
+        /** TeamOverview */
+        TeamOverview: {
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
+            /** Member Count */
+            member_count: number;
+            task_summary: components["schemas"]["TaskSummary"];
+            /** Active Strikes */
+            active_strikes?: number | null;
         };
         /**
          * TeamResponse
@@ -4284,6 +4454,62 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_v1_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

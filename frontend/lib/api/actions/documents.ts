@@ -1,11 +1,12 @@
 'use server';
 // Document changes from Admin → Documents (trellis/12 D18, D23).
 // Expected failures come back as { ok: false, message } for a toast.
-import { revalidatePath } from 'next/cache';
+import { refresh, revalidatePath } from 'next/cache';
 import { UTApi } from 'uploadthing/server';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zCreateDocumentRequest, zUpdateDocumentRequest } from '../schemas/documents';
 import type { components } from '../v1';
 import type { ActionResult } from './roles';
 
@@ -24,8 +25,10 @@ export type UpdateDocumentInput = components['schemas']['UpdateDocumentRequest']
 export async function createDocument(input: CreateDocumentInput): Promise<ActionResult<Document>> {
   const blocked = await limit('heavyWrite');
   if (blocked) return blocked;
+  const parsed = zCreateDocumentRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const document = await unwrap(api.POST('/api/v1/documents', { body: input }));
+    const document = await unwrap(api.POST('/api/v1/documents', { body: parsed.data }));
     revalidatePath('/admin/documents');
     return { ok: true, data: document };
   } catch (err) {
@@ -33,13 +36,17 @@ export async function createDocument(input: CreateDocumentInput): Promise<Action
   }
 }
 
-/** Current state of one document, for polling while it's 'processing'. */
-export async function getDocumentStatus(documentId: string): Promise<ActionResult<Document>> {
+/**
+ * Polling while documents are 'processing': one backend call for all of them. When any
+ * has finished (ready or failed), refresh() re-renders the current page and the new
+ * status comes back in this action's reply. Returns true when something changed.
+ */
+export async function checkProcessingDocuments(documentIds: string[]): Promise<ActionResult<boolean>> {
   try {
-    const document = await unwrap(
-      api.GET('/api/v1/documents/{document_id}', { params: { path: { document_id: documentId } } }),
-    );
-    return { ok: true, data: document };
+    const { documents } = await unwrap(api.GET('/api/v1/documents'));
+    const finished = documents.some((d) => documentIds.includes(d.id) && d.status !== 'processing');
+    if (finished) refresh();
+    return { ok: true, data: finished };
   } catch (err) {
     return toFailure(err);
   }
@@ -56,11 +63,13 @@ export async function updateDocument(
 ): Promise<ActionResult<Document>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zUpdateDocumentRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const document = await unwrap(
       api.PATCH('/api/v1/documents/{document_id}', {
         params: { path: { document_id: documentId } },
-        body: input,
+        body: parsed.data,
       }),
     );
     revalidatePath('/admin/documents');

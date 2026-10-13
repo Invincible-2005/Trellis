@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { z } from "zod";
 import { toast } from "sonner";
 import { ArrowLeft, FileUp, Loader2 } from "lucide-react";
 
@@ -14,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createDocument } from "@/lib/api/actions/documents";
 import type { DocumentTagOptions } from "@/lib/api/queries/documents";
+import { zUploadDocumentForm } from "@/lib/api/schemas/documents";
 import { UploadDropzone } from "@/lib/uploadthing";
 import { TagScopeSelect } from "./tag-scope-select";
 
@@ -31,57 +34,60 @@ interface DocUploadDropzoneProps {
 
 type AllowedFileType = "pdf" | "docx" | "pptx" | "txt" | "md";
 
+/** Step 2 values: the backend's CreateDocumentRequest, before and after zod checks it. */
+type UploadFormValues = z.input<typeof zUploadDocumentForm>;
+type UploadFormOutput = z.output<typeof zUploadDocumentForm>;
+
 export function DocUploadDropzone({
   open,
   onOpenChange,
   tagOptions,
   presetRoleId,
 }: DocUploadDropzoneProps) {
-  const router = useRouter();
 
   // Dialog step: 1 = File Dropzone, 2 = Metadata & Tagging
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Uploaded file metadata from UploadThing
-  const [fileUrl, setFileUrl] = useState("");
+  // Uploaded file name, for the step 2 heading
   const [fileName, setFileName] = useState("");
-  const [fileType, setFileType] = useState<AllowedFileType>("pdf");
-
-  // Step 2 form fields
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [scopeType, setScopeType] = useState<"org" | "role" | "team">("org");
-  const [targetId, setTargetId] = useState<string | undefined>(undefined);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Who the document is for, before the user changes it: the preset role, else the
   // widest place this user may share to.
-  const applyDefaultScope = () => {
-    if (presetRoleId) {
-      setScopeType("role");
-      setTargetId(presetRoleId);
-    } else if (tagOptions.org) {
-      setScopeType("org");
-      setTargetId(undefined);
-    } else if (tagOptions.roles.length > 0) {
-      setScopeType("role");
-      setTargetId(tagOptions.roles[0]?.id);
-    } else if (tagOptions.teams.length > 0) {
-      setScopeType("team");
-      setTargetId(tagOptions.teams[0]?.id);
-    }
+  const defaultScope = (): Pick<UploadFormValues, "scope_type" | "role_id" | "team_id"> => {
+    if (presetRoleId) return { scope_type: "role", role_id: presetRoleId };
+    if (tagOptions.org) return { scope_type: "org" };
+    if (tagOptions.roles.length > 0) return { scope_type: "role", role_id: tagOptions.roles[0]?.id };
+    if (tagOptions.teams.length > 0) return { scope_type: "team", team_id: tagOptions.teams[0]?.id };
+    return { scope_type: "org" };
   };
+
+  const emptyForm = (file?: { url: string; name: string; type: AllowedFileType }): UploadFormValues => ({
+    title: file ? file.name.replace(/\.[^/.]+$/, "") : "",
+    description: "",
+    file_url: file?.url ?? "",
+    file_type: file?.type ?? "pdf",
+    ...defaultScope(),
+  });
+
+  // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
+  const form = useForm<UploadFormValues, unknown, UploadFormOutput>({
+    resolver: zodResolver(zUploadDocumentForm),
+    defaultValues: emptyForm(),
+  });
+  const isSubmitting = form.formState.isSubmitting;
+  const [scopeType, roleId, teamId] = useWatch({
+    control: form.control,
+    name: ["scope_type", "role_id", "team_id"],
+  });
+  const targetId = (scopeType === "role" ? roleId : scopeType === "team" ? teamId : undefined) ?? undefined;
+  const targetError = form.formState.errors.role_id ?? form.formState.errors.team_id;
 
   const presetRoleName = tagOptions.roles.find((r) => r.id === presetRoleId)?.name;
 
   const resetForm = () => {
     setStep(1);
-    setFileUrl("");
     setFileName("");
-    setFileType("pdf");
-    setTitle("");
-    setDescription("");
-    applyDefaultScope();
+    form.reset(emptyForm());
   };
 
   const handleDialogChange = (isOpen: boolean) => {
@@ -93,8 +99,10 @@ export function DocUploadDropzone({
     newScope: "org" | "role" | "team",
     newTargetId?: string
   ) => {
-    setScopeType(newScope);
-    setTargetId(newTargetId);
+    form.setValue("scope_type", newScope);
+    form.setValue("role_id", newScope === "role" ? newTargetId : undefined);
+    form.setValue("team_id", newScope === "team" ? newTargetId : undefined);
+    form.clearErrors(["role_id", "team_id"]);
   };
 
   const handleUploadComplete = (
@@ -112,41 +120,20 @@ export function DocUploadDropzone({
       ? (ext as AllowedFileType)
       : "pdf";
 
-    setFileUrl(url);
     setFileName(name);
-    setFileType(resolvedType);
-    setTitle(name.replace(/\.[^/.]+$/, ""));
-
-    applyDefaultScope();
+    form.reset(emptyForm({ url, name, type: resolvedType }));
 
     setStep(2);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || title.trim().length < 2) {
-      toast.error("Document title must be at least 2 characters.");
-      return;
-    }
-    if (scopeType === "role" && !targetId) {
-      toast.error("Please select a target role.");
-      return;
-    }
-    if (scopeType === "team" && !targetId) {
-      toast.error("Please select a target team.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  // `values` is already checked (title trimmed, a role or team picked for that audience).
+  const handleSubmit = form.handleSubmit(async (values) => {
     try {
       const result = await createDocument({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        scope_type: scopeType,
-        role_id: scopeType === "role" ? targetId : undefined,
-        team_id: scopeType === "team" ? targetId : undefined,
-        file_url: fileUrl,
-        file_type: fileType,
+        ...values,
+        description: values.description?.trim() || undefined,
+        role_id: values.scope_type === "role" ? values.role_id : undefined,
+        team_id: values.scope_type === "team" ? values.team_id : undefined,
       });
 
       if (!result.ok) {
@@ -155,14 +142,13 @@ export function DocUploadDropzone({
       }
 
       toast.success("Document uploaded! Processing and indexing chunks...");
+      // createDocument already refreshes the page; a router.refresh() here collides with
+      // its update and freezes the page's router.
       handleDialogChange(false);
-      router.refresh();
     } catch {
       toast.error("Failed to register the document with the server.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
@@ -194,7 +180,7 @@ export function DocUploadDropzone({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5 text-primary" />
@@ -208,36 +194,53 @@ export function DocUploadDropzone({
 
             <div className="space-y-3.5 py-1">
               {/* Title */}
-              <div className="space-y-1.5">
-                <Label htmlFor="doc-title">Document Title</Label>
-                <Input
-                  id="doc-title"
-                  placeholder="e.g. Employee Handbook 2026"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={200}
-                  required
-                />
-              </div>
+              <Controller
+                name="title"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid} className="gap-1.5">
+                    <FieldLabel htmlFor="doc-title">Document Title</FieldLabel>
+                    <Input
+                      {...field}
+                      id="doc-title"
+                      placeholder="e.g. Employee Handbook 2026"
+                      maxLength={200}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    <FieldError errors={[fieldState.error]} />
+                  </Field>
+                )}
+              />
 
               {/* Description */}
-              <div className="space-y-1.5">
-                <Label htmlFor="doc-description">Description (Optional)</Label>
-                <Input
-                  id="doc-description"
-                  placeholder="Brief summary of document content"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
+              <Controller
+                name="description"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid} className="gap-1.5">
+                    <FieldLabel htmlFor="doc-description">Description (Optional)</FieldLabel>
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      id="doc-description"
+                      placeholder="Brief summary of document content"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    <FieldError errors={[fieldState.error]} />
+                  </Field>
+                )}
+              />
 
               {/* Scope tagging */}
-              <TagScopeSelect
-                tagOptions={tagOptions}
-                scopeType={scopeType}
-                targetId={targetId}
-                onScopeChange={handleScopeChange}
-              />
+              <div className="space-y-1.5">
+                <TagScopeSelect
+                  tagOptions={tagOptions}
+                  scopeType={scopeType}
+                  targetId={targetId}
+                  onScopeChange={handleScopeChange}
+                />
+                <FieldError errors={[targetError]} />
+              </div>
             </div>
 
             <DialogFooter className="flex items-center justify-between sm:justify-between pt-2">

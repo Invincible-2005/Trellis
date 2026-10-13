@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { FileText, Pencil, Trash2 } from 'lucide-react';
 
@@ -16,10 +18,11 @@ import {
 } from '@/components/ui/dialog';
 import { deleteRole, updateRole } from '@/lib/api/actions/roles';
 import type { Permission, Role } from '@/lib/api/queries/roles';
+import { zCreateRoleRequest } from '@/lib/api/schemas/roles';
 import {
   ALL_PERMISSIONS,
   RoleFormFields,
-  validateRoleForm,
+  type RoleFormOutput,
   type RoleFormValues,
 } from './role-form-fields';
 
@@ -70,30 +73,28 @@ export function EditRoleDialog({
     (p) => callerOrgPermissions.includes(p) || currentPermissions.includes(p)
   );
 
-  const [values, setValues] = useState<RoleFormValues>({
-    name: role.name,
-    description: role.description ?? '',
-    parentRoleId: role.parent_role_id ?? '',
-    permissions: currentPermissions,
+  // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
+  // Edit sends every field, so it uses the same rules as a new role; updateRole
+  // re-checks with zUpdateRoleRequest on the server.
+  const form = useForm<RoleFormValues, unknown, RoleFormOutput>({
+    resolver: zodResolver(zCreateRoleRequest),
+    defaultValues: {
+      name: role.name,
+      description: role.description ?? '',
+      parent_role_id: role.parent_role_id ?? '',
+      permissions: currentPermissions,
+    },
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isSubmitting = form.formState.isSubmitting || isDeleting;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const error = validateRoleForm(values);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleSave = form.handleSubmit(async (values) => {
     try {
       const result = await updateRole(role.id, {
+        ...values,
         name: values.name.trim(),
-        description: values.description.trim(), // empty clears it
-        parent_role_id: values.parentRoleId,
-        permissions: values.permissions,
+        description: values.description?.trim() ?? '', // empty clears it
       });
 
       if (!result.ok) {
@@ -105,13 +106,11 @@ export function EditRoleDialog({
       onClose();
     } catch {
       toast.error('An unexpected error occurred while saving the role.');
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
   const handleDelete = async () => {
-    setIsSubmitting(true);
+    setIsDeleting(true);
     try {
       const result = await deleteRole(role.id);
 
@@ -127,7 +126,7 @@ export function EditRoleDialog({
     } catch {
       toast.error('An unexpected error occurred while deleting the role.');
     } finally {
-      setIsSubmitting(false);
+      setIsDeleting(false);
     }
   };
 
@@ -163,7 +162,7 @@ export function EditRoleDialog({
             </DialogFooter>
           </>
         ) : (
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} noValidate className="space-y-4">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Pencil className="h-4 w-4" />
@@ -185,8 +184,7 @@ export function EditRoleDialog({
             )}
 
             <RoleFormFields
-              values={values}
-              onChange={setValues}
+              control={form.control}
               parentOptions={allowedParents}
               callerOrgRoleId={callerOrgRoleId}
               permissionOptions={permissionOptions}

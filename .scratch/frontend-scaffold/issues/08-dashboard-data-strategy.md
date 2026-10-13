@@ -22,3 +22,8 @@ Decisions to lock:
 - Single route, conditional rendering: one `/dashboard` (ticket 01 here).
 - Dedicated endpoint: yes. Polymorphic `GET /api/v1/dashboard` returning `my_tasks`, `managed_teams?` (if managing any team), `org_overview?` (if `view_aggregate`) (trellis/05).
 - Still open: server vs client fetching split, polling interval (map lists real-time vs polling as unspecified), Recharts chart types per view.
+
+- **Decided 2026-10-13 (trellis/12 D47):** "my work" = task counts, next 5 deadlines, my strikes, latest 5 commendations; read-only (Appeal button with the strike-appeals effort).
+- **Decided 2026-10-13 (trellis/12 D48):** Server Component loads `GET /api/v1/dashboard` on open; no polling (Server Actions' `revalidatePath` keeps it fresh after your own changes). One Recharts bar chart (my tasks by status); team cards and org totals are number cards. **Status: resolved.**
+- **Backend built 2026-10-13:** `GET /api/v1/dashboard` -> `DashboardResponse` (`my_tasks`, `upcoming_tasks`, `my_strikes`, `recent_commendations`, `teams`, `org_overview?`); types in `lib/api/v1.d.ts`.
+- **Frontend API layer 2026-10-13:** `lib/api/queries/dashboard.ts::getDashboard()`; page files listed in `spec.md`; teammate brief in the local `plans/dashboard/frontend.md`. UI next (teammates).
