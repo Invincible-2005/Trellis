@@ -3,7 +3,8 @@
 // One chat: the messages and the input box, used by /chat (new chat) and
 // /chat/[sessionId]. A new chat is created only when its first message is sent
 // (trellis/12 D42); once that first answer has finished, the address becomes
-// /chat/<id> (no reload).
+// /chat/<id> (no reload). A change the assistant prepared waits on a Confirm card
+// (trellis/12 D22); a card still waiting when the chat is opened is shown again.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,7 +12,7 @@ import { Bot } from "lucide-react";
 import { toast } from "sonner";
 
 import { createChat } from "@/lib/api/actions/chat";
-import type { ChatMessage, Mentions } from "@/lib/api/queries/chat";
+import type { ChatMessage, ConfirmCard, Mentions } from "@/lib/api/queries/chat";
 import { ChatInputBox } from "./chat-input-box";
 import { ChatMessageList } from "./chat-message-list";
 import { useChatStream } from "./use-chat-stream";
@@ -26,15 +27,20 @@ interface ChatConversationProps {
   /** null on /chat: nothing saved yet. */
   chatId: string | null;
   initialMessages: ChatMessage[];
+  /** A Confirm card still waiting from an earlier visit (D45). */
+  pendingAction?: ConfirmCard | null;
   mentions: Mentions;
 }
 
-export function ChatConversation({ chatId, initialMessages, mentions }: ChatConversationProps) {
+export function ChatConversation({ chatId, initialMessages, pendingAction, mentions }: ChatConversationProps) {
   const router = useRouter();
   const chatIdRef = useRef(chatId);
-  const { messages, step, isAnswering, send, stop } = useChatStream(
-    initialMessages.map((m) => ({ ...m, citations: m.citations ?? [] }))
-  );
+  const { messages, step, isAnswering, send, respond, stop } = useChatStream([
+    ...initialMessages.map((m) => ({ ...m, citations: m.citations ?? [] })),
+    ...(pendingAction
+      ? [{ role: "assistant" as const, content: "", citations: [], card: pendingAction, cardState: "waiting" as const }]
+      : []),
+  ]);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +76,15 @@ export function ChatConversation({ chatId, initialMessages, mentions }: ChatConv
     [router, send]
   );
 
+  const handleRespond = useCallback(
+    async (decision: "confirm" | "cancel") => {
+      if (!chatIdRef.current) return;
+      await respond(chatIdRef.current, decision);
+      router.refresh(); // the chat list order
+    },
+    [router, respond]
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -77,7 +92,7 @@ export function ChatConversation({ chatId, initialMessages, mentions }: ChatConv
           {messages.length === 0 ? (
             <EmptyState onPick={setDraft} />
           ) : (
-            <ChatMessageList messages={messages} step={step} />
+            <ChatMessageList messages={messages} step={step} isAnswering={isAnswering} onRespond={handleRespond} />
           )}
         </div>
       </div>

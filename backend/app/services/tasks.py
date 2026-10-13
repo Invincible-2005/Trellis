@@ -94,24 +94,39 @@ async def get_task(db: AsyncSession, scope: AccessScope, task_id: uuid.UUID) -> 
     return _task_result(scope, await _get_task_row(db, scope, task_id), _now())
 
 
-async def create_task(db: AsyncSession, scope: AccessScope, body: CreateTaskRequest) -> TaskResult:
+async def check_create_task(db: AsyncSession, scope: AccessScope, body: CreateTaskRequest) -> tuple[str, str]:
     """
-    Create a task for a team member ranked below the user (D32). Also used by the
-    chat agent's create_task tool after the user clicks Confirm (D22).
+    Every rule create_task checks, without saving (D32). The chat agent runs it
+    before showing a Confirm card, so a refused task never becomes a card (D45).
+
+    Returns (team name, assignee name) for the card.
 
     Raises:
         404 team_not_found   — missing, in another org, or not viewable
         403 forbidden        — no assign_task in this team, or the assignee isn't below the user
         404 member_not_found — the assignee isn't on this team
     """
-    team_ok = await db.scalar(
-        select(Team.id).where(Team.id == body.team_id, Team.org_id == scope.org_id)
+    team_name = await db.scalar(
+        select(Team.name).where(Team.id == body.team_id, Team.org_id == scope.org_id)
     )
-    if team_ok is None or not scope.can_view_team(body.team_id):
+    if team_name is None or not scope.can_view_team(body.team_id):
         raise api_error(status.HTTP_404_NOT_FOUND, "team_not_found", "Team not found.")
     if not scope.can("assign_task", body.team_id):
         raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "You can't assign tasks in this team.")
     await _check_assignee(db, scope, body.team_id, body.assigned_to_user_id)
+    assignee_name = await db.scalar(select(User.name).where(User.id == body.assigned_to_user_id))
+    return team_name, assignee_name or "this person"
+
+
+async def create_task(db: AsyncSession, scope: AccessScope, body: CreateTaskRequest) -> TaskResult:
+    """
+    Create a task for a team member ranked below the user (D32). Also used by the
+    chat agent after the user clicks Confirm (D22), with the scope of the click's
+    own request, so the rules are checked again at that moment.
+
+    Raises: see check_create_task.
+    """
+    await check_create_task(db, scope, body)
 
     task = Task(
         id=uuid.uuid4(),

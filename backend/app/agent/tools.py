@@ -150,3 +150,51 @@ async def get_team_summary() -> str:
 
 
 READ_TOOLS = [search_documents, get_tasks, get_team_summary]
+
+
+# ── Write tools (D22/D45) ────────────────────────────────────────────────────
+# Only their schemas reach the LLM. A write tool call is never executed directly:
+# the graph's prepare_action step checks it and builds a Confirm card
+# (app/agent/actions.py), and the save happens only after the user's click.
+
+@tool
+async def create_task(
+    team_id: str,
+    assigned_to_user_id: str,
+    title: str,
+    description: Optional[str] = None,
+    deadline: Optional[str] = None,
+) -> str:
+    """
+    Propose a new task for one team member. The user confirms it on a card
+    before anything is saved. team_id and assigned_to_user_id come from the
+    /team and @person tokens in the user's message. deadline is a date as
+    YYYY-MM-DD (the task is due by the end of that day).
+    """
+    return "Waiting for the user to confirm."   # never runs (see above)
+
+
+@tool
+async def give_commendation(team_id: str, to_user_id: str, reason: str) -> str:
+    """
+    Propose a commendation (praise) for one team member ranked below the user.
+    The user confirms it on a card before anything is saved. team_id and
+    to_user_id come from the /team and @person tokens in the user's message.
+    reason says what the person did well, in a sentence or two.
+    """
+    return "Waiting for the user to confirm."   # never runs (see above)
+
+
+@tool
+async def give_strike(team_id: str, to_user_id: str, reason: str) -> str:
+    """
+    Propose a formal strike for one team member ranked below the user. The app
+    checks the reason against the policy documents and the user confirms it on
+    a card before anything is saved. team_id and to_user_id come from the /team
+    and @person tokens in the user's message. reason is what the person did, in
+    the user's own words.
+    """
+    return "Waiting for the user to confirm."   # never runs (see above)
+
+
+WRITE_TOOLS = [create_task, give_commendation, give_strike]

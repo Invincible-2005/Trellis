@@ -3,6 +3,7 @@
 // The conversation: your messages on the right (mentions as chips), answers on the
 // left as formatted markdown. Citation tags like [3f9a12bc] become small numbers
 // matching the source badges; tags the backend couldn't verify are hidden (D20).
+// A change the assistant prepared shows as a Confirm / Cancel card (D22).
 
 import type { ComponentProps } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -11,6 +12,7 @@ import { AlertCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "./citation-badge";
+import { ConfirmActionCard } from "./confirm-action-card";
 import { splitMentions } from "./mentions";
 import { ThinkingStepper } from "./thinking-stepper";
 import type { ChatMessageView, Citation } from "./use-chat-stream";
@@ -65,14 +67,22 @@ const markdown: Components = {
     ),
 };
 
-export function ChatMessageList({ messages, step }: { messages: ChatMessageView[]; step: string | null }) {
+interface ChatMessageListProps {
+  messages: ChatMessageView[];
+  step: string | null;
+  /** An answer is streaming: card buttons wait. */
+  isAnswering: boolean;
+  onRespond: (decision: "confirm" | "cancel") => void;
+}
+
+export function ChatMessageList({ messages, step, isAnswering, onRespond }: ChatMessageListProps) {
   return (
     <div className="flex flex-col gap-6">
       {messages.map((message, i) =>
         message.role === "user" ? (
           <UserMessage key={i} content={message.content} />
         ) : (
-          <AssistantMessage key={i} message={message} step={step} />
+          <AssistantMessage key={i} message={message} step={step} isAnswering={isAnswering} onRespond={onRespond} />
         )
       )}
     </div>
@@ -87,7 +97,8 @@ function UserMessage({ content }: { content: string }) {
           typeof part === "string" ? (
             part
           ) : (
-            <span key={i} className="rounded bg-primary-foreground/20 px-1 font-medium">
+            // Colored text only: people blue, teams green (D43). Dark shades so they read on the orange bubble.
+            <span key={i} className={cn("font-semibold", part.kind === "user" ? "text-blue-800" : "text-green-800")}>
               {part.label}
             </span>
           )
@@ -97,8 +108,13 @@ function UserMessage({ content }: { content: string }) {
   );
 }
 
-function AssistantMessage({ message, step }: { message: ChatMessageView; step: string | null }) {
-  const { content, citations, error, pending } = message;
+function AssistantMessage({
+  message,
+  step,
+  isAnswering,
+  onRespond,
+}: { message: ChatMessageView; step: string | null } & Omit<ChatMessageListProps, "messages" | "step">) {
+  const { content, citations, error, pending, card, cardState } = message;
   return (
     <div className="flex flex-col gap-3 text-sm">
       {content && (
@@ -107,6 +123,9 @@ function AssistantMessage({ message, step }: { message: ChatMessageView; step: s
             {linkCitations(content, citations, !!pending)}
           </ReactMarkdown>
         </div>
+      )}
+      {card && (
+        <ConfirmActionCard card={card} state={cardState ?? "waiting"} busy={isAnswering} onRespond={onRespond} />
       )}
       {pending && <ThinkingStepper step={step} />}
       {error && (

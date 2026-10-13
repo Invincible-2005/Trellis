@@ -53,9 +53,9 @@ export function MentionPopover({ trigger, options, activeIndex, onPick, onHover 
               )}
             >
               {option.kind === "user" ? (
-                <User className="size-4 shrink-0 text-muted-foreground" />
+                <User className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />
               ) : (
-                <Users className="size-4 shrink-0 text-muted-foreground" />
+                <Users className="size-4 shrink-0 text-green-700 dark:text-green-400" />
               )}
               <span className="truncate font-medium">{option.label}</span>
               {option.detail && <span className="truncate text-xs text-muted-foreground">{option.detail}</span>}

@@ -333,7 +333,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Team
-         * @description Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes or documents.
+         * @description Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes, commendations or documents.
          */
         delete: operations["delete_team_api_v1_teams__team_id__delete"];
         options?: never;
@@ -535,10 +535,13 @@ export interface paths {
         put?: never;
         /**
          * Send Message
-         * @description Send a message to one of your chats; the answer streams back as SSE events:
-         *     status, tool_call, token, citations, error, done (ticket 09). Before the stream
+         * @description Send a message to one of your chats, or `{"resume": "confirm" | "cancel"}` to
+         *     answer a Confirm card (D22). The answer streams back as SSE events: status,
+         *     tool_call, token, citations, confirm, error, done (ticket 09). Before the stream
          *     opens: 404 chat_not_found, 400 message_too_long (over 4,000 characters, D21),
-         *     409 chat_busy (still answering), 422 empty message. The first message sets the title.
+         *     409 chat_busy (still answering), 409 nothing_to_confirm (resume with no card
+         *     waiting, D45), 422 empty message or both/neither of message and resume.
+         *     The first message sets the title.
          */
         post: operations["send_message_api_v1_chat_sessions__session_id__message_post"];
         delete?: never;
@@ -670,6 +673,13 @@ export interface components {
             /** Email */
             email: string;
         };
+        /** CardLine */
+        CardLine: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** ChatDetail */
         ChatDetail: {
             /**
@@ -691,6 +701,7 @@ export interface components {
             last_active_at: string;
             /** Messages */
             messages: components["schemas"]["ChatMessage"][];
+            pending_action?: components["schemas"]["ConfirmCard"] | null;
         };
         /** ChatListResponse */
         ChatListResponse: {
@@ -757,6 +768,24 @@ export interface components {
             chunk_index: number;
             /** Excerpt */
             excerpt: string;
+        };
+        /**
+         * ConfirmCard
+         * @description A change the assistant prepared and is waiting to save (D22). The text is
+         *     written by code from what will be saved, never by the AI (D45). Sent as the
+         *     SSE `confirm` event and in ChatDetail.pending_action (so a reload shows it again).
+         */
+        ConfirmCard: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create_task" | "give_strike" | "give_commendation";
+            /** Summary */
+            summary: string;
+            /** Details */
+            details: components["schemas"]["CardLine"][];
+            policy?: components["schemas"]["PolicyCheck"] | null;
         };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
@@ -1045,6 +1074,26 @@ export interface components {
             /** Clerk Org Id */
             clerk_org_id: string;
         };
+        /**
+         * PolicyCheck
+         * @description give_strike only (D46): the reason checked against the policy documents the
+         *     giver can see. A warning, never a block: the manager can confirm either way.
+         *     `sources` are only passages that were really retrieved.
+         */
+        PolicyCheck: {
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "supported" | "not_covered" | "unchecked";
+            /** Explanation */
+            explanation: string;
+            /**
+             * Sources
+             * @default []
+             */
+            sources: components["schemas"]["Citation"][];
+        };
         /** ProvisionOrgResponse */
         ProvisionOrgResponse: {
             org: components["schemas"]["OrgSummary"];
@@ -1119,13 +1168,18 @@ export interface components {
         };
         /**
          * SendMessageRequest
-         * @description One user message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long (D21).
-         *     People and teams picked in the chat box arrive as `@[email](user:<id>)` and
-         *     `/[Team](team:<id>)` (D43). A `resume` field comes with confirm cards (D22).
+         * @description Send exactly one of:
+         *     - `message`: a new message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long
+         *       (D21). People and teams picked in the chat box arrive as `@[email](user:<id>)`
+         *       and `/[Team](team:<id>)` (D43). If a Confirm card is waiting, it is cancelled first.
+         *     - `resume`: the click on a Confirm card (D22). 409 nothing_to_confirm when no
+         *       card is waiting (e.g. a second click, D45).
          */
         SendMessageRequest: {
             /** Message */
-            message: string;
+            message?: string | null;
+            /** Resume */
+            resume?: ("confirm" | "cancel") | null;
         };
         /** TagTarget */
         TagTarget: {

@@ -65,7 +65,7 @@ async def delete_team(
     scope: AccessScope = Depends(get_scope),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes or documents."""
+    """Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes, commendations or documents."""
     await teams.delete_team(db, scope, team_id)
 
 

@@ -2016,7 +2016,7 @@
           "teams"
         ],
         "summary": "Delete Team",
-        "description": "Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes or documents.",
+        "description": "Delete a team you oversee (D31). 409 team_not_empty while it has tasks, strikes, commendations or documents.",
         "operationId": "delete_team_api_v1_teams__team_id__delete",
         "security": [
           {
@@ -3534,7 +3534,7 @@
           "chat"
         ],
         "summary": "Send Message",
-        "description": "Send a message to one of your chats; the answer streams back as SSE events:\nstatus, tool_call, token, citations, error, done (ticket 09). Before the stream\nopens: 404 chat_not_found, 400 message_too_long (over 4,000 characters, D21),\n409 chat_busy (still answering), 422 empty message. The first message sets the title.",
+        "description": "Send a message to one of your chats, or `{\"resume\": \"confirm\" | \"cancel\"}` to\nanswer a Confirm card (D22). The answer streams back as SSE events: status,\ntool_call, token, citations, confirm, error, done (ticket 09). Before the stream\nopens: 404 chat_not_found, 400 message_too_long (over 4,000 characters, D21),\n409 chat_busy (still answering), 409 nothing_to_confirm (resume with no card\nwaiting, D45), 422 empty message or both/neither of message and resume.\nThe first message sets the title.",
         "operationId": "send_message_api_v1_chat_sessions__session_id__message_post",
         "security": [
           {
@@ -3951,6 +3951,24 @@
         ],
         "title": "CandidateMember"
       },
+      "CardLine": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "CardLine"
+      },
       "ChatDetail": {
         "properties": {
           "id": {
@@ -3985,6 +4003,16 @@
             },
             "type": "array",
             "title": "Messages"
+          },
+          "pending_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4117,6 +4145,48 @@
         ],
         "title": "Citation",
         "description": "A source badge under an answer (D20: only citations the agent really retrieved).\n`tag` is the 8-character label the answer cites, e.g. [3f9a12bc]."
+      },
+      "ConfirmCard": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create_task",
+              "give_strike",
+              "give_commendation"
+            ],
+            "title": "Action"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/CardLine"
+            },
+            "type": "array",
+            "title": "Details"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "summary",
+          "details"
+        ],
+        "title": "ConfirmCard",
+        "description": "A change the assistant prepared and is waiting to save (D22). The text is\nwritten by code from what will be saved, never by the AI (D45). Sent as the\nSSE `confirm` event and in ChatDetail.pending_action (so a reload shows it again)."
       },
       "CreateDocumentRequest": {
         "properties": {
@@ -4841,6 +4911,38 @@
         ],
         "title": "OrgSummary"
       },
+      "PolicyCheck": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "not_covered",
+              "unchecked"
+            ],
+            "title": "Verdict"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "title": "Sources",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict",
+          "explanation"
+        ],
+        "title": "PolicyCheck",
+        "description": "give_strike only (D46): the reason checked against the policy documents the\ngiver can see. A warning, never a block: the manager can confirm either way.\n`sources` are only passages that were really retrieved."
+      },
       "ProvisionOrgResponse": {
         "properties": {
           "org": {
@@ -4992,17 +5094,36 @@
       "SendMessageRequest": {
         "properties": {
           "message": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Message"
+          },
+          "resume": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "confirm",
+                  "cancel"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume"
           }
         },
         "type": "object",
-        "required": [
-          "message"
-        ],
         "title": "SendMessageRequest",
-        "description": "One user message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long (D21).\nPeople and teams picked in the chat box arrive as `@[email](user:<id>)` and\n`/[Team](team:<id>)` (D43). A `resume` field comes with confirm cards (D22)."
+        "description": "Send exactly one of:\n- `message`: a new message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long\n  (D21). People and teams picked in the chat box arrive as `@[email](user:<id>)`\n  and `/[Team](team:<id>)` (D43). If a Confirm card is waiting, it is cancelled first.\n- `resume`: the click on a Confirm card (D22). 409 nothing_to_confirm when no\n  card is waiting (e.g. a second click, D45)."
       },
       "TagTarget": {
         "properties": {

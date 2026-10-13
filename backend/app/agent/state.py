@@ -65,16 +65,24 @@ class RetrievedChunk(TypedDict):
 WriteTool = Literal["create_task", "give_strike", "give_commendation"]
 
 
+class CardLine(TypedDict):
+    label: str                 # e.g. "Assignee"
+    value: str                 # e.g. "Karan Mehta"
+
+
 class PendingAction(TypedDict):
     """
     A write the agent has prepared but NOT saved (D22).
     Shown to the user as a Confirm / Cancel card via the SSE `confirm` event.
     On confirm, exactly these args are written after a fresh permission check.
+    summary and details are written by code from args and database names, never
+    by the LLM, so the card always matches what is saved (D45).
     """
 
     tool: WriteTool
-    args: dict[str, Any]       # validated tool args, incl. team_id and target user_id
-    summary: str               # card text, e.g. "Strike for Rahul Sharma: missed 3 standups"
+    args: dict[str, Any]       # validated tool args (JSON-safe), incl. team_id and target user_id
+    summary: str               # card heading, e.g. "Create task for Karan Mehta"
+    details: list[CardLine]    # card lines: title, team, deadline, …
     policy: Optional[dict]     # give_strike only: policy check result + policy chunk ids
 
 
@@ -116,8 +124,9 @@ class AgentState(TypedDict):
         a short "couldn't be verified" note is streamed before `done`.
 
     pending_action : PendingAction | None
-        The write waiting for the user's Confirm / Cancel click (D22).
-        A new normal message clears it (= cancel).
+        The write waiting for the user's Confirm / Cancel click (D22). The graph
+        is paused with interrupt() while it is set. A new normal message first
+        cancels it (services/chat.py), so it never leaks into the next turn.
 
     rewrite_count : int
         Incremented each time the Query Rewrite Node fires (search_documents

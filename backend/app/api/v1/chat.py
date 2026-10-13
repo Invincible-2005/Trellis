@@ -5,7 +5,8 @@ The router requires an org (get_org_context); every route also depends on get_sc
 Every chat route only ever touches the caller's own chats (404 otherwise); the
 logic lives in app/services/chat.py.
 
-POST /sessions/{id}/message streams the answer as SSE (D2, ticket 09). Checks that
+POST /sessions/{id}/message streams the answer as SSE (D2, ticket 09); the same
+endpoint takes the Confirm / Cancel click on a card (D22). Checks that
 can fail run in the start_turn dependency, before the stream opens, so they come
 back as normal JSON errors; its cleanup runs after the stream has finished.
 """
@@ -135,9 +136,10 @@ async def start_turn(
     body: SendMessageRequest,
     scope: AccessScope = Depends(get_scope),
     db: AsyncSession = Depends(get_db),
+    agent: CompiledStateGraph = Depends(get_agent),
 ):
     """Checks before the stream opens; frees the chat for its next message once the stream ends."""
-    turn = await chat.begin_turn(db, scope, session_id, body.message)
+    turn = await chat.begin_turn(db, scope, session_id, agent, body.message, body.resume)
     try:
         yield turn
     finally:
@@ -154,10 +156,13 @@ async def send_message(
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> AsyncIterable[ServerSentEvent]:
     """
-    Send a message to one of your chats; the answer streams back as SSE events:
-    status, tool_call, token, citations, error, done (ticket 09). Before the stream
+    Send a message to one of your chats, or `{"resume": "confirm" | "cancel"}` to
+    answer a Confirm card (D22). The answer streams back as SSE events: status,
+    tool_call, token, citations, confirm, error, done (ticket 09). Before the stream
     opens: 404 chat_not_found, 400 message_too_long (over 4,000 characters, D21),
-    409 chat_busy (still answering), 422 empty message. The first message sets the title.
+    409 chat_busy (still answering), 409 nothing_to_confirm (resume with no card
+    waiting, D45), 422 empty message or both/neither of message and resume.
+    The first message sets the title.
     """
     async for event in chat.stream_turn(agent, turn):
         yield event

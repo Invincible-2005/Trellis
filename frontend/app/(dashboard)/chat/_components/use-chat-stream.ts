@@ -5,6 +5,10 @@
 // Plain fetch + reader: EventSource can't POST, and no library is needed.
 // The event shapes mirror backend/app/services/chat.py::stream_turn (SSE events
 // aren't in v1.d.ts), so keep them in step with it.
+//
+// Confirm cards (trellis/12 D22, D45): a `confirm` event puts a card on the
+// answer. The card's buttons call respond(), which sends { resume } to the same
+// route and streams the reply ("Done…" / "Cancelled…") as a new answer.
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +17,10 @@ import { toast } from "sonner";
 import type { components } from "@/lib/api/v1";
 
 export type Citation = components["schemas"]["Citation"];
+export type ConfirmCard = components["schemas"]["ConfirmCard"];
+
+/** waiting = buttons active; sending = a click is on its way; confirmed / cancelled = answered. */
+export type CardState = "waiting" | "sending" | "confirmed" | "cancelled";
 
 /** A message on screen. `pending` = the answer is still streaming. */
 export interface ChatMessageView {
@@ -21,6 +29,8 @@ export interface ChatMessageView {
   citations: Citation[];
   error?: string;
   pending?: boolean;
+  card?: ConfirmCard;
+  cardState?: CardState;
 }
 
 /** status steps (ticket 09). Unknown future steps fall back to "Working…". */
@@ -34,6 +44,8 @@ export const STEP_LABELS: Record<string, string> = {
   rewriting_query: "Searching again…",
   writing_answer: "Writing the answer…",
   verifying_citations: "Checking sources…",
+  preparing_action: "Checking the change…",
+  saving_action: "Saving…",
 };
 
 type StreamEvent =
@@ -41,6 +53,7 @@ type StreamEvent =
   | { event: "tool_call"; data: { tool: string; status: "start" | "end" } }
   | { event: "token"; data: { content: string } }
   | { event: "citations"; data: Citation[] }
+  | { event: "confirm"; data: ConfirmCard }
   | { event: "error"; data: { message: string } }
   | { event: "done"; data: { audit_id: string } };
 
@@ -54,6 +67,18 @@ function parseFrame(frame: string): StreamEvent | null {
   }
   if (!event || data.length === 0) return null;
   return { event, data: JSON.parse(data.join("\n")) } as StreamEvent;
+}
+
+/** The card still waiting for a click gets `state` (a new message cancels it, D22). */
+function settleWaitingCard(messages: ChatMessageView[], state: CardState): ChatMessageView[] {
+  return messages.map((m) =>
+    m.card && (m.cardState === "waiting" || m.cardState === "sending") ? { ...m, cardState: state } : m
+  );
+}
+
+/** settleWaitingCard on every message except the newest answer (which may bring its own card). */
+function settleOlderCards(messages: ChatMessageView[], state: CardState): ChatMessageView[] {
+  return [...settleWaitingCard(messages.slice(0, -1), state), ...messages.slice(-1)];
 }
 
 export function useChatStream(initialMessages: ChatMessageView[] = []) {
@@ -73,39 +98,27 @@ export function useChatStream(initialMessages: ChatMessageView[] = []) {
   }, []);
 
   /**
-   * Send `text` to chat `chatId` and stream the answer into `messages`.
-   * Returns false when the message was refused before answering (a toast shows why).
+   * POST `body` to chat `chatId` and stream the answer into the last message.
+   * Returns null when it was refused before answering (status + backend body).
    */
-  const send = useCallback(
-    async (chatId: string, text: string): Promise<boolean> => {
+  const stream = useCallback(
+    async (chatId: string, body: { message: string } | { resume: "confirm" | "cancel" }) => {
       const controller = new AbortController();
       abortRef.current = controller;
       setIsAnswering(true);
       setStep(null);
-      setMessages((current) => [
-        ...current,
-        { role: "user", content: text, citations: [] },
-        { role: "assistant", content: "", citations: [], pending: true },
-      ]);
 
       try {
         const response = await fetch(`/api/chat/sessions/${chatId}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
         if (!response.ok || !response.body) {
-          // Refused before answering (too long, busy, rate limit…): take the message back
-          setMessages((current) => current.slice(0, -2));
-          if (response.status === 401) {
-            router.push("/sign-in");
-            return false;
-          }
-          const body = await response.json().catch(() => null);
-          toast.error(body?.detail?.message ?? "Something went wrong. Please try again.");
-          return false;
+          const error = await response.json().catch(() => null);
+          return { status: response.status, error } as const;
         }
 
         const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -122,15 +135,18 @@ export function useChatStream(initialMessages: ChatMessageView[] = []) {
             if (ev.event === "status") setStep(ev.data.step);
             else if (ev.event === "token") updateAnswer((a) => ({ ...a, content: a.content + ev.data.content }));
             else if (ev.event === "citations") updateAnswer((a) => ({ ...a, citations: ev.data }));
+            else if (ev.event === "confirm") updateAnswer((a) => ({ ...a, card: ev.data, cardState: "waiting" }));
             else if (ev.event === "error") updateAnswer((a) => ({ ...a, error: ev.data.message }));
           }
         }
-        return true;
+        return null;
       } catch (err) {
-        if (controller.signal.aborted) return true; // the user left or stopped it
-        updateAnswer((a) => ({ ...a, error: "The connection was lost. Please try again." }));
-        console.error(err);
-        return true;
+        if (!controller.signal.aborted) {
+          // not the user leaving or stopping it
+          updateAnswer((a) => ({ ...a, error: "The connection was lost. Please try again." }));
+          console.error(err);
+        }
+        return null;
       } finally {
         updateAnswer((a) => ({ ...a, pending: false }));
         setIsAnswering(false);
@@ -138,11 +154,67 @@ export function useChatStream(initialMessages: ChatMessageView[] = []) {
         abortRef.current = null;
       }
     },
-    [router, updateAnswer],
+    [updateAnswer]
+  );
+
+  /** Refused before answering (too long, busy, rate limit…): explain with a toast. */
+  const explainRefusal = useCallback(
+    (status: number, error: { detail?: { message?: string } } | null) => {
+      if (status === 401) router.push("/sign-in");
+      else toast.error(error?.detail?.message ?? "Something went wrong. Please try again.");
+    },
+    [router]
+  );
+
+  /**
+   * Send `text` to chat `chatId` and stream the answer into `messages`.
+   * Returns false when the message was refused before answering (a toast shows why).
+   */
+  const send = useCallback(
+    async (chatId: string, text: string): Promise<boolean> => {
+      setMessages((current) => [
+        ...current,
+        { role: "user", content: text, citations: [] },
+        { role: "assistant", content: "", citations: [], pending: true },
+      ]);
+      const refused = await stream(chatId, { message: text });
+      if (refused) {
+        setMessages((current) => current.slice(0, -2)); // take the message back
+        explainRefusal(refused.status, refused.error);
+        return false;
+      }
+      // The backend cancelled a card that was still waiting (D22)
+      setMessages((current) => settleOlderCards(current, "cancelled"));
+      return true;
+    },
+    [stream, explainRefusal]
+  );
+
+  /** The Confirm / Cancel click on the waiting card (D22). The reply streams as a new answer. */
+  const respond = useCallback(
+    async (chatId: string, decision: "confirm" | "cancel") => {
+      setMessages((current) => [
+        ...settleWaitingCard(current, "sending"),
+        { role: "assistant", content: "", citations: [], pending: true },
+      ]);
+      const refused = await stream(chatId, { resume: decision });
+      if (!refused) {
+        setMessages((current) => settleOlderCards(current, decision === "confirm" ? "confirmed" : "cancelled"));
+        return;
+      }
+      if (refused.status === 409 && refused.error?.detail?.code === "nothing_to_confirm") {
+        // Already answered (another tab, a second click): the card is no longer waiting
+        setMessages((current) => settleWaitingCard(current.slice(0, -1), "cancelled"));
+      } else {
+        setMessages((current) => settleWaitingCard(current.slice(0, -1), "waiting"));
+      }
+      explainRefusal(refused.status, refused.error);
+    },
+    [stream, explainRefusal]
   );
 
   /** Stop listening (e.g. when leaving the page). The backend stops too. */
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  return { messages, step, isAnswering, send, stop };
+  return { messages, step, isAnswering, send, respond, stop };
 }

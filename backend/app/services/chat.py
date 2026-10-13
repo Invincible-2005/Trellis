@@ -1,5 +1,5 @@
 """
-app/services/chat.py — The user's own chats (Ticket 08, Ticket 12 D2/D11/D42/D43)
+app/services/chat.py — The user's own chats (Ticket 08, Ticket 12 D2/D11/D22/D42/D43/D45)
 
 A chat belongs to one user in one org. Anyone else's chat, Admin included,
 behaves exactly like a missing one (404 chat_not_found).
@@ -16,7 +16,13 @@ passed in by the router.
 Sending a message (D2, D20, D21): begin_turn() runs every check that can fail
 before the answer starts (so failures are normal JSON errors), then
 stream_turn() runs the agent and turns what it does into SSE events (ticket 09):
-status, tool_call, token, citations, error, done. One audit row per turn.
+status, tool_call, token, citations, confirm, error, done. One audit row per turn.
+
+Confirm cards (D22, D45): when the agent proposes a change, the graph pauses
+(interrupt) and the stream ends with a `confirm` event. The click comes back as
+{"resume": "confirm" | "cancel"} on the same endpoint and continues the paused
+run. A new message while a card waits cancels the card first. The card is read
+back from the checkpoint, so a reloaded chat shows it again.
 """
 import logging
 import re
@@ -31,6 +37,7 @@ from fastapi.sse import ServerSentEvent
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +55,7 @@ from app.schemas.chat import (
     ChatMessage,
     ChatSummary,
     Citation,
+    ConfirmCard,
     MentionPerson,
     MentionsResponse,
     MentionTeam,
@@ -64,6 +72,14 @@ AUDIT_ANSWER_CHARS = 300
 def thread_id(chat: ChatSession) -> str:
     """The agent-memory key for a chat (Ticket 08 §2)."""
     return f"{chat.org_id}:{chat.user_id}:{chat.id}"
+
+
+async def waiting_card(agent: CompiledStateGraph, thread: str) -> dict | None:
+    """The Confirm card this chat is paused on (D22), or None."""
+    snapshot = await agent.aget_state({"configurable": {"thread_id": thread}})
+    if not snapshot.next:
+        return None
+    return snapshot.values.get("pending_action")
 
 
 async def get_own_chat(db: AsyncSession, scope: AccessScope, chat_id: uuid.UUID) -> ChatSession:
@@ -115,6 +131,7 @@ async def get_chat_detail(
     """
     chat = await get_own_chat(db, scope, chat_id)
     state = await agent.aget_state({"configurable": {"thread_id": thread_id(chat)}})
+    card = state.values.get("pending_action") if state.next else None
 
     messages: list[ChatMessage] = []
     for message in state.values.get("messages", []):
@@ -124,7 +141,11 @@ async def get_chat_detail(
             citations = [Citation(**c) for c in message.additional_kwargs.get("citations", [])]
             messages.append(ChatMessage(role="assistant", content=message.text, citations=citations))
 
-    return ChatDetail(**ChatSummary.model_validate(chat).model_dump(), messages=messages)
+    return ChatDetail(
+        **ChatSummary.model_validate(chat).model_dump(),
+        messages=messages,
+        pending_action=_card(card) if card else None,
+    )
 
 
 async def rename_chat(
@@ -210,6 +231,8 @@ _MENTION = re.compile(r"([@/])\[([^\]]+)\]\((?:user|team):[0-9a-fA-F-]{36}\)")
 _STATUS_ON_START = {
     "router": "routing",
     "read_agent": "thinking",
+    "write_agent": "thinking",
+    "prepare_action": "preparing_action",
     "grade": "grading_relevance",
     "rewrite": "rewriting_query",
     "check_citations": "verifying_citations",
@@ -219,7 +242,8 @@ _STATUS_FOR_TOOL = {
     "get_tasks": "looking_up_tasks",
     "get_team_summary": "looking_up_teams",
 }
-_ANSWER_NODES = {"read_agent", "not_found"}   # nodes whose LLM text is the answer
+_ANSWER_NODES = {"read_agent", "not_found", "write_agent"}   # nodes whose LLM text is the answer
+_CODE_REPLY_NODES = {"prepare_action", "confirm_action"}     # nodes whose reply is written by code
 
 # Chats answering right now. In memory: fine with one backend instance (D11).
 _busy: set[uuid.UUID] = set()
@@ -232,7 +256,8 @@ class ChatTurn:
     chat_id: uuid.UUID
     thread_id: str
     scope: AccessScope
-    message: str
+    message: str | None             # a new message, or
+    resume: str | None              # a click on a Confirm card ("confirm" | "cancel")
     injection_suspected: bool
     audit_id: uuid.UUID = field(default_factory=uuid.uuid4)
 
@@ -243,19 +268,26 @@ def plain_text(message: str) -> str:
 
 
 async def begin_turn(
-    db: AsyncSession, scope: AccessScope, chat_id: uuid.UUID, message: str
+    db: AsyncSession,
+    scope: AccessScope,
+    chat_id: uuid.UUID,
+    agent: CompiledStateGraph,
+    message: str | None,
+    resume: str | None = None,
 ) -> ChatTurn:
     """
     Everything that can fail before the answer starts. Call end_turn() afterwards.
+    Exactly one of message / resume is set (SendMessageRequest checks it).
 
     Raises:
         404 chat_not_found
         400 message_too_long — over CHAT_MAX_MESSAGE_CHARS (D21)
         409 chat_busy — this chat is still answering the previous message
+        409 nothing_to_confirm — a resume, but no Confirm card is waiting (D45)
     """
     chat = await get_own_chat(db, scope, chat_id)
     limit = settings.CHAT_MAX_MESSAGE_CHARS
-    if len(message) > limit:
+    if message is not None and len(message) > limit:
         raise api_error(
             status.HTTP_400_BAD_REQUEST, "message_too_long",
             f"Messages can be at most {limit:,} characters. Please shorten it.",
@@ -267,7 +299,13 @@ async def begin_turn(
         )
     _busy.add(chat.id)
     try:
-        if chat.title is None:
+        # Checked while holding the chat, so two quick clicks can't both pass
+        if resume is not None and await waiting_card(agent, thread_id(chat)) is None:
+            raise api_error(
+                status.HTTP_409_CONFLICT, "nothing_to_confirm",
+                "There's nothing waiting for confirmation in this chat.",
+            )
+        if message is not None and chat.title is None:
             chat.title = plain_text(message)[:TITLE_CHARS].strip()
         chat.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
@@ -275,12 +313,13 @@ async def begin_turn(
         _busy.discard(chat.id)
         raise
 
-    lowered = message.lower()
+    lowered = (message or "").lower()
     return ChatTurn(
         chat_id=chat.id,
         thread_id=thread_id(chat),
         scope=scope,
         message=message,
+        resume=resume,
         injection_suspected=any(phrase in lowered for phrase in INJECTION_PHRASES),
     )
 
@@ -292,6 +331,16 @@ def end_turn(turn: ChatTurn) -> None:
 
 def _event(name: str, data) -> ServerSentEvent:
     return ServerSentEvent(event=name, data=data)
+
+
+def _card(pending: dict) -> ConfirmCard:
+    """A pending_action from the agent's state → the card the frontend shows."""
+    return ConfirmCard(
+        action=pending["tool"],
+        summary=pending["summary"],
+        details=pending["details"],
+        policy=pending.get("policy"),
+    )
 
 
 def _friendly_error(exc: Exception) -> str:
@@ -311,6 +360,7 @@ async def stream_turn(agent: CompiledStateGraph, turn: ChatTurn) -> AsyncIterato
         token {content}           answer text as it's written
         citations [Citation]      verified sources only, after the answer (D20)
         token {content}           "N sources couldn't be verified" note, if any
+        confirm ConfirmCard       a change is waiting for Confirm / Cancel (D22)
         done {audit_id}
 
     On failure: error {message}, and the stream ends. The audit row is written
@@ -324,8 +374,20 @@ async def stream_turn(agent: CompiledStateGraph, turn: ChatTurn) -> AsyncIterato
     writing = False     # has the current answer step started writing text?
 
     try:
+        if turn.resume is not None:
+            graph_input = Command(resume=turn.resume)
+            card = await waiting_card(agent, turn.thread_id)
+            if card:
+                tools_called.append(f"{card['tool']}:{turn.resume}")
+        else:
+            # D22: a new message cancels a card that's still waiting (recorded in the chat)
+            if await waiting_card(agent, turn.thread_id):
+                async for _ in agent.astream(Command(resume="cancel"), config, context=context):
+                    pass
+            graph_input = new_turn_input(turn.message)
+
         async for mode, data in agent.astream(
-            new_turn_input(turn.message), config, context=context,
+            graph_input, config, context=context,
             stream_mode=["tasks", "updates", "messages"],
         ):
             if mode == "tasks":
@@ -333,6 +395,8 @@ async def stream_turn(agent: CompiledStateGraph, turn: ChatTurn) -> AsyncIterato
                     writing = False
                     if data["name"] in _STATUS_ON_START:
                         yield _event("status", {"step": _STATUS_ON_START[data["name"]]})
+                    elif data["name"] == "confirm_action" and turn.resume == "confirm":
+                        yield _event("status", {"step": "saving_action"})
 
             elif mode == "messages":
                 chunk, meta = data
@@ -347,7 +411,9 @@ async def stream_turn(agent: CompiledStateGraph, turn: ChatTurn) -> AsyncIterato
                 for node, update in data.items():
                     if not isinstance(update, dict):
                         continue
-                    if node == "read_agent":
+                    if node == "write_agent":
+                        tools_called += [call["name"] for call in update["messages"][-1].tool_calls]
+                    elif node == "read_agent":
                         for call in update["messages"][-1].tool_calls:
                             tools_called.append(call["name"])
                             yield _event("tool_call", {"tool": call["name"], "status": "start"})
@@ -358,18 +424,24 @@ async def stream_turn(agent: CompiledStateGraph, turn: ChatTurn) -> AsyncIterato
                             yield _event("tool_call", {"tool": result.name, "status": "end"})
                     elif node == "rewrite":
                         tools_called.append("search_documents")
-                    elif node == "write_not_ready":
+                    elif node in _CODE_REPLY_NODES and update.get("messages"):
                         yield _event("token", {"content": update["messages"][-1].text})
 
-        state = (await agent.aget_state(config)).values
+        snapshot = await agent.aget_state(config)
+        state = snapshot.values
         last = state["messages"][-1]
-        answer = last.text
-        chunk_ids = [c["chunk_id"] for c in state.get("retrieved_chunks", [])]
-        citations = last.additional_kwargs.get("citations", []) if isinstance(last, AIMessage) else []
-        yield _event("citations", citations)
-        note = citation_note(state.get("dropped_citation_count", 0))
-        if note:
-            yield _event("token", {"content": note})
+        card = state.get("pending_action") if snapshot.next else None
+        if card:
+            answer = card["summary"]
+            yield _event("confirm", _card(card).model_dump(mode="json"))
+        else:
+            answer = last.text
+            chunk_ids = [c["chunk_id"] for c in state.get("retrieved_chunks", [])]
+            citations = last.additional_kwargs.get("citations", []) if isinstance(last, AIMessage) else []
+            yield _event("citations", citations)
+            note = citation_note(state.get("dropped_citation_count", 0))
+            if note:
+                yield _event("token", {"content": note})
         yield _event("done", {"audit_id": str(turn.audit_id)})
 
     except Exception as exc:
@@ -401,7 +473,7 @@ async def _save_audit(turn: ChatTurn, tools_called: list[str], chunk_ids: list[s
                 org_id=scope.org_id,
                 user_id=scope.user_id,
                 role_ids_at_time=sorted(role_ids),
-                query=turn.message,
+                query=turn.message if turn.message is not None else f"[{turn.resume}]",
                 tools_called=tools_called,
                 chunks_retrieved_ids=chunk_ids,
                 answer_summary=answer[:AUDIT_ANSWER_CHARS] or None,

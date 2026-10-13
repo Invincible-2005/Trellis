@@ -29,6 +29,7 @@ from app.models.document import Document
 from app.models.invitation import Invitation
 from app.models.organization import OrgMember
 from app.models.role import Role
+from app.models.commendation import Commendation
 from app.models.strike import Strike
 from app.models.task import Task
 from app.models.team import Team, TeamMember
@@ -187,7 +188,7 @@ async def delete_team(db: AsyncSession, scope: AccessScope, team_id: uuid.UUID) 
     Raises:
         404 team_not_found — missing, in another org, or not viewable
         403 forbidden      — no org-level create_team, or a team the user doesn't oversee
-        409 team_not_empty — it still has tasks, strikes or team documents
+        409 team_not_empty — it still has tasks, strikes, commendations or team documents
     """
     await _get_visible_team(db, scope, team_id)
     if not (scope.can_org("create_team") and team_id in scope.governed_team_ids):
@@ -195,7 +196,9 @@ async def delete_team(db: AsyncSession, scope: AccessScope, team_id: uuid.UUID) 
 
     leftovers = [
         label
-        for label, model in (("tasks", Task), ("strikes", Strike), ("documents", Document))
+        for label, model in (
+            ("tasks", Task), ("strikes", Strike), ("commendations", Commendation), ("documents", Document)
+        )
         if await db.scalar(select(exists().where(model.team_id == team_id)))
     ]
     if leftovers:

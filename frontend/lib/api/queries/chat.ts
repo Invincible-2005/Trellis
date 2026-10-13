@@ -9,6 +9,7 @@ export type ChatSummary = components['schemas']['ChatSummary'];
 export type ChatDetail = components['schemas']['ChatDetail'];
 export type ChatMessage = components['schemas']['ChatMessage'];
 export type Citation = components['schemas']['Citation'];
+export type ConfirmCard = components['schemas']['ConfirmCard'];
 export type Mentions = components['schemas']['MentionsResponse'];
 
 /**

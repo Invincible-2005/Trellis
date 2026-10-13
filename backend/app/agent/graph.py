@@ -1,5 +1,5 @@
 """
-The Trellis LangGraph agent, read path (ticket 10 as updated by ticket 12 D19–D22).
+The Trellis LangGraph agent (ticket 10 as updated by ticket 12 D19–D22, D45).
 
     START → router ─ read  → read_agent ⇄ tools → collect
               │                  │                  │ searched documents?
@@ -10,10 +10,16 @@ The Trellis LangGraph agent, read path (ticket 10 as updated by ticket 12 D19–
               │                  ▼ (no tool calls: final answer)            │
               │            check_citations ←────────────────────────────────┘
               │                  ▼
-              └ write → write_not_ready (until write actions are built) → END
+              └ write → write_agent ─ no tool call (asks for what's missing) ──────→ END
+                              └ proposes a change → prepare_action ─ refused (says why) → END
+                                                         └ ok → confirm_action → END
+                                                                 (pauses with interrupt() until
+                                                                  the user's Confirm / Cancel)
 
 LLM calls per message: router (1) + read agent (1–3) + grader only after a
-document search. The citation check is code (D19/D20).
+document search; a change costs router + write agent (2). The citation check,
+the rule checks, the card text and the replies after a click are code
+(D19/D20, D45).
 
 AccessScope arrives per run as context=AgentContext(...) and is read by the tools
 and the rewrite node from the runtime; it is never in AgentState (D1).
@@ -29,12 +35,12 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.runtime import Runtime
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
-from app.agent import prompts
+from app.agent import actions, prompts
 from app.agent.state import AgentContext, AgentState, RetrievedChunk
-from app.agent.tools import READ_TOOLS, citation_tag, run_document_search
+from app.agent.tools import READ_TOOLS, WRITE_TOOLS, citation_tag, run_document_search
 from app.core.config import settings
 
 MAX_STEPS = 8        # tool calls per message (ticket 04)
@@ -291,9 +297,86 @@ async def check_citations(state: AgentState) -> dict:
     return update
 
 
-async def write_not_ready(state: AgentState) -> dict:
-    """Placeholder until write actions with the Confirm card are built (D22)."""
-    return {"messages": [AIMessage(content=prompts.WRITE_NOT_READY)]}
+# ── Write path (D22, D45) ─────────────────────────────────────────────────────
+
+async def write_agent(state: AgentState) -> dict:
+    """
+    One LLM call with only the write tools bound. Either it proposes a change
+    (a tool call, nothing saved) or it asks for what's missing.
+    """
+    today = date.today()
+    system = prompts.WRITE_AGENT_PROMPT.format(today=today.isoformat(), weekday=today.strftime("%A"))
+    response = await _chat_model().bind_tools(WRITE_TOOLS).ainvoke(
+        [SystemMessage(system), *_trim(state["messages"])]
+    )
+    return {"messages": [response]}
+
+
+def _closing_messages(proposal: AIMessage, first_result: str, reply: str) -> list[BaseMessage]:
+    """
+    A ToolMessage for every proposed call (the history must answer each tool
+    call, or the next LLM call fails), then the reply the user sees. Only the
+    first call is ever acted on (one change per message, D45).
+    """
+    calls = proposal.tool_calls
+    results: list[BaseMessage] = [
+        ToolMessage(
+            content=first_result if i == 0 else "Not done: one change per message.",
+            name=call["name"],
+            tool_call_id=call["id"],
+        )
+        for i, call in enumerate(calls)
+    ]
+    if len(calls) > 1:
+        reply += "\n\n" + prompts.ONE_ACTION_NOTE
+    return results + [AIMessage(content=reply)]
+
+
+async def prepare_action(
+    state: AgentState, runtime: Runtime[AgentContext]
+) -> Command[Literal["confirm_action", "__end__"]]:
+    """
+    Code, no LLM: run the real rules without saving, and write the card text
+    from database names (D45). A refused change never becomes a card.
+    """
+    proposal = state["messages"][-1]
+    call = proposal.tool_calls[0]
+    try:
+        pending = await actions.prepare(runtime.context.scope, call["name"], call["args"])
+    except actions.ActionRefused as exc:
+        reason = str(exc)
+        return Command(
+            goto=END,
+            update={"messages": _closing_messages(proposal, f"Refused: {reason}", reason)},
+        )
+    return Command(goto="confirm_action", update={"pending_action": pending})
+
+
+async def confirm_action(state: AgentState, runtime: Runtime[AgentContext]) -> dict:
+    """
+    Pause until the user clicks Confirm or Cancel (D22). LangGraph re-runs this
+    node from the top on resume, so nothing before interrupt() may change
+    anything. On Confirm the save runs with the scope of the click's own
+    request, so the rules are checked again at that moment.
+    """
+    action = state["pending_action"]
+    decision = interrupt(action)        # the SSE `confirm` event shows this card
+
+    if decision == "confirm":
+        try:
+            reply = await actions.execute(runtime.context.scope, action)
+        except actions.ActionRefused as exc:
+            reply = str(exc)
+    else:
+        reply = prompts.CANCELLED
+
+    proposal = next(
+        m for m in reversed(state["messages"]) if isinstance(m, AIMessage) and m.tool_calls
+    )
+    return {
+        "messages": _closing_messages(proposal, reply, reply),
+        "pending_action": None,
+    }
 
 
 # ── Graph ─────────────────────────────────────────────────────────────────────
@@ -313,12 +396,14 @@ def build_graph(checkpointer=None):
     builder.add_node("rewrite", rewrite)
     builder.add_node("not_found", not_found)
     builder.add_node("check_citations", check_citations)
-    builder.add_node("write_not_ready", write_not_ready)
+    builder.add_node("write_agent", write_agent)
+    builder.add_node("prepare_action", prepare_action)
+    builder.add_node("confirm_action", confirm_action)
 
     builder.add_edge(START, "router")
     builder.add_conditional_edges(
-        "router", lambda s: "read_agent" if s["intent"] == "read" else "write_not_ready",
-        ["read_agent", "write_not_ready"],
+        "router", lambda s: "read_agent" if s["intent"] == "read" else "write_agent",
+        ["read_agent", "write_agent"],
     )
     builder.add_conditional_edges(
         "read_agent", lambda s: "tools" if s["messages"][-1].tool_calls else "check_citations",
@@ -329,5 +414,9 @@ def build_graph(checkpointer=None):
     builder.add_edge("rewrite", "grade")
     builder.add_edge("not_found", "check_citations")
     builder.add_edge("check_citations", END)
-    builder.add_edge("write_not_ready", END)
+    builder.add_conditional_edges(
+        "write_agent", lambda s: "prepare_action" if s["messages"][-1].tool_calls else END,
+        ["prepare_action", END],
+    )
+    builder.add_edge("confirm_action", END)
     return builder.compile(checkpointer=checkpointer)

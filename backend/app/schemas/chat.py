@@ -1,5 +1,5 @@
 """
-app/schemas/chat.py — Chat list, one chat's history, mentions (Ticket 08, Ticket 12 D2/D41–D43)
+app/schemas/chat.py — Chat list, one chat's history, mentions, Confirm cards (Ticket 08, Ticket 12 D2/D22/D41–D43/D45)
 
 A chat belongs to one user in one org; nobody else sees it (Ticket 08).
 The conversation itself lives in the agent's memory (LangGraph checkpoint in
@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Annotated, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, model_validator
 
 from app.schemas.auth import AppBaseModel
 
@@ -35,12 +35,27 @@ class RenameChatRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     """
-    One user message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long (D21).
-    People and teams picked in the chat box arrive as `@[email](user:<id>)` and
-    `/[Team](team:<id>)` (D43). A `resume` field comes with confirm cards (D22).
+    Send exactly one of:
+    - `message`: a new message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long
+      (D21). People and teams picked in the chat box arrive as `@[email](user:<id>)`
+      and `/[Team](team:<id>)` (D43). If a Confirm card is waiting, it is cancelled first.
+    - `resume`: the click on a Confirm card (D22). 409 nothing_to_confirm when no
+      card is waiting (e.g. a second click, D45).
     """
 
-    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    message: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]] = None
+    resume: Optional[Literal["confirm", "cancel"]] = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "SendMessageRequest":
+        if (self.message is None) == (self.resume is None):
+            raise ValueError("Send either message or resume.")
+        return self
+
+
+class CardLine(BaseModel):
+    label: str      # e.g. "Assignee"
+    value: str      # e.g. "Karan Mehta"
 
 
 class Citation(BaseModel):
@@ -56,6 +71,31 @@ class Citation(BaseModel):
     excerpt: str        # start of the passage the answer used
 
 
+class PolicyCheck(BaseModel):
+    """
+    give_strike only (D46): the reason checked against the policy documents the
+    giver can see. A warning, never a block: the manager can confirm either way.
+    `sources` are only passages that were really retrieved.
+    """
+
+    verdict: Literal["supported", "not_covered", "unchecked"]
+    explanation: str
+    sources: List[Citation] = []
+
+
+class ConfirmCard(BaseModel):
+    """
+    A change the assistant prepared and is waiting to save (D22). The text is
+    written by code from what will be saved, never by the AI (D45). Sent as the
+    SSE `confirm` event and in ChatDetail.pending_action (so a reload shows it again).
+    """
+
+    action: Literal["create_task", "give_strike", "give_commendation"]
+    summary: str                      # card heading, e.g. "Create a task for Karan Mehta"
+    details: List[CardLine]
+    policy: Optional[PolicyCheck] = None   # give_strike only: the policy check (D46)
+
+
 class ChatMessage(BaseModel):
     """A question you asked, or the assistant's final answer (no tool steps)."""
 
@@ -66,6 +106,7 @@ class ChatMessage(BaseModel):
 
 class ChatDetail(ChatSummary):
     messages: List[ChatMessage]
+    pending_action: Optional[ConfirmCard] = None   # a Confirm card still waiting for a click
 
 
 class MentionPerson(BaseModel):

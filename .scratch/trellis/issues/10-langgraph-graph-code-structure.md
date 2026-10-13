@@ -25,6 +25,8 @@ What is the exact LangGraph `StateGraph` code skeleton — node functions, condi
 > - **D7:** models are Gemini Flash (`CHAT_MODEL`) and Flash-Lite (`ROUTER_MODEL`) via `init_chat_model`. `give_strike` / `give_commendation` also take `team_id`.
 > The original text is kept below for history.
 
+> **Built 2026-10-13 (write path, step 1 of 3, ticket 12 D45):** router `write` → `write_agent` (one LLM call, only `WRITE_TOOLS` bound; asks when the person/team/title is missing) → `prepare_action` (code: `app/agent/actions.py::prepare` runs the service's rules without saving and writes the card text; refused → reply, no card) → `confirm_action` (`interrupt()`; on resume `actions.execute` saves through the service with the click's fresh scope; ToolMessages answer every proposed call; replies are code-written). One action per message. Write tools: `create_task`, `give_commendation`, `give_strike` (all built 2026-10-13). `give_strike`'s "policy-compliant infraction" check (§2 Node 5) is `actions.py::_policy_check`: a warning on the card, never a block (ticket 12 D46).
+
 > **Built 2026-10-09 (agent slices 1–2, read path):** `app/services/tasks.py` (`list_tasks`, `team_summary`, D24) next to `app/services/documents.py::search_chunks`; `app/agent/tools.py`, `prompts.py`, `graph.py`; optional `scripts/try_agent.py`. Implementation choices (no decision needed):
 > - Tools get the scope with `get_runtime(AgentContext)`, not an injected `ToolRuntime` argument (that makes LangChain run `AccessScope` through Pydantic and log warnings). Either way it is outside the LLM's tool schema.
 > - Citations are 8-hex tags of the chunk id, e.g. `[3f9a12bc]`; `check_citations` maps tags back to this turn's `retrieved_chunks`.
