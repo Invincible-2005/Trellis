@@ -76,6 +76,9 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
 - [12-D46 Strike policy check](./issues/12-decision-reconciliation.md): before a strike card, the reason is checked against the policy documents the giver can see; the card shows "Policy supports this" / "No policy found that covers this reason" with the passages. A warning, never a block; the verdict is saved for appeal reviewers.
 - [12-D45 Write-tool hardening](./issues/12-decision-reconciliation.md): the Confirm card's text is written by code; rules are checked before the card and again on Confirm; one action per message; the card survives a reload; a second Confirm gets `409 nothing_to_confirm`. Build order: tasks → commendations → strikes.
 - [12-D43 Mentions](./issues/12-decision-reconciliation.md): in the chat box `@` picks a person (shown by email) and `/` picks a team, only among teams you can see (D13) and their members; sent as `@[email](user:<uuid>)` / `/[Team](team:<uuid>)`; ids are hints, scope still decides.
+- [12-D47 Dashboard "my work"](./issues/12-decision-reconciliation.md): `/dashboard` shows the caller's task counts, next 5 deadlines, their strikes and latest 5 commendations (read-only; appeals come later), plus team cards (D24) and org totals with `view_aggregate`.
+- [12-D48 Dashboard freshness](./issues/12-decision-reconciliation.md): loaded on the server when opened, no polling (fresh after your own changes via `revalidatePath`); one task-status bar chart, the rest number cards.
+- [12-D49 Form input checks](./issues/12-decision-reconciliation.md): zod + react-hook-form, zod schemas **generated from `openapi.json`** (`pnpm api:generate` → `lib/api/schemas/zod.gen.ts`, picked out per area in `lib/api/schemas/<area>.ts`) so frontend checks stay in sync with Pydantic; used by the dialog (errors under the field) and re-checked in the Server Action.
 
 ## Not yet specified
 
@@ -97,7 +100,7 @@ A complete, working, role-aware agentic RAG workspace built by a 3-person team i
   - ~~switch the embedding call to Gemini~~ done 2026-10-09 (ticket 12 D14; `app/services/embeddings.py`, live-verified).
 - **Agent build (tickets 10/12, 4 slices):** 1 permission-filtered lookups ✅ (`services/documents.py`, `services/tasks.py`), 2 read agent ✅ (`app/agent/tools.py`, `prompts.py`, `graph.py`; see ticket 10 "Built 2026-10-09"), 3 chat endpoint + SSE + checkpointer + audit ✅ (chat effort, 2026-10-12), 4 write tools with Confirm (D22/D45): `create_task` ✅ 2026-10-13 (live-tested 8/8); `give_commendation` ✅ 2026-10-13 (table + migration `f3b8d1e6a724`, live-tested 8/8); `give_strike` ✅ 2026-10-13 (D6 columns, migration `a9c4e2f7b815`; policy check warns, never blocks, D46; 3rd active strike → escalated; live-tested 9/9). **The agent build is complete.**
 - [09-sse-streaming-implementation](./issues/09-sse-streaming-implementation.md): FastAPI SSE emitter from LangGraph nodes + Next.js BFF proxy contract + frontend consumption. Resolve together with frontend-scaffold/07. Endpoint: `POST /api/v1/chat/sessions/{session_id}/message` (SSE). **Unblocked.**
-- [07-role-scoped-chat-and-dashboard-ui](./issues/07-role-scoped-chat-and-dashboard-ui.md): Umbrella — tracked in detail by frontend-scaffold/07 (chat) and /08 (dashboard).
+- [07-role-scoped-chat-and-dashboard-ui](./issues/07-role-scoped-chat-and-dashboard-ui.md): Umbrella — tracked in detail by frontend-scaffold/07 (chat) and /08 (dashboard). **Dashboard (D47/D48):** `GET /api/v1/dashboard` built and live-tested 2026-10-13; frontend loader `getDashboard()` + teammate brief done the same day; next: the page (teammates).
 
 ## Open backend decisions (undecided)
 

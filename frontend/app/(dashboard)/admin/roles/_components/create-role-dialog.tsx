@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 
@@ -15,10 +17,11 @@ import {
 } from '@/components/ui/dialog';
 import { createRole } from '@/lib/api/actions/roles';
 import type { Role } from '@/lib/api/queries/roles';
+import { zCreateRoleRequest } from '@/lib/api/schemas/roles';
 import {
   ALL_PERMISSIONS,
   RoleFormFields,
-  validateRoleForm,
+  type RoleFormOutput,
   type RoleFormValues,
 } from './role-form-fields';
 
@@ -29,13 +32,6 @@ interface CreateRoleDialogProps {
   callerOrgRoleId?: string | null;
   callerOrgPermissions?: string[];
 }
-
-const EMPTY_FORM: RoleFormValues = {
-  name: '',
-  description: '',
-  parentRoleId: '',
-  permissions: [],
-};
 
 export function CreateRoleDialog({
   open,
@@ -51,27 +47,27 @@ export function CreateRoleDialog({
   // Permission checkboxes: only what the caller holds (D9)
   const grantable = ALL_PERMISSIONS.filter((p) => callerOrgPermissions.includes(p));
 
-  const [form, setForm] = useState<RoleFormValues>(EMPTY_FORM);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // The first allowed parent (the caller's own role) starts selected.
+  const emptyForm: RoleFormValues = {
+    name: '',
+    description: '',
+    parent_role_id: allowedParents[0]?.id ?? '',
+    permissions: [],
+  };
 
-  // Until the user picks a parent, the first allowed one (their own role) is selected.
-  const values = { ...form, parentRoleId: form.parentRoleId || allowedParents[0]?.id || '' };
+  // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
+  const form = useForm<RoleFormValues, unknown, RoleFormOutput>({
+    resolver: zodResolver(zCreateRoleRequest),
+    defaultValues: emptyForm,
+  });
+  const isSubmitting = form.formState.isSubmitting;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const error = validateRoleForm(values);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    setIsSubmitting(true);
+  const onSubmit = form.handleSubmit(async (values) => {
     try {
       const result = await createRole({
+        ...values,
         name: values.name.trim(),
-        description: values.description.trim() || undefined,
-        parent_role_id: values.parentRoleId,
-        permissions: values.permissions,
+        description: values.description?.trim() || undefined,
       });
 
       if (!result.ok) {
@@ -80,19 +76,17 @@ export function CreateRoleDialog({
       }
 
       toast.success(`Role "${result.data.name}" created successfully.`);
-      setForm(EMPTY_FORM);
+      form.reset(emptyForm);
       onOpenChange(false);
     } catch {
       toast.error('An unexpected error occurred while creating the role.');
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -104,8 +98,7 @@ export function CreateRoleDialog({
           </DialogHeader>
 
           <RoleFormFields
-            values={values}
-            onChange={setForm}
+            control={form.control}
             parentOptions={allowedParents}
             callerOrgRoleId={callerOrgRoleId}
             permissionOptions={grantable}

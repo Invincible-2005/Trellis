@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 
@@ -14,10 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { addMember } from "@/lib/api/actions/members";
 import type { Role } from "@/lib/api/queries/roles";
+import { zInviteMemberForm } from "@/lib/api/schemas/members";
+
+const EMPTY_FORM = { email: "", role_id: "" };
 
 interface InviteMemberDialogProps {
   open: boolean;
@@ -30,38 +34,26 @@ export function InviteMemberDialog({
   onOpenChange,
   assignableRoles,
 }: InviteMemberDialogProps) {
-  const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
+  const form = useForm({
+    resolver: zodResolver(zInviteMemberForm),
+    defaultValues: EMPTY_FORM,
+  });
+  const isSubmitting = form.formState.isSubmitting;
 
+  const selectedRoleId = useWatch({ control: form.control, name: "role_id" });
   const selectedRole = assignableRoles.find((r) => r.id === selectedRoleId);
 
-  const resetForm = () => {
-    setEmail("");
-    setSelectedRoleId("");
-  };
-
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) resetForm();
+    if (!nextOpen) form.reset(EMPTY_FORM);
     onOpenChange(nextOpen);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      toast.error("Please enter a valid email address.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  // `values` is already checked: email trimmed + lower-cased, "No role" is null.
+  const handleSubmit = form.handleSubmit(async (values) => {
     try {
-      const res = await addMember({
-        email: trimmedEmail,
-        role_id: selectedRoleId ? selectedRoleId : undefined,
-      });
+      const res = await addMember(values);
 
       if (!res.ok) {
         toast.error(res.message);
@@ -69,25 +61,23 @@ export function InviteMemberDialog({
       }
 
       if (res.data.status === "added") {
-        const name = res.data.member?.name || trimmedEmail;
+        const name = res.data.member?.name || values.email;
         toast.success(`${name} has been added to the organization.`);
       } else {
-        toast.success(`Invitation email sent to ${trimmedEmail}.`);
+        toast.success(`Invitation email sent to ${values.email}.`);
       }
 
+      // addMember already refreshes the page; no router.refresh() (it collides with that update).
       handleOpenChange(false);
-      router.refresh();
     } catch {
       toast.error("An unexpected error occurred while adding member.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[460px]">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" />
@@ -100,39 +90,53 @@ export function InviteMemberDialog({
 
           <div className="space-y-3.5 py-1">
             {/* Email input */}
-            <div className="space-y-1.5">
-              <Label htmlFor="member-email">Email Address</Label>
-              <Input
-                id="member-email"
-                type="email"
-                placeholder="colleague@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="off"
-              />
-            </div>
+            <Controller
+              name="email"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="gap-1.5">
+                  <FieldLabel htmlFor="member-email">Email Address</FieldLabel>
+                  <Input
+                    {...field}
+                    id="member-email"
+                    type="email"
+                    placeholder="colleague@company.com"
+                    autoComplete="off"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
 
             {/* Role picker */}
-            <div className="space-y-1.5">
-              <Label htmlFor="member-role">Assign Role</Label>
-              <select
-                id="member-role"
-                value={selectedRoleId}
-                onChange={(e) => setSelectedRoleId(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              >
-                <option value="">No role (member without org-level role)</option>
-                {assignableRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name} (Level {role.depth})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-muted-foreground">
-                You can give roles below your own, with permissions you hold.
-              </p>
-            </div>
+            <Controller
+              name="role_id"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="gap-1.5">
+                  <FieldLabel htmlFor="member-role">Assign Role</FieldLabel>
+                  <select
+                    {...field}
+                    value={field.value ?? ""}
+                    id="member-role"
+                    aria-invalid={fieldState.invalid}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <option value="">No role (member without org-level role)</option>
+                    {assignableRoles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name} (Level {role.depth})
+                      </option>
+                    ))}
+                  </select>
+                  <FieldDescription className="text-[11px]">
+                    You can give roles below your own, with permissions you hold.
+                  </FieldDescription>
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
 
             {/* Permission preview for selected role */}
             {selectedRole && selectedRole.permissions && selectedRole.permissions.length > 0 && (

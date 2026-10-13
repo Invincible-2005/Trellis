@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zRenameChatRequest } from '../schemas/chat';
 import type { components } from '../v1';
 
 type ChatSummary = components['schemas']['ChatSummary'];
@@ -33,11 +34,13 @@ export async function createChat(): Promise<ActionResult<ChatSummary>> {
 export async function renameChat(sessionId: string, title: string): Promise<ActionResult<ChatSummary>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zRenameChatRequest.safeParse({ title });
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const chat = await unwrap(
       api.PATCH('/api/v1/chat/sessions/{session_id}', {
         params: { path: { session_id: sessionId } },
-        body: { title },
+        body: parsed.data,
       }),
     );
     revalidateChatList();

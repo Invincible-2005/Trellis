@@ -429,6 +429,10 @@ class OrgOverview(BaseModel):
 
 class DashboardResponse(BaseModel):
     my_tasks: TaskSummary
+    # ⚠️ 2026-10-13 (ticket 12 D47): also upcoming_tasks (next 5 open, by deadline),
+    # my_strikes (own, non-dismissed) and recent_commendations (own, latest 5). Read-only.
+    # As built 2026-10-13 (app/schemas/dashboard.py): managed_teams is named `teams` (every viewable team, D24);
+    # OrgOverview.total_strikes is `active_strikes` (non-dismissed); total_documents counts ready ones.
     managed_teams: Optional[List[TeamOverview]] = None
     org_overview: Optional[OrgOverview] = None
 ```

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zAddMemberRequest, zUpdateMemberRequest } from '../schemas/members';
 import type { components } from '../v1';
 
 type AddMemberResult = components['schemas']['AddMemberResponse'];
@@ -26,8 +27,10 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
 export async function addMember(input: AddMemberInput): Promise<ActionResult<AddMemberResult>> {
   const blocked = await limit('heavyWrite');
   if (blocked) return blocked;
+  const parsed = zAddMemberRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const result = await unwrap(api.POST('/api/v1/admin/members', { body: input }));
+    const result = await unwrap(api.POST('/api/v1/admin/members', { body: parsed.data }));
     revalidatePath('/admin/members');
     return { ok: true, data: result };
   } catch (err) {
@@ -62,11 +65,13 @@ export async function updateMemberRole(
 ): Promise<ActionResult<Member>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zUpdateMemberRequest.safeParse({ role_id: roleId });
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const member = await unwrap(
       api.PATCH('/api/v1/admin/members/{user_id}', {
         params: { path: { user_id: userId } },
-        body: { role_id: roleId },
+        body: parsed.data,
       }),
     );
     revalidatePath('/admin/members');

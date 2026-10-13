@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { firstError, zCreateTaskRequest, zUpdateTaskRequest } from '../schemas/tasks';
 import type { components } from '../v1';
 
 type Task = components['schemas']['TaskResult'];
@@ -24,8 +25,10 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: stri
 export async function createTask(input: CreateTaskInput): Promise<ActionResult<Task>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zCreateTaskRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
-    const task = await unwrap(api.POST('/api/v1/tasks', { body: input }));
+    const task = await unwrap(api.POST('/api/v1/tasks', { body: parsed.data }));
     revalidateTaskPages(task.team_id);
     return { ok: true, data: task };
   } catch (err) {
@@ -42,9 +45,11 @@ export async function createTask(input: CreateTaskInput): Promise<ActionResult<T
 export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<ActionResult<Task>> {
   const blocked = await limit('write');
   if (blocked) return blocked;
+  const parsed = zUpdateTaskRequest.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstError(parsed.error) };
   try {
     const task = await unwrap(
-      api.PATCH('/api/v1/tasks/{task_id}', { params: { path: { task_id: taskId } }, body: input }),
+      api.PATCH('/api/v1/tasks/{task_id}', { params: { path: { task_id: taskId } }, body: parsed.data }),
     );
     revalidateTaskPages(task.team_id);
     return { ok: true, data: task };
