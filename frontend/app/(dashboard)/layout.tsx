@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { getAuthContext } from "@/lib/api/queries/auth"
+import { QueryProvider } from "@/lib/query/provider"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -30,13 +31,16 @@ export default async function DashboardLayout({
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar adminTabs={adminTabs} />
-      <SidebarInset>
-        <AppHeader orgRoleName={orgRoleName} />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
-      </SidebarInset>
-      <Toaster />
-    </SidebarProvider>
+    // Keyed by org: switching org starts a fresh TanStack cache, so one org's data never shows in another
+    <QueryProvider key={active_org.org_id}>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <AppSidebar adminTabs={adminTabs} />
+        <SidebarInset>
+          <AppHeader orgRoleName={orgRoleName} />
+          <main className="flex-1 p-4 md:p-6">{children}</main>
+        </SidebarInset>
+        <Toaster />
+      </SidebarProvider>
+    </QueryProvider>
   )
 }

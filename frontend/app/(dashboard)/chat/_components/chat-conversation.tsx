@@ -9,12 +9,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot } from "lucide-react";
-import { toast } from "sonner";
 
-import { createChat } from "@/lib/api/actions/chat";
 import type { ChatMessage, ConfirmCard, Mentions } from "@/lib/api/queries/chat";
 import { ChatInputBox } from "./chat-input-box";
 import { ChatMessageList } from "./chat-message-list";
+import { useChatChanges } from "./use-chat-changes";
 import { useChatStream } from "./use-chat-stream";
 
 const EXAMPLES = [
@@ -35,6 +34,8 @@ interface ChatConversationProps {
 export function ChatConversation({ chatId, initialMessages, pendingAction, mentions }: ChatConversationProps) {
   const router = useRouter();
   const chatIdRef = useRef(chatId);
+  // Creates the chat with a greyed "New chat" row in the list at once (use-chat-changes.ts)
+  const { mutateAsync: createChat } = useChatChanges().create;
   const { messages, step, isAnswering, send, respond, stop } = useChatStream([
     ...initialMessages.map((m) => ({ ...m, citations: m.citations ?? [] })),
     ...(pendingAction
@@ -55,25 +56,26 @@ export function ChatConversation({ chatId, initialMessages, pendingAction, menti
 
   const handleSend = useCallback(
     async (text: string) => {
-      let id = chatIdRef.current;
-      const isNew = !id;
-      if (!id) {
-        const created = await createChat();
-        if (!created.ok) {
-          toast.error(created.message);
-          return false;
-        }
-        id = created.data.id;
-        chatIdRef.current = id;
-      }
-      const accepted = await send(id, text);
+      const isNew = !chatIdRef.current;
+      // A new chat is created behind the message, which shows at once (use-chat-stream.ts)
+      const accepted = await send(
+        chatIdRef.current ??
+          (async () => {
+            const id = (await createChat()).id;
+            chatIdRef.current = id;
+            return id;
+          }),
+        text
+      );
+      const id = chatIdRef.current;
+      if (!id) return false; // creating it failed: the row is gone and the toast shown
       // Only now move a new chat to its own address: changing the URL mid-answer
       // re-renders the page, which would cut the stream off.
       if (isNew) router.replace(`/chat/${id}`);
       router.refresh(); // the chat list: new title, most recent first
       return accepted;
     },
-    [router, send]
+    [createChat, router, send]
   );
 
   const handleRespond = useCallback(

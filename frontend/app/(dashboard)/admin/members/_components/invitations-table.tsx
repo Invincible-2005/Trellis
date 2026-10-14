@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { toast } from "sonner";
 import { Clock, Shield, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,36 +12,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cancelInvitation } from "@/lib/api/actions/members";
-import type { Invitation } from "@/lib/api/queries/members";
+import { useMemberChanges, type InvitationRow } from "./use-member-changes";
 
 interface InvitationsTableProps {
-  invitations: Invitation[];
+  invitations: InvitationRow[];
 }
 
 export function InvitationsTable({ invitations }: InvitationsTableProps) {
-  const [inviteToCancel, setInviteToCancel] = useState<Invitation | null>(null);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const [inviteToCancel, setInviteToCancel] = useState<InvitationRow | null>(null);
+  const { cancelInvite } = useMemberChanges();
 
-  const handleCancelInvite = async () => {
+  // The row disappears at once; the server's answer comes later (use-member-changes.ts).
+  const handleCancelInvite = () => {
     if (!inviteToCancel) return;
-
-    setIsCancelling(true);
-    try {
-      const res = await cancelInvitation(inviteToCancel.id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-
-      // cancelInvitation refreshes /admin/members, so the row disappears by itself.
-      toast.success(`Invitation to ${inviteToCancel.email} cancelled.`);
-      setInviteToCancel(null);
-    } catch {
-      toast.error("Failed to cancel invitation.");
-    } finally {
-      setIsCancelling(false);
-    }
+    cancelInvite.mutate(inviteToCancel);
+    setInviteToCancel(null);
   };
 
   if (invitations.length === 0) {
@@ -65,7 +49,10 @@ export function InvitationsTable({ invitations }: InvitationsTableProps) {
             </thead>
             <tbody className="divide-y divide-border">
               {invitations.map((inv) => (
-                <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={inv.id}
+                  className={inv.pending ? "opacity-60" : "hover:bg-muted/30 transition-colors"}
+                >
                   {/* Email */}
                   <td className="px-5 py-3.5 font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -95,18 +82,21 @@ export function InvitationsTable({ invitations }: InvitationsTableProps) {
 
                   {/* Sent Date */}
                   <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(inv.created_at).toLocaleDateString("en-GB", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {inv.pending
+                      ? "Sending…"
+                      : new Date(inv.created_at).toLocaleDateString("en-GB", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
                   </td>
 
-                  {/* Cancel Action */}
+                  {/* Cancel Action: not until the server has the invite (it has no real id yet) */}
                   <td className="px-5 py-3.5 text-right whitespace-nowrap">
                     <Button
                       variant="ghost"
                       size="sm"
+                      disabled={inv.pending}
                       onClick={() => setInviteToCancel(inv)}
                       className="text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive gap-1"
                     >
@@ -131,21 +121,11 @@ export function InvitationsTable({ invitations }: InvitationsTableProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setInviteToCancel(null)}
-              disabled={isCancelling}
-            >
+            <Button type="button" variant="outline" onClick={() => setInviteToCancel(null)}>
               Keep Invite
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleCancelInvite}
-              disabled={isCancelling}
-            >
-              {isCancelling ? "Cancelling..." : "Cancel Invite"}
+            <Button type="button" variant="destructive" onClick={handleCancelInvite}>
+              Cancel Invite
             </Button>
           </DialogFooter>
         </DialogContent>

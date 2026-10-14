@@ -6,9 +6,11 @@ import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Invitation, Member } from "@/lib/api/queries/members";
 import type { Role } from "@/lib/api/queries/roles";
+import { useServerData } from "@/lib/query/use-server-data";
 import { InvitationsTable } from "./invitations-table";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MembersTable } from "./members-table";
+import { INVITATIONS_KEY, MEMBERS_KEY, type InvitationRow } from "./use-member-changes";
 
 interface MembersViewProps {
   members: Member[];
@@ -16,12 +18,13 @@ interface MembersViewProps {
   assignableRoles: Role[];
 }
 
-export function MembersView({
-  members,
-  invitations,
-  assignableRoles,
-}: MembersViewProps) {
+export function MembersView(props: MembersViewProps) {
+  const { assignableRoles } = props;
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+
+  // The server's lists, kept in TanStack so changes show instantly (use-member-changes.ts).
+  const members = useServerData(MEMBERS_KEY, props.members);
+  const invitations = useServerData<InvitationRow[]>(INVITATIONS_KEY, props.invitations);
 
   return (
     <div className="space-y-8">

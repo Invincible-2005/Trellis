@@ -8,6 +8,7 @@ import type { Member } from "@/lib/api/queries/members";
 import type { Role } from "@/lib/api/queries/roles";
 import { ChangeRoleDialog } from "./change-role-dialog";
 import { RemoveMemberDialog } from "./remove-member-dialog";
+import { useMemberChanges } from "./use-member-changes";
 
 interface MembersTableProps {
   members: Member[];
@@ -18,6 +19,7 @@ interface MembersTableProps {
 export function MembersTable({ members, assignableRoles }: MembersTableProps) {
   const [changingRoleOf, setChangingRoleOf] = useState<Member | null>(null);
   const [removing, setRemoving] = useState<Member | null>(null);
+  const { remove, changeRole } = useMemberChanges();
 
   if (members.length === 0) {
     return (
@@ -123,6 +125,7 @@ export function MembersTable({ members, assignableRoles }: MembersTableProps) {
           key={changingRoleOf.user_id}
           member={changingRoleOf}
           assignableRoles={assignableRoles}
+          onSave={(roleId, roleName) => changeRole.mutate({ member: changingRoleOf, roleId, roleName })}
           onClose={() => setChangingRoleOf(null)}
         />
       )}
@@ -130,6 +133,7 @@ export function MembersTable({ members, assignableRoles }: MembersTableProps) {
         <RemoveMemberDialog
           key={removing.user_id}
           member={removing}
+          onRemove={() => remove.mutate(removing)}
           onClose={() => setRemoving(null)}
         />
       )}

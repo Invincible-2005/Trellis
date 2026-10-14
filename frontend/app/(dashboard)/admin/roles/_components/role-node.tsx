@@ -3,11 +3,12 @@
 import React, { memo } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Shield, ShieldAlert, Layers, Pencil } from 'lucide-react';
-import type { Permission, Role } from '@/lib/api/queries/roles';
+import type { Permission } from '@/lib/api/queries/roles';
 import { PERMISSION_LABELS } from './role-form-fields';
+import type { RoleRow } from './use-role-changes';
 
 export type RoleNodeData = {
-  role: Role;
+  role: RoleRow;
   [key: string]: unknown;
 };
 
@@ -22,7 +23,7 @@ export const RoleNode = memo(function RoleNode({
     <div
       className={`relative min-w-[240px] max-w-[280px] rounded-xl border bg-card p-3.5 shadow-sm transition-all hover:shadow-md ${
         role.manageable ? 'cursor-pointer hover:border-primary' : ''
-      }`}
+      } ${role.pending ? 'opacity-60' : ''}`}
     >
       {/* Target handle at Top */}
       <Handle
@@ -57,7 +58,7 @@ export const RoleNode = memo(function RoleNode({
       {/* Depth Badge */}
       <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
         <Layers className="h-3 w-3" />
-        <span>Level {role.depth}</span>
+        <span>{role.pending ? 'Saving…' : `Level ${role.depth}`}</span>
       </div>
 
       {/* Description */}

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { FileText, Pencil, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { deleteRole, updateRole } from '@/lib/api/actions/roles';
+import type { UpdateRoleInput } from '@/lib/api/actions/roles';
 import type { Permission, Role } from '@/lib/api/queries/roles';
 import { zCreateRoleRequest } from '@/lib/api/schemas/roles';
 import {
@@ -25,35 +24,25 @@ import {
   type RoleFormOutput,
   type RoleFormValues,
 } from './role-form-fields';
+import { descendantIds } from './use-role-changes';
 
 interface EditRoleDialogProps {
   /** A role with manageable: true (never the protected Admin role). */
   role: Role;
   roles: Role[];
+  /** Show the change at once; the server's answer comes later (use-role-changes.ts). */
+  onSave: (input: UpdateRoleInput) => void;
+  onDelete: () => void;
   onClose: () => void;
   callerOrgRoleId?: string | null;
   callerOrgPermissions?: string[];
 }
 
-/** Ids of every role below `roleId` (its sub-roles, their sub-roles, ...). */
-function descendantIds(roleId: string, roles: Role[]): Set<string> {
-  const found = new Set<string>();
-  const queue = [roleId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const r of roles) {
-      if (r.parent_role_id === current && !found.has(r.id)) {
-        found.add(r.id);
-        queue.push(r.id);
-      }
-    }
-  }
-  return found;
-}
-
 export function EditRoleDialog({
   role,
   roles,
+  onSave,
+  onDelete,
   onClose,
   callerOrgRoleId,
   callerOrgPermissions = [],
@@ -86,48 +75,20 @@ export function EditRoleDialog({
     },
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isSubmitting = form.formState.isSubmitting || isDeleting;
 
-  const handleSave = form.handleSubmit(async (values) => {
-    try {
-      const result = await updateRole(role.id, {
-        ...values,
-        name: values.name.trim(),
-        description: values.description?.trim() ?? '', // empty clears it
-      });
-
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-
-      toast.success(`Role "${result.data.name}" updated.`);
-      onClose();
-    } catch {
-      toast.error('An unexpected error occurred while saving the role.');
-    }
+  const handleSave = form.handleSubmit((values) => {
+    onSave({
+      ...values,
+      name: values.name.trim(),
+      description: values.description?.trim() ?? '', // empty clears it
+    });
+    onClose();
   });
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      const result = await deleteRole(role.id);
-
-      if (!result.ok) {
-        // e.g. "Move or delete the roles under this one first."
-        toast.error(result.message);
-        setConfirmingDelete(false);
-        return;
-      }
-
-      toast.success(`Role "${role.name}" deleted.`);
-      onClose();
-    } catch {
-      toast.error('An unexpected error occurred while deleting the role.');
-    } finally {
-      setIsDeleting(false);
-    }
+  // A role still in use comes back with the server's reason as a toast (use-role-changes.ts).
+  const handleDelete = () => {
+    onDelete();
+    onClose();
   };
 
   return (
@@ -147,17 +108,11 @@ export function EditRoleDialog({
                 type="button"
                 variant="outline"
                 onClick={() => setConfirmingDelete(false)}
-                disabled={isSubmitting}
               >
                 Back
               </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Deleting...' : 'Delete Role'}
+              <Button type="button" variant="destructive" onClick={handleDelete}>
+                Delete Role
               </Button>
             </DialogFooter>
           </>
@@ -196,18 +151,17 @@ export function EditRoleDialog({
                 variant="ghost"
                 size="sm"
                 onClick={() => setConfirmingDelete(true)}
-                disabled={isSubmitting}
                 className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete
               </Button>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting || allowedParents.length === 0}>
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                <Button type="submit" disabled={allowedParents.length === 0}>
+                  Save Changes
                 </Button>
               </div>
             </DialogFooter>

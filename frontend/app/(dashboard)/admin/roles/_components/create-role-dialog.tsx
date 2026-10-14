@@ -3,7 +3,6 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { createRole } from '@/lib/api/actions/roles';
+import type { CreateRoleInput } from '@/lib/api/actions/roles';
 import type { Role } from '@/lib/api/queries/roles';
 import { zCreateRoleRequest } from '@/lib/api/schemas/roles';
 import {
@@ -31,6 +30,8 @@ interface CreateRoleDialogProps {
   roles: Role[];
   callerOrgRoleId?: string | null;
   callerOrgPermissions?: string[];
+  /** Adds the role to the tree at once; the server's answer comes later (use-role-changes.ts). */
+  onCreate: (input: CreateRoleInput) => void;
 }
 
 export function CreateRoleDialog({
@@ -39,6 +40,7 @@ export function CreateRoleDialog({
   roles,
   callerOrgRoleId,
   callerOrgPermissions = [],
+  onCreate,
 }: CreateRoleDialogProps) {
   // Parent picker: own org role + roles with manageable: true
   const allowedParents = roles.filter(
@@ -60,27 +62,15 @@ export function CreateRoleDialog({
     resolver: zodResolver(zCreateRoleRequest),
     defaultValues: emptyForm,
   });
-  const isSubmitting = form.formState.isSubmitting;
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      const result = await createRole({
-        ...values,
-        name: values.name.trim(),
-        description: values.description?.trim() || undefined,
-      });
-
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-
-      toast.success(`Role "${result.data.name}" created successfully.`);
-      form.reset(emptyForm);
-      onOpenChange(false);
-    } catch {
-      toast.error('An unexpected error occurred while creating the role.');
-    }
+  const onSubmit = form.handleSubmit((values) => {
+    onCreate({
+      ...values,
+      name: values.name.trim(),
+      description: values.description?.trim() || undefined,
+    });
+    form.reset(emptyForm);
+    onOpenChange(false);
   });
 
   return (
@@ -109,12 +99,11 @@ export function CreateRoleDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || allowedParents.length === 0}>
-              {isSubmitting ? 'Creating...' : 'Create Role'}
+            <Button type="submit" disabled={allowedParents.length === 0}>
+              Create Role
             </Button>
           </DialogFooter>
         </form>

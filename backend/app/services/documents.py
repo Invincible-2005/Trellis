@@ -30,6 +30,7 @@ from typing_extensions import TypedDict
 
 from app.core.errors import api_error
 from app.models.document import Document, DocumentChunk
+from app.models.organization import OrgMember
 from app.models.role import Role
 from app.models.team import Team
 from app.schemas.documents import (
@@ -39,7 +40,7 @@ from app.schemas.documents import (
     TagTarget,
     UpdateDocumentRequest,
 )
-from app.scope.resolver import AccessScope
+from app.scope.resolver import AccessScope, resolve_scope
 from app.services.embeddings import embed_query
 from app.services.ingestion import is_allowed_file_url
 
@@ -59,6 +60,53 @@ def _visible(model, scope: AccessScope):
             and_(model.scope_type == "team", model.team_id.in_(list(scope.viewable_team_ids))),
         ),
     )
+
+
+class SharedDocument(TypedDict):
+    title: str
+    audience: str       # "whole org", "role TEST-Employee", "team Alpha"
+    status: str         # processing | ready | failed
+
+
+async def documents_visible_to(
+    db: AsyncSession, scope: AccessScope, user_id: uuid.UUID
+) -> Optional[list[SharedDocument]]:
+    """
+    Which documents another org member can see, limited to documents the caller
+    can see too (D53). Follows the role tree: for someone below the caller it is
+    their whole list; for anyone else it never reveals a document the caller
+    couldn't open. The person's access is their own resolve_scope().
+
+    Returns None when the person isn't in the caller's org.
+    """
+    in_org = await db.scalar(
+        select(OrgMember.user_id).where(OrgMember.user_id == user_id, OrgMember.org_id == scope.org_id)
+    )
+    if in_org is None:
+        return None
+    person = await resolve_scope(user_id, scope.org_id, db)
+
+    rows = (
+        await db.execute(
+            select(Document.title, Document.scope_type, Document.status, Role.name, Team.name)
+            .outerjoin(Role, Role.id == Document.role_id)
+            .outerjoin(Team, Team.id == Document.team_id)
+            .where(_visible(Document, scope), _visible(Document, person))
+            .order_by(Document.title)
+        )
+    ).all()
+    return [
+        {"title": title, "audience": _audience(scope_type, role_name, team_name), "status": status_}
+        for title, scope_type, status_, role_name, team_name in rows
+    ]
+
+
+def _audience(scope_type: str, role_name: Optional[str], team_name: Optional[str]) -> str:
+    if scope_type == "role":
+        return f"role {role_name}"
+    if scope_type == "team":
+        return f"team {team_name}"
+    return "whole org"
 
 
 def can_place(

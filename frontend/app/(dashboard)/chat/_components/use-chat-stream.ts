@@ -40,6 +40,8 @@ export const STEP_LABELS: Record<string, string> = {
   searching_documents: "Searching documents…",
   looking_up_tasks: "Looking up tasks…",
   looking_up_teams: "Looking up teams…",
+  looking_up_people: "Looking up people…",
+  checking_document_access: "Checking document access…",
   grading_relevance: "Checking the results…",
   rewriting_query: "Searching again…",
   writing_answer: "Writing the answer…",
@@ -167,16 +169,28 @@ export function useChatStream(initialMessages: ChatMessageView[] = []) {
   );
 
   /**
-   * Send `text` to chat `chatId` and stream the answer into `messages`.
+   * Send `text` and stream the answer into `messages`. `chat` is the chat's id, or (for a
+   * new chat) a function that creates it: the message shows at once either way, and the
+   * chat is created behind it (trellis/12 D42, D50).
    * Returns false when the message was refused before answering (a toast shows why).
    */
   const send = useCallback(
-    async (chatId: string, text: string): Promise<boolean> => {
+    async (chat: string | (() => Promise<string>), text: string): Promise<boolean> => {
       setMessages((current) => [
         ...current,
         { role: "user", content: text, citations: [] },
         { role: "assistant", content: "", citations: [], pending: true },
       ]);
+      setIsAnswering(true); // no second message while the chat is being created
+      let chatId: string;
+      try {
+        chatId = typeof chat === "string" ? chat : await chat();
+      } catch {
+        // Creating the chat failed (its toast is already shown): take the message back
+        setMessages((current) => current.slice(0, -2));
+        setIsAnswering(false);
+        return false;
+      }
       const refused = await stream(chatId, { message: text });
       if (refused) {
         setMessages((current) => current.slice(0, -2)); // take the message back

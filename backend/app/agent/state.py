@@ -130,8 +130,14 @@ class AgentState(TypedDict):
 
     rewrite_count : int
         Incremented each time the Query Rewrite Node fires (search_documents
-        only). If rewrite_count >= 2 and chunks are still not relevant → plain
-        LLM refusal, no tools bound. (Ticket 04: max 2 rewrites.)
+        only). If rewrite_count >= 2 and chunks are still not relevant: plain
+        LLM refusal, no tools bound, unless other lookups ran this turn (D52).
+        (Ticket 04: max 2 rewrites.)
+
+    documents_exhausted : bool
+        Set when the document searches failed after the rewrites but other
+        lookups (people, tasks, teams) ran this turn (D52). The read agent then
+        answers from those, without the search tool, and says no documents matched.
 
     step_count : int
         Incremented on every tool call by the read or write agent.
@@ -157,6 +163,7 @@ class AgentState(TypedDict):
     # ── Loop guards (conditional edge inputs) ─────────────────────────────────
     rewrite_count: int
     step_count: int
+    documents_exhausted: bool
 
 
 def new_turn_input(message: str) -> dict:
@@ -174,4 +181,5 @@ def new_turn_input(message: str) -> dict:
         "pending_action": None,
         "rewrite_count": 0,
         "step_count": 0,
+        "documents_exhausted": False,
     }

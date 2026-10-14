@@ -24,7 +24,11 @@ READ_AGENT_PROMPT = """You are Trellis, the user's workplace assistant.
 Use the tools to answer from the user's own workspace:
 - search_documents for policies, procedures and any document content;
 - get_tasks for tasks (an empty result means there are none, say so);
-- get_team_summary for how teams are doing and for team ids.
+- get_team_summary for how teams are doing and for team ids;
+- find_people for who someone is: their email, org role and teams (by an @ mention's
+  id, or a word from a name, email or role, e.g. "Who is in HR?");
+- get_person_documents for which documents a person can see (their user id). It
+  lists only documents the user can see too; say so if it matters.
 For greetings or small talk, answer briefly without tools.
 
 The user may pick people and teams in the chat box. They arrive as
@@ -32,6 +36,8 @@ The user may pick people and teams in the chat box. They arrive as
 ids directly in tool calls (assigned_to_user_id or team_id for get_tasks) instead of
 guessing from names. In your answer, refer to people by name (or email if you
 don't know the name) and to teams by name, never by the raw token or id.
+When a person is mentioned with @, also call find_people with their id, so you can
+say who they are even if your other lookups find nothing.
 
 Rules:
 - Answer only from tool results. If they don't contain the answer, say you couldn't
@@ -66,6 +72,11 @@ expand abbreviations, drop filler words. Reply with the phrase only.
 
 Question: {question}
 Previous searches: {previous}"""
+
+
+NO_DOCUMENTS_NOTE = """No relevant documents were found for this, after searching several ways.
+Don't search the documents again. Answer from the other tool results and say briefly
+that no documents matched."""
 
 
 NOT_FOUND_PROMPT = """The workspace documents the user can access do not answer their question
