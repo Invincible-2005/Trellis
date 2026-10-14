@@ -90,6 +90,21 @@ class UpdateMemberRequest(BaseModel):
     role_id: Optional[UUID]
 
 
+class PersonTeam(BaseModel):
+    team_name: str
+    role_name: str
+
+
+class DirectoryPerson(BaseModel):
+    """One person in the chat's company directory (D51). Teams: only the ones the caller can see (D13)."""
+
+    user_id: UUID
+    name: str
+    email: str
+    org_role_name: Optional[str] = None
+    teams: List[PersonTeam] = []
+
+
 class AddMemberResponse(AppBaseModel):
     # "added": had a Trellis account, now in the org (member is set).
     # "invited": Clerk emailed an invite (invitation is set), applied on their first visit.

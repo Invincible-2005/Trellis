@@ -4975,6 +4975,11 @@
           "email": {
             "type": "string",
             "title": "Email"
+          },
+          "on_my_team": {
+            "type": "boolean",
+            "title": "On My Team",
+            "default": false
           }
         },
         "type": "object",
@@ -4984,7 +4989,7 @@
           "email"
         ],
         "title": "MentionPerson",
-        "description": "`@` in the chat box (D43): picked by email, sent with the exact id."
+        "description": "`@` in the chat box (D43): picked by email, sent with the exact id. Every org member (D51)."
       },
       "MentionTeam": {
         "properties": {
@@ -5029,7 +5034,7 @@
           "teams"
         ],
         "title": "MentionsResponse",
-        "description": "Only teams the user can see (D13) and the people on them."
+        "description": "Every org member, your teammates first (D51); only teams the user can see (D13)."
       },
       "OrgOverview": {
         "properties": {

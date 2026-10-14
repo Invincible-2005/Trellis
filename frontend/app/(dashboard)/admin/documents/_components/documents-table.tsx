@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { toast } from "sonner";
 import {
   AlertCircle,
   Building2,
@@ -30,26 +29,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { checkProcessingDocuments, deleteDocument } from "@/lib/api/actions/documents";
+import { checkProcessingDocuments } from "@/lib/api/actions/documents";
 import type { Document, DocumentTagOptions } from "@/lib/api/queries/documents";
 import { EditDocumentDialog } from "./edit-document-dialog";
+import { useDocumentChanges, type DocumentRow } from "./use-document-changes";
 
 interface DocumentsTableProps {
-  documents: Document[];
+  documents: DocumentRow[];
   tagOptions: DocumentTagOptions;
 }
 
 export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTableProps) {
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [docToEdit, setDocToEdit] = useState<Document | null>(null);
+  const { remove, edit } = useDocumentChanges();
 
   // While a document is still being indexed, check every 5 s with ONE request. When one
   // has finished, the Server Action refreshes the page itself, so the new status arrives in
   // its reply; no router.refresh() here (it collides with Server Action updates and freezes
   // the router). Ids joined into a string so the timer only restarts when the set changes.
   const processingIds = docs
-    .filter((d) => d.status === "processing")
+    .filter((d) => d.status === "processing" && !d.pending) // a "Saving…" row has no real id yet
     .map((d) => d.id)
     .join(",");
 
@@ -92,7 +92,15 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
     return null;
   };
 
-  const getStatusBadge = (doc: Document) => {
+  const getStatusBadge = (doc: DocumentRow) => {
+    if (doc.pending) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Saving…
+        </span>
+      );
+    }
     if (doc.status === "processing") {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
@@ -132,23 +140,11 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
     return null;
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!docToDelete) return;
-    setIsDeleting(true);
-    try {
-      const res = await deleteDocument(docToDelete.id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-      // deleteDocument refreshes /admin/documents, so the row disappears by itself.
-      toast.success("Document deleted.");
-      setDocToDelete(null);
-    } catch {
-      toast.error("Failed to delete document.");
-    } finally {
-      setIsDeleting(false);
-    }
+    // The row disappears at once; the server's answer comes later (use-document-changes.ts).
+    remove.mutate(docToDelete);
+    setDocToDelete(null);
   };
 
   if (docs.length === 0) {
@@ -179,7 +175,10 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
             </thead>
             <tbody className="divide-y divide-border">
               {docs.map((doc) => (
-                <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={doc.id}
+                  className={doc.pending ? "opacity-60" : "hover:bg-muted/30 transition-colors"}
+                >
                   {/* Title & Type */}
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-0.5">
@@ -267,6 +266,7 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
           key={docToEdit.id}
           document={docToEdit}
           tagOptions={tagOptions}
+          onSave={(input) => edit.mutate({ document: docToEdit, input })}
           onClose={() => setDocToEdit(null)}
         />
       )}
@@ -282,21 +282,11 @@ export function DocumentsTable({ documents: docs, tagOptions }: DocumentsTablePr
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDocToDelete(null)}
-              disabled={isDeleting}
-            >
+            <Button type="button" variant="outline" onClick={() => setDocToDelete(null)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
+            <Button type="button" variant="destructive" onClick={handleDelete}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

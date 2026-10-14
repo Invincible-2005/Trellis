@@ -1083,7 +1083,7 @@ export interface components {
         };
         /**
          * MentionPerson
-         * @description `@` in the chat box (D43): picked by email, sent with the exact id.
+         * @description `@` in the chat box (D43): picked by email, sent with the exact id. Every org member (D51).
          */
         MentionPerson: {
             /**
@@ -1095,6 +1095,11 @@ export interface components {
             name: string;
             /** Email */
             email: string;
+            /**
+             * On My Team
+             * @default false
+             */
+            on_my_team: boolean;
         };
         /**
          * MentionTeam
@@ -1111,7 +1116,7 @@ export interface components {
         };
         /**
          * MentionsResponse
-         * @description Only teams the user can see (D13) and the people on them.
+         * @description Every org member, your teammates first (D51); only teams the user can see (D13).
          */
         MentionsResponse: {
             /** People */

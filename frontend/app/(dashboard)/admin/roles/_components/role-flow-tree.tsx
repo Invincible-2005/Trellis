@@ -15,9 +15,11 @@ import { Plus, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { Role } from '@/lib/api/queries/roles';
+import { useServerData } from '@/lib/query/use-server-data';
 import { RoleNode, type RoleNodeData } from './role-node';
 import { CreateRoleDialog } from './create-role-dialog';
 import { EditRoleDialog } from './edit-role-dialog';
+import { ROLES_KEY, useRoleChanges, type RoleRow } from './use-role-changes';
 
 interface RoleFlowTreeProps {
   roles: Role[];
@@ -34,9 +36,9 @@ const HORIZONTAL_GAP = 50;
 const VERTICAL_GAP = 180;
 
 /** Tree layout from the flat list: each role sits centred above its own sub-roles. */
-function layoutTree(roles: Role[]): { nodes: Node<RoleNodeData>[]; edges: Edge[] } {
+function layoutTree(roles: RoleRow[]): { nodes: Node<RoleNodeData>[]; edges: Edge[] } {
   const ids = new Set(roles.map((r) => r.id));
-  const children = new Map<string, Role[]>();
+  const children = new Map<string, RoleRow[]>();
   for (const role of roles) {
     if (role.parent_role_id && ids.has(role.parent_role_id)) {
       children.set(role.parent_role_id, [...(children.get(role.parent_role_id) ?? []), role]);
@@ -49,7 +51,7 @@ function layoutTree(roles: Role[]): { nodes: Node<RoleNodeData>[]; edges: Edge[]
   let nextColumn = 0;
 
   // A role with no sub-roles takes the next free column; a parent sits midway over its children.
-  const place = (role: Role): number => {
+  const place = (role: RoleRow): number => {
     const kids = children.get(role.id) ?? [];
     const kidColumns = kids.map(place);
     const column =
@@ -78,10 +80,13 @@ function layoutTree(roles: Role[]): { nodes: Node<RoleNodeData>[]; edges: Edge[]
 }
 
 export function RoleFlowTree({
-  roles,
+  roles: serverRoles,
   callerOrgRoleId,
   callerOrgPermissions = [],
 }: RoleFlowTreeProps) {
+  // The server's list, kept in TanStack so changes show instantly (use-role-changes.ts).
+  const roles = useServerData<RoleRow[]>(ROLES_KEY, serverRoles);
+  const { create, edit, remove } = useRoleChanges();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const { resolvedTheme } = useTheme();
@@ -169,12 +174,15 @@ export function RoleFlowTree({
         roles={roles}
         callerOrgRoleId={callerOrgRoleId}
         callerOrgPermissions={callerOrgPermissions}
+        onCreate={(input) => create.mutate(input)}
       />
       {editingRole && (
         <EditRoleDialog
           key={editingRole.id}
           role={editingRole}
           roles={roles}
+          onSave={(input) => edit.mutate({ role: editingRole, input })}
+          onDelete={() => remove.mutate(editingRole)}
           onClose={() => setEditingRole(null)}
           callerOrgRoleId={callerOrgRoleId}
           callerOrgPermissions={callerOrgPermissions}

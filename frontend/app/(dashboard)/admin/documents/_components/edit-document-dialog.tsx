@@ -3,7 +3,6 @@
 import React from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import { Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { updateDocument, type UpdateDocumentInput } from "@/lib/api/actions/documents";
+import type { UpdateDocumentInput } from "@/lib/api/actions/documents";
 import type { Document, DocumentTagOptions } from "@/lib/api/queries/documents";
 import { zEditDocumentForm } from "@/lib/api/schemas/documents";
 import { TagScopeSelect } from "./tag-scope-select";
@@ -26,10 +25,12 @@ interface EditDocumentDialogProps {
   /** A row with deletable: true (trellis/12 D39: you may edit what you may delete). */
   document: Document;
   tagOptions: DocumentTagOptions;
+  /** Shows the change at once; the server's answer comes later (use-document-changes.ts). */
+  onSave: (input: UpdateDocumentInput) => void;
   onClose: () => void;
 }
 
-export function EditDocumentDialog({ document, tagOptions, onClose }: EditDocumentDialogProps) {
+export function EditDocumentDialog({ document, tagOptions, onSave, onClose }: EditDocumentDialogProps) {
   const currentTargetId = document.role_id ?? document.team_id ?? undefined;
 
   // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
@@ -43,7 +44,6 @@ export function EditDocumentDialog({ document, tagOptions, onClose }: EditDocume
       team_id: document.team_id ?? undefined,
     },
   });
-  const isSubmitting = form.formState.isSubmitting;
   const [title, description, scopeType, roleId, teamId] = useWatch({
     control: form.control,
     name: ["title", "description", "scope_type", "role_id", "team_id"],
@@ -61,7 +61,7 @@ export function EditDocumentDialog({ document, tagOptions, onClose }: EditDocume
     audienceChanged;
 
   // `values` is already checked (title trimmed, a role or team picked for that audience).
-  const handleSave = form.handleSubmit(async (values) => {
+  const handleSave = form.handleSubmit((values) => {
     // Send only what changed, so a rename never touches the audience.
     const input: UpdateDocumentInput = {};
     if (values.title !== document.title) input.title = values.title;
@@ -73,21 +73,8 @@ export function EditDocumentDialog({ document, tagOptions, onClose }: EditDocume
       input.team_id = values.scope_type === "team" ? values.team_id : undefined;
     }
 
-    try {
-      const result = await updateDocument(document.id, input);
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-      toast.success(
-        audienceChanged
-          ? "Document updated. The new audience applies to the chat right away."
-          : "Document updated."
-      );
-      onClose();
-    } catch {
-      toast.error("An unexpected error occurred while saving the document.");
-    }
+    onSave(input);
+    onClose();
   });
 
   return (
@@ -158,11 +145,11 @@ export function EditDocumentDialog({ document, tagOptions, onClose }: EditDocume
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !changed}>
-              {isSubmitting ? "Saving..." : "Save Changes"}
+            <Button type="submit" disabled={!changed}>
+              Save Changes
             </Button>
           </DialogFooter>
         </form>

@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, FileUp, Loader2 } from "lucide-react";
+import { ArrowLeft, FileUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,11 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { createDocument } from "@/lib/api/actions/documents";
 import type { DocumentTagOptions } from "@/lib/api/queries/documents";
 import { zUploadDocumentForm } from "@/lib/api/schemas/documents";
 import { UploadDropzone } from "@/lib/uploadthing";
 import { TagScopeSelect } from "./tag-scope-select";
+import { useDocumentChanges } from "./use-document-changes";
 
 interface DocUploadDropzoneProps {
   open: boolean;
@@ -74,7 +74,7 @@ export function DocUploadDropzone({
     resolver: zodResolver(zUploadDocumentForm),
     defaultValues: emptyForm(),
   });
-  const isSubmitting = form.formState.isSubmitting;
+  const { create } = useDocumentChanges();
   const [scopeType, roleId, teamId] = useWatch({
     control: form.control,
     name: ["scope_type", "role_id", "team_id"],
@@ -127,27 +127,16 @@ export function DocUploadDropzone({
   };
 
   // `values` is already checked (title trimmed, a role or team picked for that audience).
-  const handleSubmit = form.handleSubmit(async (values) => {
-    try {
-      const result = await createDocument({
-        ...values,
-        description: values.description?.trim() || undefined,
-        role_id: values.scope_type === "role" ? values.role_id : undefined,
-        team_id: values.scope_type === "team" ? values.team_id : undefined,
-      });
-
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-
-      toast.success("Document uploaded! Processing and indexing chunks...");
-      // createDocument already refreshes the page; a router.refresh() here collides with
-      // its update and freezes the page's router.
-      handleDialogChange(false);
-    } catch {
-      toast.error("Failed to register the document with the server.");
-    }
+  // The file is already in UploadThing; registering it is instant: the dialog closes and a
+  // greyed "Saving…" row appears until the server answers (use-document-changes.ts).
+  const handleSubmit = form.handleSubmit((values) => {
+    create.mutate({
+      ...values,
+      description: values.description?.trim() || undefined,
+      role_id: values.scope_type === "role" ? values.role_id : undefined,
+      team_id: values.scope_type === "team" ? values.team_id : undefined,
+    });
+    handleDialogChange(false);
   });
 
   return (
@@ -249,7 +238,6 @@ export function DocUploadDropzone({
                 variant="ghost"
                 size="sm"
                 onClick={() => setStep(1)}
-                disabled={isSubmitting}
                 className="flex items-center gap-1.5"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -260,17 +248,10 @@ export function DocUploadDropzone({
                   type="button"
                   variant="outline"
                   onClick={() => handleDialogChange(false)}
-                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
-                  ) : (
-                    "Save & Index"
-                  )}
-                </Button>
+                <Button type="submit">Save &amp; Index</Button>
               </div>
             </DialogFooter>
           </form>

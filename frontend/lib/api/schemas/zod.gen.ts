@@ -309,12 +309,13 @@ export const zMemberListResponse = z.object({
 /**
  * MentionPerson
  *
- * `@` in the chat box (D43): picked by email, sent with the exact id.
+ * `@` in the chat box (D43): picked by email, sent with the exact id. Every org member (D51).
  */
 export const zMentionPerson = z.object({
     id: z.uuid(),
     name: z.string(),
-    email: z.string()
+    email: z.string(),
+    on_my_team: z.boolean().optional().default(false)
 });
 
 /**
@@ -330,7 +331,7 @@ export const zMentionTeam = z.object({
 /**
  * MentionsResponse
  *
- * Only teams the user can see (D13) and the people on them.
+ * Every org member, your teammates first (D51); only teams the user can see (D13).
  */
 export const zMentionsResponse = z.object({
     people: z.array(zMentionPerson),

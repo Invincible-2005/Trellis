@@ -43,7 +43,7 @@ frontend/
 │   │       └── page.tsx                          # Server Component: POST /api/v1/orgs/provision → redirect('/dashboard')
 │   │
 │   ├── (dashboard)/                              # Authenticated application shell
-│   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check
+│   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check; wraps everything in QueryProvider keyed by org (D50, 2026-10-14)
 │   │   ├── _components/                          # Shell-level private components
 │   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar; collapse button fixed top-left, <OrganizationSwitcher /> beside it (2026-10-11)
 │   │   │   ├── app-header.tsx                    # Breadcrumbs, Active Role badge, Command search trigger
@@ -166,6 +166,10 @@ frontend/
 │   │       ├── zod.gen.ts                        # Auto-generated from openapi.json by `pnpm api:generate`; never edit, never import directly
 │   │       ├── shared.ts                         # Friendly error wording (z.config), firstError() for toasts, emptyAsNull() for "None" pickers
 │   │       └── roles.ts, members.ts, teams.ts, tasks.ts, documents.ts, chat.ts, orgs.ts  # that area's generated schemas + form versions (e.g. zInviteMemberForm)
+│   ├── query/                                    # TanStack Query, only for instant (optimistic) changes (trellis/12 D50, added 2026-10-14)
+│   │   ├── provider.tsx                          # QueryProvider: one cache per tab (fresh per org); never fetches on its own
+│   │   ├── use-server-data.ts                    # useServerData(key, serverData): page data from the Server Component → cache; the server's fresh copy wins
+│   │   └── action.ts                             # fromAction(action): a Server Action's { ok: false, message } becomes a thrown error, so onError rolls back
 │   ├── middleware/                               # Arcjet request protection (trellis/12 D27, added 2026-10-10)
 │   │   ├── arcjet.ts                             # All rules + per-user limits (read, write, heavyRead, heavyWrite)
 │   │   ├── gate.ts                               # gate(): front gate run by proxy.ts (shield, bots, read limit)

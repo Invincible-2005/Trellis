@@ -4,7 +4,8 @@
 // assistant answers. Messages over 4,000 characters are refused by the backend
 // (trellis/12 D21), so a counter shows near the limit and Send is disabled past it.
 //
-// Mentions (D43): at the start of a word, `@` lists people and `/` lists teams.
+// Mentions (D43): at the start of a word, `@` lists people (everyone in the org,
+// your teammates first, D51) and `/` lists teams.
 // The box shows "@riya@acme.com" / "/Team Alpha"; on send each picked mention is
 // swapped for its token with the exact id (mentions.ts).
 
@@ -59,7 +60,14 @@ export function ChatInputBox({ value, onChange, onSend, disabled, mentions }: Ch
       return mentions.people
         .filter((p) => p.name.toLowerCase().includes(query.search) || p.email.toLowerCase().includes(query.search))
         .slice(0, MAX_OPTIONS)
-        .map((p) => ({ id: p.id, kind: "user", label: p.name, detail: p.email, display: `@${p.email}` }));
+        .map((p) => ({
+          id: p.id,
+          kind: "user",
+          label: p.name,
+          detail: p.email,
+          display: `@${p.email}`,
+          group: p.on_my_team ? "Your teams" : "Others in the org",
+        }));
     }
     return mentions.teams
       .filter((t) => t.name.toLowerCase().includes(query.search))
