@@ -19,10 +19,14 @@ export const zActiveOrgPermissions = z.object({
     admin_tabs: z.array(z.enum([
         'roles',
         'members',
-        'documents',
-        'strikes'
+        'documents'
     ])).optional(),
-    can_open_admin: z.boolean()
+    can_open_admin: z.boolean(),
+    feedback_tabs: z.array(z.enum([
+        'give_strike',
+        'give_commendation',
+        'review_appeals'
+    ])).optional()
 });
 
 /**
@@ -41,6 +45,13 @@ export const zAddMemberRequest = z.object({
 export const zAddTeamMemberRequest = z.object({
     user_id: z.uuid(),
     role_id: z.uuid()
+});
+
+/**
+ * AppealStrikeRequest
+ */
+export const zAppealStrikeRequest = z.object({
+    appeal_notes: z.string().min(5).max(1000)
 });
 
 /**
@@ -105,6 +116,36 @@ export const zCitation = z.object({
 });
 
 /**
+ * AppealResponse
+ *
+ * An appeal you may decide (D6, D55: never your own strike, given or received).
+ */
+export const zAppealResponse = z.object({
+    id: z.uuid(),
+    team_id: z.uuid(),
+    team_name: z.string(),
+    given_by_user_id: z.uuid(),
+    given_by_name: z.string(),
+    given_to_user_id: z.uuid(),
+    given_to_name: z.string(),
+    reason: z.string(),
+    status: z.enum([
+        'pending_agent_review',
+        'confirmed',
+        'appealed',
+        'dismissed'
+    ]),
+    escalated: z.boolean(),
+    created_at: z.iso.datetime({ offset: true, local: true }),
+    appeal_notes: z.string().nullish(),
+    reviewed_by_name: z.string().nullish(),
+    reviewed_at: z.iso.datetime({ offset: true, local: true }).nullish(),
+    can_appeal: z.boolean().optional().default(false),
+    policy_evaluation: z.string().nullish(),
+    policy_sources: z.array(zCitation).optional().default([])
+});
+
+/**
  * ChatMessage
  *
  * A question you asked, or the assistant's final answer (no tool steps).
@@ -128,6 +169,15 @@ export const zCommendationResponse = z.object({
     given_to_name: z.string(),
     reason: z.string(),
     created_at: z.iso.datetime({ offset: true, local: true })
+});
+
+/**
+ * CreateCommendationRequest
+ */
+export const zCreateCommendationRequest = z.object({
+    team_id: z.uuid(),
+    given_to_user_id: z.uuid(),
+    reason: z.string().min(5).max(1000)
 });
 
 /**
@@ -170,6 +220,15 @@ export const zCreateRoleRequest = z.object({
         'view_aggregate',
         'review_strike'
     ])).optional()
+});
+
+/**
+ * CreateStrikeRequest
+ */
+export const zCreateStrikeRequest = z.object({
+    team_id: z.uuid(),
+    given_to_user_id: z.uuid(),
+    reason: z.string().min(5).max(1000)
 });
 
 /**
@@ -248,6 +307,40 @@ export const zErrorDetail = z.object({
  */
 export const zErrorResponse = z.object({
     detail: zErrorDetail
+});
+
+/**
+ * FeedbackPerson
+ */
+export const zFeedbackPerson = z.object({
+    user_id: z.uuid(),
+    name: z.string(),
+    email: z.string(),
+    team_role_name: z.string()
+});
+
+/**
+ * FeedbackTeamOption
+ *
+ * One team in the Give form: who you may strike and who you may commend there.
+ */
+export const zFeedbackTeamOption = z.object({
+    team_id: z.uuid(),
+    team_name: z.string(),
+    strike_people: z.array(zFeedbackPerson).optional().default([]),
+    commend_people: z.array(zFeedbackPerson).optional().default([])
+});
+
+/**
+ * FeedbackOptionsResponse
+ */
+export const zFeedbackOptionsResponse = z.object({
+    tabs: z.array(z.enum([
+        'give_strike',
+        'give_commendation',
+        'review_appeals'
+    ])),
+    teams: z.array(zFeedbackTeamOption)
 });
 
 /**
@@ -441,6 +534,13 @@ export const zRenameChatRequest = z.object({
 });
 
 /**
+ * ReviewAppealRequest
+ */
+export const zReviewAppealRequest = z.object({
+    decision: z.enum(['uphold', 'dismiss'])
+});
+
+/**
  * RoleOption
  */
 export const zRoleOption = z.object({
@@ -487,6 +587,19 @@ export const zSendMessageRequest = z.object({
 });
 
 /**
+ * StrikePreviewResponse
+ *
+ * /feedback's check before Confirm (D54): the rules passed; nothing is saved yet.
+ */
+export const zStrikePreviewResponse = z.object({
+    team_name: z.string(),
+    given_to_name: z.string(),
+    active_strikes: z.int(),
+    will_escalate: z.boolean(),
+    policy: zPolicyCheck
+});
+
+/**
  * StrikeResponse
  */
 export const zStrikeResponse = z.object({
@@ -505,7 +618,21 @@ export const zStrikeResponse = z.object({
         'dismissed'
     ]),
     escalated: z.boolean(),
-    created_at: z.iso.datetime({ offset: true, local: true })
+    created_at: z.iso.datetime({ offset: true, local: true }),
+    appeal_notes: z.string().nullish(),
+    reviewed_by_name: z.string().nullish(),
+    reviewed_at: z.iso.datetime({ offset: true, local: true }).nullish(),
+    can_appeal: z.boolean().optional().default(false)
+});
+
+/**
+ * GivenFeedbackResponse
+ *
+ * What you gave, newest first (D54: only your own, not everything in your teams).
+ */
+export const zGivenFeedbackResponse = z.object({
+    strikes: z.array(zStrikeResponse),
+    commendations: z.array(zCommendationResponse)
 });
 
 /**

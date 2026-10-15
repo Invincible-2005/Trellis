@@ -3719,6 +3719,760 @@
         ]
       }
     },
+    "/api/v1/feedback/options": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Get Options",
+        "description": "The tabs you get on /feedback, and per team who you may strike or commend (the Give form's pickers).",
+        "operationId": "get_options_api_v1_feedback_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/strikes/check": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Check Strike",
+        "description": "The preview before Confirm: every rule of the real save, their active strike\ncount, and the policy check against the documents you can see (D46, a\nwarning only). Nothing is saved.",
+        "operationId": "check_strike_api_v1_feedback_strikes_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStrikeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrikePreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/strikes": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Create Strike",
+        "description": "Save a strike after Confirm. Rules are checked again; the policy result of\nyour preview (same person, team and reason, last 10 minutes) is kept with it.",
+        "operationId": "create_strike_api_v1_feedback_strikes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStrikeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrikeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/commendations": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Create Commendation",
+        "description": "Commend someone ranked below you in that team (D5: rank only, no permission).",
+        "operationId": "create_commendation_api_v1_feedback_commendations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommendationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommendationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/given": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "List Given",
+        "description": "Strikes (every status) and commendations you gave, newest first.",
+        "operationId": "list_given_api_v1_feedback_given_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GivenFeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/appeals": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "List Appeals",
+        "description": "Appeals waiting for your decision, oldest first: review_strike for that team,\nand you neither gave nor received the strike (D6, D55).",
+        "operationId": "list_appeals_api_v1_feedback_appeals_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AppealResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Appeals Api V1 Feedback Appeals Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/appeals/{strike_id}/decision": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Decide Appeal",
+        "description": "Uphold (the strike stays) or dismiss (it stops counting) an appeal.",
+        "operationId": "decide_appeal_api_v1_feedback_appeals__strike_id__decision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "strike_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Strike Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAppealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrikeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback/strikes/{strike_id}/appeal": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Appeal",
+        "description": "Appeal a strike you received, once, with a note (the dashboard's Appeal button).",
+        "operationId": "appeal_api_v1_feedback_strikes__strike_id__appeal_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "strike_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Strike Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppealStrikeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrikeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3814,8 +4568,7 @@
               "enum": [
                 "roles",
                 "members",
-                "documents",
-                "strikes"
+                "documents"
               ]
             },
             "type": "array",
@@ -3824,6 +4577,18 @@
           "can_open_admin": {
             "type": "boolean",
             "title": "Can Open Admin"
+          },
+          "feedback_tabs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "give_strike",
+                "give_commendation",
+                "review_appeals"
+              ]
+            },
+            "type": "array",
+            "title": "Feedback Tabs"
           }
         },
         "type": "object",
@@ -3918,6 +4683,154 @@
         ],
         "title": "AddTeamMemberRequest",
         "description": "An existing org member (D25) and the team role to give them (D30)."
+      },
+      "AppealResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "given_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given By User Id"
+          },
+          "given_by_name": {
+            "type": "string",
+            "title": "Given By Name"
+          },
+          "given_to_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given To User Id"
+          },
+          "given_to_name": {
+            "type": "string",
+            "title": "Given To Name"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_agent_review",
+              "confirmed",
+              "appealed",
+              "dismissed"
+            ],
+            "title": "Status"
+          },
+          "escalated": {
+            "type": "boolean",
+            "title": "Escalated"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "appeal_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appeal Notes"
+          },
+          "reviewed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By Name"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "can_appeal": {
+            "type": "boolean",
+            "title": "Can Appeal",
+            "default": false
+          },
+          "policy_evaluation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Evaluation"
+          },
+          "policy_sources": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "title": "Policy Sources",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id",
+          "team_name",
+          "given_by_user_id",
+          "given_by_name",
+          "given_to_user_id",
+          "given_to_name",
+          "reason",
+          "status",
+          "escalated",
+          "created_at"
+        ],
+        "title": "AppealResponse",
+        "description": "An appeal you may decide (D6, D55: never your own strike, given or received)."
+      },
+      "AppealStrikeRequest": {
+        "properties": {
+          "appeal_notes": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Appeal Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "appeal_notes"
+        ],
+        "title": "AppealStrikeRequest"
       },
       "AuthContextResponse": {
         "properties": {
@@ -4313,6 +5226,33 @@
         "title": "ConfirmCard",
         "description": "A change the assistant prepared and is waiting to save (D22). The text is\nwritten by code from what will be saved, never by the AI (D45). Sent as the\nSSE `confirm` event and in ChatDetail.pending_action (so a reload shows it again)."
       },
+      "CreateCommendationRequest": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "given_to_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given To User Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "given_to_user_id",
+          "reason"
+        ],
+        "title": "CreateCommendationRequest"
+      },
       "CreateDocumentRequest": {
         "properties": {
           "title": {
@@ -4438,6 +5378,33 @@
           "parent_role_id"
         ],
         "title": "CreateRoleRequest"
+      },
+      "CreateStrikeRequest": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "given_to_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Given To User Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "given_to_user_id",
+          "reason"
+        ],
+        "title": "CreateStrikeRequest"
       },
       "CreateTaskRequest": {
         "properties": {
@@ -4765,6 +5732,125 @@
         ],
         "title": "ErrorResponse",
         "description": "The error body, published in OpenAPI so the frontend's generated types include it."
+      },
+      "FeedbackOptionsResponse": {
+        "properties": {
+          "tabs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "give_strike",
+                "give_commendation",
+                "review_appeals"
+              ]
+            },
+            "type": "array",
+            "title": "Tabs"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackTeamOption"
+            },
+            "type": "array",
+            "title": "Teams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tabs",
+          "teams"
+        ],
+        "title": "FeedbackOptionsResponse"
+      },
+      "FeedbackPerson": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "team_role_name": {
+            "type": "string",
+            "title": "Team Role Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "name",
+          "email",
+          "team_role_name"
+        ],
+        "title": "FeedbackPerson"
+      },
+      "FeedbackTeamOption": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "strike_people": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackPerson"
+            },
+            "type": "array",
+            "title": "Strike People",
+            "default": []
+          },
+          "commend_people": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackPerson"
+            },
+            "type": "array",
+            "title": "Commend People",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "team_name"
+        ],
+        "title": "FeedbackTeamOption",
+        "description": "One team in the Give form: who you may strike and who you may commend there."
+      },
+      "GivenFeedbackResponse": {
+        "properties": {
+          "strikes": {
+            "items": {
+              "$ref": "#/components/schemas/StrikeResponse"
+            },
+            "type": "array",
+            "title": "Strikes"
+          },
+          "commendations": {
+            "items": {
+              "$ref": "#/components/schemas/CommendationResponse"
+            },
+            "type": "array",
+            "title": "Commendations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strikes",
+          "commendations"
+        ],
+        "title": "GivenFeedbackResponse",
+        "description": "What you gave, newest first (D54: only your own, not everything in your teams)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -5198,6 +6284,23 @@
         ],
         "title": "RenameChatRequest"
       },
+      "ReviewAppealRequest": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "uphold",
+              "dismiss"
+            ],
+            "title": "Decision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ReviewAppealRequest"
+      },
       "RoleListResponse": {
         "properties": {
           "roles": {
@@ -5342,6 +6445,39 @@
         "title": "SendMessageRequest",
         "description": "Send exactly one of:\n- `message`: a new message. Over CHAT_MAX_MESSAGE_CHARS → 400 message_too_long\n  (D21). People and teams picked in the chat box arrive as `@[email](user:<id>)`\n  and `/[Team](team:<id>)` (D43). If a Confirm card is waiting, it is cancelled first.\n- `resume`: the click on a Confirm card (D22). 409 nothing_to_confirm when no\n  card is waiting (e.g. a second click, D45)."
       },
+      "StrikePreviewResponse": {
+        "properties": {
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "given_to_name": {
+            "type": "string",
+            "title": "Given To Name"
+          },
+          "active_strikes": {
+            "type": "integer",
+            "title": "Active Strikes"
+          },
+          "will_escalate": {
+            "type": "boolean",
+            "title": "Will Escalate"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PolicyCheck"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_name",
+          "given_to_name",
+          "active_strikes",
+          "will_escalate",
+          "policy"
+        ],
+        "title": "StrikePreviewResponse",
+        "description": "/feedback's check before Confirm (D54): the rules passed; nothing is saved yet."
+      },
       "StrikeResponse": {
         "properties": {
           "id": {
@@ -5398,6 +6534,45 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "appeal_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appeal Notes"
+          },
+          "reviewed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By Name"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "can_appeal": {
+            "type": "boolean",
+            "title": "Can Appeal",
+            "default": false
           }
         },
         "type": "object",

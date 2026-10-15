@@ -25,7 +25,7 @@ const LABEL_MAP: Record<string, string> = {
   admin: "Admin",
   roles: "Roles",
   members: "Members",
-  strikes: "Strikes",
+  feedback: "Feedback",
 }
 
 function isId(segment: string) {

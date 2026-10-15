@@ -58,7 +58,7 @@ frontend/
 │   │   │       ├── task-status-chart.tsx         # Client: the one Recharts bar chart (my tasks by status)
 │   │   │       ├── role-metrics-cards.tsx        # Team cards (D24) + org totals (view_aggregate only)
 │   │   │       ├── deadline-tracker.tsx          # Next 5 deadlines
-│   │   │       ├── personal-strikes-card.tsx     # My strikes (read-only; Appeal comes with /admin/strikes)
+│   │   │       ├── personal-strikes-card.tsx     # My strikes (teammates build it read-only first); Piyush + Claude add the Appeal button (rows with can_appeal → note dialog, zAppealForm → appealStrike) afterwards (2026-10-15, D54)
 │   │   │       └── commendations-card.tsx        # My latest 5 commendations
 │   │   │       Data: lib/api/queries/dashboard.ts (getDashboard, added 2026-10-13)
 │   │   │
@@ -105,6 +105,21 @@ frontend/
 │   │   │       ├── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
 │   │   │       └── confirm-action-card.tsx       # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
 │   │   │
+│   │   ├── feedback/                             # Route: /feedback (added 2026-10-15, trellis/12 D54; replaces /admin/strikes)
+│   │   │   ├── page.tsx                          # Shown if you can give a strike, commend someone or review appeals; loads options, given, appeals
+│   │   │   └── _components/                      # Layout settled 2026-10-15 (Piyush + Claude build it)
+│   │   │       ├── feedback-view.tsx             # Heading + shadcn Tabs: Give · Given by you · Appeals to review (count); only tabs you can use; ?tab= in the URL
+│   │   │       ├── give-feedback-form.tsx        # ONE form: Commendation / Strike switch (Strike only with give_strike), Team, Person, Reason (zGiveFeedbackForm).
+│   │   │       │                                 #   Strike: Check policy → policy box (reused from chat's confirm card) + escalation line → Confirm strike; any edit drops the check.
+│   │   │       │                                 #   Commendation: Give + "Are you sure?"
+│   │   │       ├── given-feedback-list.tsx       # Newest first; status label: commendation / active / appealed, waiting / upheld or dismissed by X
+│   │   │       ├── appeal-card.tsx               # Full card (no drawer): person, team, giver, date, escalated, reason, appeal note, saved policy check; Uphold / Dismiss with confirm
+│   │   │       ├── policy-check-box.tsx          # Green / amber / grey policy verdict + passages (Feedback's own copy of chat's box, Piyush 2026-10-15)
+│   │   │       ├── source-badge.tsx              # Clickable policy passage badge (own copy of chat's citation badge)
+│   │   │       └── use-feedback-changes.ts       # Instant changes (D50): decided appeal leaves the list, a new strike/commendation shows in Given
+│   │   │       Data: lib/api/queries/feedback.ts, lib/api/actions/feedback.ts, lib/api/schemas/feedback.ts (added 2026-10-15)
+│   │   │       Sidebar: "Feedback" link when auth/context feedback_tabs isn't empty (nav-items.tsx)
+│   │   │
 │   │   │   (organization/ (D34) dropped 2026-10-11 by trellis/12 D37: no documents page outside Admin)
 │   │   │
 │   │   └── admin/                                # Route: /admin/* (open if any tab is allowed; per-tab perms)
@@ -135,11 +150,7 @@ frontend/
 │   │       │       ├── doc-upload-dropzone.tsx   # Two-step dialog: Uploadthing dropzone → tag → createDocument
 │   │       │       ├── edit-document-dialog.tsx  # Edit title / description / who sees it (rows with deletable: true; D39, 2026-10-11)
 │   │       │       └── tag-scope-select.tsx      # Tag picker: whole org / a role / a team
-│   │       └── strikes/                          # Route: /admin/strikes
-│   │           ├── page.tsx                      # Strike appeal review & policy validation audit
-│   │           └── _components/
-│   │               ├── appeal-review-table.tsx   # Pending appeals for review_strike roles
-│   │               └── strike-audit-drawer.tsx   # Drawer showing agent RAG validation rationale
+│   │       (strikes/ tab dropped 2026-10-15, trellis/12 D54 → see /feedback above)
 │   │
 │   └── api/
 │       ├── uploadthing/                          # Added 2026-10-09 (documents effort)
@@ -162,6 +173,7 @@ frontend/
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
 │   │       (chat: queries/chat.ts getChats/getChat/getMentions, actions/chat.ts createChat/renameChat/deleteChat, 2026-10-12)
+│   │       (feedback: queries/feedback.ts getFeedbackOptions/getGivenFeedback/getAppeals, actions/feedback.ts checkStrike/giveStrike/giveCommendation/appealStrike/decideAppeal, schemas/feedback.ts zGiveFeedbackForm/zAppealForm, 2026-10-15, trellis/12 D54)
 │   │   └── schemas/                              # zod schemas for forms, one file per area (trellis/12 D49)
 │   │       ├── zod.gen.ts                        # Auto-generated from openapi.json by `pnpm api:generate`; never edit, never import directly
 │   │       ├── shared.ts                         # Friendly error wording (z.config), firstError() for toasts, emptyAsNull() for "None" pickers

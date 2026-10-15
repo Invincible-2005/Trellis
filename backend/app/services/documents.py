@@ -407,3 +407,45 @@ async def search_chunks(db: AsyncSession, scope: AccessScope, question: str, k: 
     ]
     hits.sort(key=lambda hit: hit["distance"])
     return hits
+
+
+async def visible_chunks(db: AsyncSession, scope: AccessScope, chunk_ids: list[str]) -> list[ChunkHit]:
+    """
+    These pieces (by id), keeping only the ones the user may see. Used to show a
+    strike's saved policy passages to an appeal reviewer (D6/D46): a passage
+    from a document the reviewer can't see is left out. Pieces of a deleted
+    document are simply gone.
+    """
+    ids = []
+    for chunk_id in chunk_ids or []:
+        try:
+            ids.append(uuid.UUID(str(chunk_id)))
+        except ValueError:
+            continue
+    if not ids:
+        return []
+    rows = (
+        await db.execute(
+            select(
+                DocumentChunk.id,
+                DocumentChunk.document_id,
+                Document.title,
+                DocumentChunk.chunk_index,
+                DocumentChunk.content,
+            )
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(DocumentChunk.id.in_(ids), _visible(DocumentChunk, scope))
+            .order_by(Document.title, DocumentChunk.chunk_index)
+        )
+    ).all()
+    return [
+        {
+            "chunk_id": str(row.id),
+            "document_id": str(row.document_id),
+            "title": row.title,
+            "chunk_index": row.chunk_index,
+            "text": row.content,
+            "distance": 0.0,
+        }
+        for row in rows
+    ]
