@@ -15,9 +15,10 @@ import { UserNav } from "./user-nav"
 
 interface AppSidebarProps {
   adminTabs: AdminTab[]
+  showFeedback: boolean
 }
 
-export function AppSidebar({ adminTabs }: AppSidebarProps) {
+export function AppSidebar({ adminTabs, showFeedback }: AppSidebarProps) {
   const { state, isMobile } = useSidebar()
   // Icon-only mode (desktop). On phones the sidebar is a full-width drawer.
   const compact = state === "collapsed" && !isMobile
@@ -37,7 +38,7 @@ export function AppSidebar({ adminTabs }: AppSidebarProps) {
             <OrgSwitcher compact />
           </div>
         )}
-        <NavItems adminTabs={adminTabs} />
+        <NavItems adminTabs={adminTabs} showFeedback={showFeedback} />
       </SidebarContent>
 
       <SidebarFooter className="border-t p-2">

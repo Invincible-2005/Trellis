@@ -29,6 +29,7 @@ from app.schemas.auth import (
     OrgSummary,
 )
 from app.scope.resolver import AccessScope, resolve_scope
+from app.services.feedback import feedback_tabs
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -151,6 +152,7 @@ async def _active_org_permissions(db: AsyncSession, scope: AccessScope) -> Activ
         viewable_team_ids=sorted(scope.viewable_team_ids),
         admin_tabs=tabs,
         can_open_admin=bool(tabs),
+        feedback_tabs=await feedback_tabs(db, scope),
     )
 
 
@@ -160,7 +162,8 @@ def _admin_tabs(scope: AccessScope) -> list[str]:
     own permission, org-wide unless noted. The backend checks every action anyway.
     No Teams tab: teams have their own /teams pages (D28). Documents is an admin
     tab again (D37, replacing D34's /organization page): only people who may
-    upload somewhere get a documents page at all.
+    upload somewhere get a documents page at all. No Strikes tab: strikes live
+    on /feedback (D54), whose tabs come from services/feedback.py.
     """
     tabs = []
     if scope.can_org("create_role"):
@@ -172,6 +175,4 @@ def _admin_tabs(scope: AccessScope) -> list[str]:
         "upload_document" in perms for perms in scope.permissions_by_team.values()
     ):
         tabs.append("documents")
-    if scope.can_org("review_strike"):
-        tabs.append("strikes")
     return tabs

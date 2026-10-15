@@ -26,7 +26,7 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 - **Org Context**: Managed via Clerk session state (NOT in the URL path). All app URLs are clean: `/dashboard`, `/tasks`, `/chat`, `/admin`.
 - **First-time / Org Switch Onboarding**: Standalone route outside authenticated layout: `/org-selection`.
 - **Tasks**: Summary widget on `/dashboard` + dedicated CRUD & filtering page on `/tasks`.
-- **Strikes & Appeals**: User's personal strikes shown on `/dashboard`; strike review & appeals in `/admin/strikes`.
+- **Strikes & Appeals**: User's personal strikes shown on `/dashboard`; ~~strike review & appeals in `/admin/strikes`~~ giving strikes, giving commendations and reviewing appeals on `/feedback` *(2026-10-15, trellis/12 D54)*.
 
 ### 2. Complete Route Map
 
@@ -47,6 +47,7 @@ The frontend is structured by auth state route groups: `app/(public)`, `app/(aut
 | `/teams/[teamId]` | `app/(dashboard)/teams/[teamId]/page.tsx` | RSC + Client dialogs | Members + tasks; Add member if `can("add_member", team)`, Create task if `can("assign_task", team)` (D28) |
 | ~~`/admin/teams`~~ | ~~`app/(admin)/admin/teams/page.tsx`~~ | | (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`) |
 | ~~`/admin/documents`~~ | ~~`app/(admin)/admin/documents/page.tsx`~~ | | (superseded 2026-10-11 by trellis/12 D34: uploads moved to `/organization`) |
-| `/admin/strikes` | `app/(admin)/admin/strikes/page.tsx` | RSC + Client dialogs | Admin shell. Strike appeal review & policy validation log |
+| ~~`/admin/strikes`~~ | ~~`app/(admin)/admin/strikes/page.tsx`~~ | | (superseded 2026-10-15 by trellis/12 D54 → `/feedback`) |
+| `/feedback` | `app/(dashboard)/feedback/page.tsx` | RSC + Client dialogs | Give a strike / give a commendation / appeals to review; shown if you can do at least one, tabs per ability *(added 2026-10-15, trellis/12 D54)* |
 | `/api/chat/sessions/[sessionId]/message` | `app/api/chat/sessions/[sessionId]/message/route.ts` | Route Handler (Node) | BFF SSE proxy to FastAPI `POST /api/v1/chat/sessions/{session_id}/message` *(path updated 2026-10-08, trellis/12 D2)* |
 

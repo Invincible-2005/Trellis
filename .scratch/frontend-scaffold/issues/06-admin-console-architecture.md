@@ -31,7 +31,7 @@ Decisions to lock:
 | `/admin/members` | `add_member` *(added 2026-10-09, trellis/12 D25)* |
 | ~~`/admin/teams`~~ | ~~`add_member` or `create_team`~~ (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`) |
 | `/admin/documents` | `upload_document` (org-wide **or on any team**) *(dropped by D34 and restored the same day by trellis/12 D37: people without upload permission get no documents page)* |
-| `/admin/strikes` | `review_strike` (org-level, or on any team: D6 2026-10-10) |
+| ~~`/admin/strikes`~~ | ~~`review_strike` (org-level, or on any team: D6 2026-10-10)~~ (superseded 2026-10-15 by trellis/12 D54: appeal review moved to the `/feedback` sidebar page) |
 
 - **Implementation:**
   - `app/(dashboard)/admin/layout.tsx` (a Server Component) calls a `cache()`-wrapped `getAuthContext()` → `GET /api/v1/auth/context`. If `active_org.can_open_admin` is false, it calls `redirect('/dashboard')`. ~~The tab bar shows exactly `active_org.admin_tabs`.~~ *(Superseded 2026-10-11 by trellis/12 D36: no tab bar; the layout is only the gate and renders `children`.)*
@@ -49,7 +49,7 @@ The Admin Console uses dedicated sub-routes wrapped by a shared `app/(dashboard)
 - `/admin/members`: Everyone in the org with their org role, pending invites, "Invite member" (email + optional role). **Change role** and **Remove** on rows with `manageable: true` (every role the person holds is below yours; trellis/12 D38, 2026-10-11). *Added 2026-10-09 (trellis/12 D25/D26); brief in `plans/member-management/frontend.md`.*
 - ~~`/admin/teams`: Team directory and member assignments (existing org members only, after D25)~~ (superseded 2026-10-10 by trellis/12 D28: team work moved to `/teams`)
 - `/admin/documents`: Policy/SOP documents you can see, uploader & tagging; **Edit** (title, description, who sees it) and **Delete** on rows with `deletable: true` (trellis/12 D23, D39) *(restored 2026-10-11 by trellis/12 D37 after D34 briefly moved it to `/organization`)*
-- `/admin/strikes`: Strike appeal reviews and audit log (D6: lists only appeals the viewer may review; the giver of a strike never reviews its appeal)
+- ~~`/admin/strikes`: Strike appeal reviews and audit log (D6: lists only appeals the viewer may review; the giver of a strike never reviews its appeal)~~ (superseded 2026-10-15 by trellis/12 D54 → `/feedback`; the D6 review rules are unchanged)
 ~~The shared admin layout provides top navigation tabs between these four surfaces so admins can switch contexts without re-fetching unrelated data.~~ *(Superseded 2026-10-11 by trellis/12 D36: the sidebar's Admin sub-list is the only admin navigation; the shared layout is just the permission gate.)*
 - `/admin` itself (`admin/page.tsx`): redirects to the first tab in `admin_tabs`.
 
@@ -79,4 +79,4 @@ Roles and Members followed this ticket and the briefs; the Documents tab followe
 
 - [x] **Making "share with a role" findable (Piyush, 2026-10-11):** Documents page and upload dialog in plain words ("Who should see this document?": Everyone / A role (and every role above it) / A team; table column "Shared with"; greyed "A role" explains it needs org-wide upload). Edit role dialog has **"Add a document for <role>"** (shown with org-wide `upload_document`) → `/admin/documents?role=<id>` opens the upload with that role picked.
 
-**Known, not a bug:** the Strikes link appears for people with `review_strike`, but `/admin/strikes` isn't built yet, so it shows a 404 until the strikes feature lands.
+**Known, not a bug:** the Strikes link appears for people with `review_strike`, but `/admin/strikes` isn't built yet, so it shows a 404 until the strikes feature lands. *(2026-10-15, D54: the link goes away; the Feedback sidebar item replaces it.)*

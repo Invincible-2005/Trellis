@@ -1,8 +1,8 @@
 """
 app/schemas/commendations.py — Commendation shapes (Ticket 05 §6, Ticket 12 D5)
 
-Used by the chat agent's give_commendation action today; a future
-/api/v1/commendations route (and the dashboard) reuse them.
+Used by the chat agent's give_commendation action, the dashboard, and the
+/feedback page (give + "given by you", D54).
 """
 from datetime import datetime
 from typing import Annotated

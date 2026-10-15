@@ -10,6 +10,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# /feedback tabs (D54). Defined here, not in schemas/feedback.py, because that
+# file imports the strike and commendation shapes, which import this file.
+# give_strike: give_strike in a team where someone ranks below you (D30)
+# give_commendation: someone on one of your teams ranks below you (D5: rank only)
+# review_appeals: review_strike org-wide or on any team (D6)
+FeedbackTab = Literal["give_strike", "give_commendation", "review_appeals"]
+
 
 class AppBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -66,8 +73,11 @@ class ActiveOrgPermissions(BaseModel):
     # and sidebar show exactly these; can_open_admin = at least one tab.
     # No "teams" tab since D28 (2026-10-10): teams live at /teams.
     # "documents" is back since D37 (2026-10-11, replacing D34's /organization page).
-    admin_tabs: List[Literal["roles", "members", "documents", "strikes"]] = Field(default_factory=list)
+    # No "strikes" tab since D54 (2026-10-15): strikes live on /feedback.
+    admin_tabs: List[Literal["roles", "members", "documents"]] = Field(default_factory=list)
     can_open_admin: bool
+    # /feedback tabs this user may use (D54); the sidebar shows Feedback when not empty.
+    feedback_tabs: List[FeedbackTab] = Field(default_factory=list)
 
 
 class AuthContextResponse(AppBaseModel):
