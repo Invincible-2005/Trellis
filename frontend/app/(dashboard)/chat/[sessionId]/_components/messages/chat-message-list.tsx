@@ -13,9 +13,9 @@ import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "./citation-badge";
 import { ConfirmActionCard } from "./confirm-action-card";
-import { splitMentions } from "./mentions";
+import { splitMentions } from "../mentions";
 import { ThinkingStepper } from "./thinking-stepper";
-import type { ChatMessageView, Citation } from "./use-chat-stream";
+import type { ChatMessageView, Citation } from "../use-chat-stream";
 
 const CITE_GROUP = /\[([^[\]]+)\]/g; // [3f9a12bc] or [3f9a12bc, 77aa01cd]
 const HEX8 = /^[0-9a-f]{8}$/i;

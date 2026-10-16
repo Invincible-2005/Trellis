@@ -8,7 +8,7 @@
 import { notFound } from "next/navigation";
 
 import { getChat, getMentions } from "@/lib/api/queries/chat";
-import { ChatConversation } from "../_components/chat-conversation";
+import { ChatConversation } from "./_components/chat-conversation";
 
 export default async function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;

@@ -123,9 +123,13 @@ def context_queries(monkeypatch):
     async def no_invitations(db, email):
         return []
 
+    async def no_feedback_tabs(db, scope):
+        return []
+
     monkeypatch.setattr(auth_routes, "ensure_org_member", ensure)
     monkeypatch.setattr(auth_routes, "_my_orgs", my_orgs)
     monkeypatch.setattr(auth_routes, "_pending_invitations", no_invitations)
+    monkeypatch.setattr(auth_routes, "feedback_tabs", no_feedback_tabs)
     return calls
 
 

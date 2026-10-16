@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "./citation-badge";
-import type { CardState, ConfirmCard } from "./use-chat-stream";
+import type { CardState, ConfirmCard } from "../use-chat-stream";
 
 const ACTION_ICON: Partial<Record<ConfirmCard["action"], LucideIcon>> = {
   create_task: ClipboardCheck,

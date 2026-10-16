@@ -6,7 +6,7 @@
  * under the header: the dashboard's page padding is cancelled here, for chat only.
  */
 import { getChats } from "@/lib/api/queries/chat";
-import { ChatSessionList } from "./_components/chat-session-list";
+import { ChatSessionList } from "./_components/chat-list/chat-session-list";
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const chats = await getChats();

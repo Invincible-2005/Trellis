@@ -5,7 +5,7 @@
 
 import { Loader2 } from "lucide-react";
 
-import { STEP_LABELS } from "./use-chat-stream";
+import { STEP_LABELS } from "../use-chat-stream";
 
 export function ThinkingStepper({ step }: { step: string | null }) {
   const label = step ? (STEP_LABELS[step] ?? "Working…") : "Starting…";

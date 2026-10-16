@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "ask_as": "TEST-HR",
+    "question": "How many floating holidays do we get in 2026?",
+    "expected_answer": "Everyone may take 2 floating holidays in 2026, chosen from Eid al-Fitr, Raksha Bandhan, Onam, Pongal and Dussehra. Ask your manager at least 7 days before.",
+    "source": "org-holiday-calendar-2026.docx"
+  },
+  {
+    "id": 2,
+    "ask_as": "TEST-Employee",
+    "question": "Can I fly to a client meeting?",
+    "expected_answer": "Only in economy class, and only when the train journey is longer than 8 hours. Every trip needs your manager's approval before booking, and trips costing more than Rs 25,000 in total also need the Admin's approval.",
+    "source": "org-travel-and-expense-policy.md"
+  },
+  {
+    "id": 3,
+    "ask_as": "TEST-Manager",
+    "question": "I clicked a phishing link. What do I do?",
+    "expected_answer": "Report it to IT support within 1 hour of noticing it.",
+    "source": "org-it-security-policy.pdf"
+  },
+  {
+    "id": 4,
+    "ask_as": "TEST-Employee",
+    "question": "Can I share my password with a teammate?",
+    "expected_answer": "No. Never share your password or let someone else use your account, not even a teammate; it leads to a strike and IT resets the account.",
+    "source": "org-code-of-conduct.md"
+  },
+  {
+    "id": 5,
+    "ask_as": "TEST-Employee",
+    "question": "How many paid leave days do I get?",
+    "expected_answer": "18 paid leave days a year.",
+    "source": "employee-handbook.md"
+  },
+  {
+    "id": 6,
+    "ask_as": "TEST-Employee",
+    "question": "What time is the Alpha standup?",
+    "expected_answer": "The TEST-Alpha standup is at 10:15, lasts 15 minutes, and is held on Google Meet.",
+    "source": "team-alpha-project-charter.md"
+  },
+  {
+    "id": 7,
+    "ask_as": "TEST-Manager",
+    "question": "How quickly must I respond to a blocked task?",
+    "expected_answer": "Within 1 working day.",
+    "source": "manager-playbook.md"
+  },
+  {
+    "id": 8,
+    "ask_as": "TEST-Manager",
+    "question": "What does someone need to get promoted?",
+    "expected_answer": "Two reviews in a row rated 4 or higher, and the manager nominates them by 15 February.",
+    "source": "manager-performance-reviews.pptx"
+  },
+  {
+    "id": 9,
+    "ask_as": "TEST-HR",
+    "question": "What is the L3 salary band?",
+    "expected_answer": "Rs 10 to 16 lakh per year (L3 Senior Engineer).",
+    "source": "hr-compensation-and-payroll.txt"
+  },
+  {
+    "id": 10,
+    "ask_as": "TEST-HR",
+    "question": "What's the notice period for a manager?",
+    "expected_answer": "60 days.",
+    "source": "hr-recruitment-and-onboarding.md"
+  }
+]

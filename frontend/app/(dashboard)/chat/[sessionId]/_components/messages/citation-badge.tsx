@@ -6,7 +6,7 @@
 import { FileText } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { Citation } from "./use-chat-stream";
+import type { Citation } from "../use-chat-stream";
 
 export function CitationBadge({ citation, number }: { citation: Citation; number: number }) {
   return (
