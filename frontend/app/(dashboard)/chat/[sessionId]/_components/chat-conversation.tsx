@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation";
 import { Bot } from "lucide-react";
 
 import type { ChatMessage, ConfirmCard, Mentions } from "@/lib/api/queries/chat";
-import { ChatInputBox } from "./chat-input-box";
-import { ChatMessageList } from "./chat-message-list";
-import { useChatChanges } from "./use-chat-changes";
+import { ChatInputBox } from "./input/chat-input-box";
+import { ChatMessageList } from "./messages/chat-message-list";
+import { useChatChanges } from "../../_components/use-chat-changes";
 import { useChatStream } from "./use-chat-stream";
 
 const EXAMPLES = [

@@ -180,6 +180,13 @@ async def find_people(query: Optional[str] = None, user_id: Optional[str] = None
     return "\n".join(lines)
 
 
+# D56: the same note for everyone, so it never hints whether anything is hidden.
+PERSON_DOCUMENTS_NOTE = (
+    "Note (always tell the user): only documents the user can also see are listed;"
+    " this person may have access to others."
+)
+
+
 @tool
 async def get_person_documents(user_id: str) -> str:
     """
@@ -196,8 +203,8 @@ async def get_person_documents(user_id: str) -> str:
     if documents is None:
         return "That person isn't in this organization."
     if not documents:
-        return "They can't see any of the documents the user can see."
-    return "\n".join(
+        return f"They can't see any of the documents the user can see. {PERSON_DOCUMENTS_NOTE}"
+    return PERSON_DOCUMENTS_NOTE + "\n" + "\n".join(
         f"- {d['title']} | shared with: {d['audience']}"
         + ("" if d["status"] == "ready" else f" | status: {d['status']}")
         for d in documents

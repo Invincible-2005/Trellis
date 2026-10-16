@@ -99,7 +99,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - Free-tier limits are unclear and have been cut before (third-party guides: ~10–15 RPM, ~20–1,500 requests/day). Check the real quota in AI Studio; if the daily cap is too tight, top up for demo day or switch provider via settings.
   - The lean graph (D19) keeps a message to 2–4 calls, which is what makes the free tier realistic.
   - Query-time embedding still follows D14 (must match ingestion).
-  - **Unused packages:** `tavily-python` and `deepeval` removed 2026-10-09 (`uv remove` + `requirements.txt`). `ollama` kept pending D14.
+  - **Unused packages:** `tavily-python` and `deepeval` removed 2026-10-09 (`uv remove` + `requirements.txt`). `ollama` kept pending D14. *(`deepeval` re-added 2026-10-16 as a dev-only package for the evaluation, D57.)*
 - *Original gap text below.*
 - **Gap:** No ticket picks the chat or router model. `requirements.txt` includes `langchain-google-genai`, `ollama`, `tavily-python` and `deepeval`, and none of them are justified in any ticket. Guardrails AI (ticket 10) is not installed.
 - **To decide:**
@@ -500,6 +500,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   - The pop-up opens only at the start of a word (so "and/or" doesn't trigger it).
   - **Sent to the backend** as `@[karan@acme.com](user:<uuid>)` / `/[Alpha](team:<uuid>)`; the agent prompt explains the tokens and uses the ids in tool calls (`get_tasks` gains an assignee filter so "@Karan's tasks" works). The ids are hints; scope still decides (D1).
   - Backend: `GET /api/v1/chat/mentions` → `{ people: [{id, name, email}], teams: [{id, name}] }` (chat slice B).
+  - *2026-10-15 (Piyush):* picked mentions are colored in the box while typing too (people blue, teams green, as in sent messages), via a colored copy of the text over the textarea; a mention edited after picking loses its color, matching that it is then sent as plain text.
 - **Written into:** ticket 10 (write node note), D22 note (`@team` → `/team`), map. Plan: `plans/chat/`.
 - ⚠️ **Superseded in part 2026-10-14 by D51:** `@` now lists every org member (teammates first); `/` unchanged.
 
@@ -587,6 +588,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - ✅ **Decision (Piyush): anyone in the org may ask; the answer lists only documents both the asker and that person can see** (each with its audience: whole org / a role / a team). This follows the role tree: for someone below you it is their full list (you see everything shared with roles below yours); for someone at or above you it shows only documents you could already see, so nothing higher up the tree is revealed. The person's access comes from `resolve_scope()` for them, the same rule as everywhere (ticket 03, D13).
 - **Rejected:** only allowing questions about people below you (redundant given the "both can see" limit); leaving it out of the MVP.
 - **Built 2026-10-14:** `services/documents.py::documents_visible_to` (the one `_visible()` rule applied for the caller AND the person) + chat tool `get_person_documents` (status step `checking_document_access`). Checked on the 12 dev documents for all 12 asker/person pairs: about someone below → their full list; Employee about Admin → only the 6 documents the Employee sees; Employee about Jayant → 5 (manager and consultant documents hidden); HR doesn't see the employee handbook (TEST-Employee isn't below TEST-HR), so it never appears in HR's answers. Live chat as Admin and as TEST-Employee answers with titles and audiences.
+- *2026-10-15, D56:* every answer now also says the list covers only documents you can also see and the person may have access to others.
 - **Written into:** map. Plan: `plans/chat/` (local).
 
 ### D54. One page to give strikes, give commendations and review appeals (added 2026-10-15, raised by Piyush) — ✅ RESOLVED 2026-10-15
@@ -614,6 +616,25 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Gap:** D6 excludes only the **giver** from reviewing an appeal. A reviewer (e.g. HR with org-wide `review_strike`) who receives a strike on a team could appeal it and then dismiss it themselves.
 - ✅ **Decision (Piyush): no.** Neither the giver nor the receiver may decide an appeal. If no one else has `review_strike` for that team, the appeal waits (same as D6's gray area).
 - **Written into:** D6 (note), D54 part C, map.
+
+### D56. The chat presents a partial document list as someone's full access (added 2026-10-15, found from Piyush's chat test) — ✅ RESOLVED 2026-10-15
+- **Gap:** D53's rule works (TEST-Employee asking about Jayant got the 5 documents both can see; Jayant's manager/consultant documents stayed hidden). But the answer said "Here are the documents that Jayant can see", which reads as his full access. The tool prompt only says "say so if it matters", so the model skipped the "only documents you can also see" caveat.
+- ✅ **Decision (Piyush): always add the note.** `get_person_documents` starts every result (also the empty one) with `PERSON_DOCUMENTS_NOTE`: only documents the user can also see are listed; this person may have access to others. Same wording for everyone, so it never hints whether anything is hidden. The read-agent prompt says to always pass it on. Rejected: "full list" wording for people below you (more code, little gain).
+- **Built 2026-10-15:** checked in-process as TEST-Employee about Jayant → note + the same 5 documents. Backend tests: all 58 pass (the stale `test_context_team_permission_does_not_open_admin` was fixed the same day: its fake database predated the Feedback-tabs lookup in `/auth/context`, now stubbed like the test's other lookups).
+- **Written into:** D53 (note), map.
+
+### D57. How do we measure the chat's answer quality? (added 2026-10-16, raised by Piyush) — ✅ RESOLVED 2026-10-16
+- **Gap:** the map listed a "Scoring & Evaluation Suite" as not yet specified, and nothing measured how good the read path's answers are. `deepeval` had been removed on 2026-10-09 (D7) because nothing used it.
+- ✅ **Decision (Piyush): a DeepEval run in `backend/evaluation/`** scoring Context Relevancy, Context Precision, Context Recall, Faithfulness and Answer Relevancy on 10 read-path questions from `plans/documents/test-files` (all 5 file types; asked as real TEST-Employee, TEST-Manager and TEST-HR members with their real scope). Expected answers come from that README, checked against the documents.
+  - **Two steps** so a free-tier rate limit never wastes work: `run_agent.py` saves answers + retrieved parts to `results/answers.json`; `score.py` scores that file into `results/scores.json` and `results/report.md`. Both skip what's already done.
+  - ~~**Judge: Gemini Flash (`gemini-3.6-flash`, pinned), not the agent's Flash-Lite**, so the agent doesn't grade itself and the judge has its own free quota.~~ *Superseded the same day:* Flash's free tier allows only ~20 requests a day (see "Which AI powers the chat", 12 October) and a run needs ~200 judge calls; it also kept returning 503 "high demand".
+  - ✅ **Judge: Flash-Lite pinned to `gemini-3.5-flash-lite` (Piyush, 2026-10-16).** Fits the free daily limit (~500–1,000). It is the model the agent's `gemini-flash-lite-latest` pointed to that day, so the agent is graded by its own model; accepted because DeepEval splits each score into small yes/no checks against the document text, and the report says so. Rejected: another provider (new account + key), Flash spread over ~10 days.
+  - One judge call at a time, 7 s apart; waits a minute and retries (up to 5 times) when Gemini says it's overloaded (503). Checked 2026-10-16 on a made-up answer: all 5 metrics scored with sensible reasons.
+  - `deepeval` re-added as a **dev-only** package (`uv add --dev`), not in `requirements.txt`. No app code changed.
+  - Left out: the README's "must NOT be answered" questions (permission checks, not answer quality). Red-teaming / prompt-injection testing stays unspecified.
+- **First run 2026-10-16** (all 10 scored): averages Context Relevancy 0.13 (low by design: 6 parts per search), Context Precision 0.75, Context Recall 1.00, Faithfulness 1.00, Answer Relevancy 1.00. Every search found the right document; weak spot is ranking (#4, #5, #7 had the answer part 3rd). The employee test account's org role is now `TEST-Employee2` (under TEST-HR, created 2026-10-14); it still holds TEST-Employee on TEST-Alpha, so `run_agent.py` falls back to team roles.
+- **Improvement options** (none built yet) are in `backend/evaluation/results/improvements.md`; recommended first: 500-character pieces with title + section in each, then rerun.
+- **Written into:** map ("Decisions so far" + "Not yet specified"), `backend/CLAUDE.md` folder map.
 
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.

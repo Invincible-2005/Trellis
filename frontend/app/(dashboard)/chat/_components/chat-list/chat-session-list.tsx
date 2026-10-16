@@ -25,7 +25,7 @@ import type { ChatSummary } from "@/lib/api/queries/chat";
 import { useServerData } from "@/lib/query/use-server-data";
 import { RenameChatDialog } from "./rename-chat-dialog";
 import { DeleteChatDialog } from "./delete-chat-dialog";
-import { CHATS_KEY, useChatChanges, type ChatRow } from "./use-chat-changes";
+import { CHATS_KEY, useChatChanges, type ChatRow } from "../use-chat-changes";
 
 interface ChatSessionListProps {
   chats: ChatSummary[];

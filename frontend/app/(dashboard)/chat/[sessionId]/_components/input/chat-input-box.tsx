@@ -8,6 +8,11 @@
 // your teammates first, D51) and `/` lists teams.
 // The box shows "@riya@acme.com" / "/Team Alpha"; on send each picked mention is
 // swapped for its token with the exact id (mentions.ts).
+//
+// A textarea can't color part of its text, so a copy of the text sits over it
+// with picked mentions colored (people blue, teams green, like sent messages);
+// the textarea's own text is transparent but keeps the caret and selection.
+// Only color changes in the copy: a bolder font would move the caret.
 
 import { useMemo, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
@@ -16,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Mentions } from "@/lib/api/queries/chat";
-import { type PickedMention, withTokens } from "./mentions";
+import { markPicked, type PickedMention, withTokens } from "../mentions";
 import { MentionPopover, type MentionOption } from "./mention-popover";
 
 export const MAX_MESSAGE_CHARS = 4000;
@@ -37,6 +42,7 @@ interface ChatInputBoxProps {
 
 export function ChatInputBox({ value, onChange, onSend, disabled, mentions }: ChatInputBoxProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState(0);
   const [picked, setPicked] = useState<PickedMention[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -90,7 +96,9 @@ export function ChatInputBox({ value, onChange, onSend, disabled, mentions }: Ch
     const token =
       option.kind === "user" ? `@[${option.detail}](user:${option.id})` : `/[${option.label}](team:${option.id})`;
     setPicked((current) =>
-      current.some((m) => m.display === option.display) ? current : [...current, { display: option.display, token }]
+      current.some((m) => m.display === option.display)
+        ? current
+        : [...current, { display: option.display, token, kind: option.kind }]
     );
     setActiveIndex(0);
   };
@@ -156,15 +164,44 @@ export function ChatInputBox({ value, onChange, onSend, disabled, mentions }: Ch
             setActiveIndex(0);
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          onScroll={(e) => {
+            if (overlayRef.current) overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+          }}
           onKeyDown={handleKeyDown}
           onBlur={() => setDismissedAt(value)}
           onFocus={() => setDismissedAt(null)}
           placeholder="Ask about your documents, tasks or teams… (@ person, / team)"
           aria-label="Message"
           aria-expanded={listOpen}
-          className="max-h-48 min-h-12 resize-none pr-12"
+          className="max-h-48 min-h-12 resize-none pr-12 text-transparent caret-foreground [scrollbar-gutter:stable]"
           autoFocus
         />
+        {/* Same box size, padding and font as the textarea, so the copy lines up with it */}
+        <div
+          ref={overlayRef}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg border border-transparent px-2.5 py-2 pr-12 text-base break-words whitespace-pre-wrap [scrollbar-gutter:stable] md:text-sm"
+        >
+          {markPicked(value, picked).map((part, i) =>
+            typeof part === "string" ? (
+              part
+            ) : (
+              <span
+                key={i}
+                className={cn(
+                  "rounded-sm",
+                  part.kind === "user"
+                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                    : "bg-green-500/10 text-green-700 dark:text-green-400"
+                )}
+              >
+                {part.label}
+              </span>
+            )
+          )}
+          {/* Keeps a trailing new line as a real line, as in the textarea */}
+          {"​"}
+        </div>
         <Button
           type="submit"
           size="icon"

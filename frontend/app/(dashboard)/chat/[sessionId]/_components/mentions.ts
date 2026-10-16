@@ -23,6 +23,24 @@ export function splitMentions(text: string): MessagePart[] {
 export interface PickedMention {
   display: string; // "@riya@acme.com" or "/Team Alpha"
   token: string; // "@[riya@acme.com](user:<id>)"
+  kind: "user" | "team";
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Box text → plain text and the picked mentions still in it, for coloring them while typing. */
+export function markPicked(text: string, picked: PickedMention[]): MessagePart[] {
+  if (picked.length === 0) return [text];
+  const kinds = new Map(picked.map((m) => [m.display, m.kind]));
+  // Longest first, as in withTokens; the capture group keeps the mentions in split()'s output
+  const pattern = new RegExp(`(${[...kinds.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp).join("|")})`);
+  return text
+    .split(pattern)
+    .filter(Boolean)
+    .map((piece) => {
+      const kind = kinds.get(piece);
+      return kind ? { kind, label: piece } : piece;
+    });
 }
 
 /** Box text → message text: each picked mention still in the text becomes its token. */

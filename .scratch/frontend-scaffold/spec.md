@@ -87,23 +87,28 @@ frontend/
 │   │   │
 │   │   ├── chat/                                 # Route: /chat (agent chat; task discussions are "Comments" inside a task, trellis/12 D41)
 │   │   │   ├── layout.tsx                        # Chat-list panel + chat area, full height under the header (D41, 2026-10-12)
-│   │   │   ├── page.tsx                          # /chat: new chat (empty screen + input)
+│   │   │   ├── page.tsx                          # /chat: new chat (the same chat screen, empty; imports it from [sessionId]/_components)
 │   │   │   ├── [sessionId]/
 │   │   │   │   ├── page.tsx                      # /chat/[sessionId]: an existing chat (history loaded on open)
-│   │   │   │   └── not-found.tsx                 # "Chat not found" (deleted, someone else's) + New chat (2026-10-12)
-│   │   │   └── _components/
-│   │   │       ├── use-chat-stream.ts            # Client hook: POST to the stream route, read SSE → messages / current step (built 2026-10-12)
-│   │   │       ├── chat-conversation.tsx         # One chat: messages + input; a new chat is created on its first message (D42) (2026-10-12)
-│   │   │       ├── chat-session-list.tsx         # New chat + your chats, rename/delete; hideable panel, drawer on phones (plain panel, not a shadcn Sidebar)
-│   │   │       ├── rename-chat-dialog.tsx        # Rename (2026-10-12)
-│   │   │       ├── delete-chat-dialog.tsx        # Delete with confirmation (2026-10-12)
-│   │   │       ├── mention-popover.tsx           # The @ people / / teams list above the input (D43, 2026-10-12)
-│   │   │       ├── mentions.ts                   # Mention tokens: chips in sent messages, display → token on send (D43)
-│   │   │       ├── chat-message-list.tsx         # Message bubbles with markdown rendering
-│   │   │       ├── chat-input-box.tsx            # Input: Enter sends, @ / mentions, 4,000-char counter (file context toggle dropped 2026-10-12)
-│   │   │       ├── citation-badge.tsx            # Clickable SOP source references
-│   │   │       ├── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
-│   │   │       └── confirm-action-card.tsx       # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
+│   │   │   │   ├── not-found.tsx                 # "Chat not found" (deleted, someone else's) + New chat (2026-10-12)
+│   │   │   │   └── _components/                  # The chat screen, kept with the page that shows it, grouped by part (Piyush, 2026-10-16)
+│   │   │   │       ├── chat-conversation.tsx     # One chat: messages + input; a new chat is created on its first message (D42) (2026-10-12)
+│   │   │   │       ├── use-chat-stream.ts        # Client hook: POST to the stream route, read SSE → messages / current step (built 2026-10-12)
+│   │   │   │       ├── mentions.ts               # Mention tokens: chips in sent messages, display → token on send, colors while typing (D43); used by messages/ and input/
+│   │   │   │       ├── messages/                 # The conversation area
+│   │   │   │       │   ├── chat-message-list.tsx # Message bubbles with markdown rendering
+│   │   │   │       │   ├── citation-badge.tsx    # Clickable SOP source references
+│   │   │   │       │   ├── thinking-stepper.tsx  # Agent reasoning & tool-call indicator
+│   │   │   │       │   └── confirm-action-card.tsx # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
+│   │   │   │       └── input/                    # The message box
+│   │   │   │           ├── chat-input-box.tsx    # Input: Enter sends, @ / mentions, picked mentions colored while typing (2026-10-15), 4,000-char counter (file context toggle dropped 2026-10-12)
+│   │   │   │           └── mention-popover.tsx   # The @ people / / teams list above the input (D43, 2026-10-12)
+│   │   │   └── _components/                      # Used by layout.tsx
+│   │   │       ├── use-chat-changes.ts           # Instant chat-list changes (D50); also used by chat-conversation.tsx
+│   │   │       └── chat-list/                    # The side panel
+│   │   │           ├── chat-session-list.tsx     # New chat + your chats, rename/delete; hideable panel, drawer on phones (plain panel, not a shadcn Sidebar)
+│   │   │           ├── rename-chat-dialog.tsx    # Rename (2026-10-12)
+│   │   │           └── delete-chat-dialog.tsx    # Delete with confirmation (2026-10-12)
 │   │   │
 │   │   ├── feedback/                             # Route: /feedback (added 2026-10-15, trellis/12 D54; replaces /admin/strikes)
 │   │   │   ├── page.tsx                          # Shown if you can give a strike, commend someone or review appeals; loads options, given, appeals
