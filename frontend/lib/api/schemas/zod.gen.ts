@@ -172,6 +172,37 @@ export const zCommendationResponse = z.object({
 });
 
 /**
+ * CommentRequest
+ *
+ * Posting or editing a comment: plain text, trimmed.
+ */
+export const zCommentRequest = z.object({
+    content: z.string().min(1).max(2000)
+});
+
+/**
+ * CommentResult
+ */
+export const zCommentResult = z.object({
+    id: z.uuid(),
+    task_id: z.uuid(),
+    author_user_id: z.uuid(),
+    author_name: z.string(),
+    content: z.string(),
+    created_at: z.iso.datetime({ offset: true, local: true }),
+    edited_at: z.iso.datetime({ offset: true, local: true }).nullish(),
+    can_edit: z.boolean().optional().default(false),
+    can_delete: z.boolean().optional().default(false)
+});
+
+/**
+ * CommentListResponse
+ */
+export const zCommentListResponse = z.object({
+    comments: z.array(zCommentResult)
+});
+
+/**
  * CreateCommendationRequest
  */
 export const zCreateCommendationRequest = z.object({
@@ -229,6 +260,18 @@ export const zCreateStrikeRequest = z.object({
     team_id: z.uuid(),
     given_to_user_id: z.uuid(),
     reason: z.string().min(5).max(1000)
+});
+
+/**
+ * CreateSubmissionRequest
+ *
+ * A file already uploaded to UploadThing, handed in on a task with an optional note.
+ */
+export const zCreateSubmissionRequest = z.object({
+    file_url: z.string(),
+    file_name: z.string().min(1).max(255),
+    file_size: z.int().gte(0).lte(16777216).nullish(),
+    notes: z.string().max(1000).nullish()
 });
 
 /**
@@ -636,6 +679,29 @@ export const zGivenFeedbackResponse = z.object({
 });
 
 /**
+ * SubmissionResult
+ */
+export const zSubmissionResult = z.object({
+    id: z.uuid(),
+    task_id: z.uuid(),
+    submitted_by_user_id: z.uuid(),
+    submitted_by_name: z.string(),
+    file_url: z.string(),
+    file_name: z.string(),
+    file_size: z.int().nullish(),
+    notes: z.string().nullish(),
+    submitted_at: z.iso.datetime({ offset: true, local: true }),
+    can_delete: z.boolean().optional().default(false)
+});
+
+/**
+ * SubmissionListResponse
+ */
+export const zSubmissionListResponse = z.object({
+    submissions: z.array(zSubmissionResult)
+});
+
+/**
  * TagTarget
  */
 export const zTagTarget = z.object({
@@ -675,7 +741,11 @@ export const zTaskResult = z.object({
     ]),
     overdue: z.boolean(),
     can_edit: z.boolean().optional().default(false),
-    can_change_status: z.boolean().optional().default(false)
+    can_change_status: z.boolean().optional().default(false),
+    can_submit: z.boolean().optional().default(false),
+    can_view_submissions: z.boolean().optional().default(false),
+    submission_count: z.int().nullish(),
+    comment_count: z.int().optional().default(0)
 });
 
 /**

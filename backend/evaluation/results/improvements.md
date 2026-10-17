@@ -27,6 +27,48 @@ Also seen, outside the five measures:
 **Caveats:** the 10 questions are easy (one fact each, all answerable), and the judge is the agent's
 own model (Flash-Lite), so treat 1.00 as "no problems found", not "perfect".
 
+## Update: offline splitting test (16 October)
+
+Before changing any app code, `evaluation/compare_splits.py` cut the 12 test documents five ways and
+searched them with the agent's real search phrases (full table: [`splitting_comparison.md`](splitting_comparison.md)).
+It scores with marker phrases instead of an AI judge; its stand-in for precision gives today's split
+**0.75, the same as the live DeepEval run**, so the stand-in tracks the real measure.
+
+| Way of cutting | Embedded pieces | Returned | Answer ranked 1st | Precision | Text sent per question | Answer found |
+|---|---|---|---|---|---|---|
+| A today (1,000-character cuts) | 28 | 6 | 6/10 | 0.75 | 4,157 chars | 10/10 |
+| B a new piece at every heading | 79 | 4 | 9/10 | 0.91 | 866 chars | 10/10 |
+| C B + "Document title > Section" on each piece | 79 | 3 | 9/10 | 0.93 | 863 chars | 10/10 |
+| D C + merging small sections to ~400 characters | 35 | 4 | 8/10 | 0.88 | 2,411 chars | 10/10 |
+| **E parent-child: search C's pieces, return their parent block** | 79 | 3 | **10/10** | **1.00** | 2,482 chars | 10/10 |
+
+(E's parents are blocks of whole neighbouring sections up to ~1,000 characters, never cut inside a
+section. Only the children are embedded; parents are plain stored text.)
+
+What it shows:
+
+- **Cutting at headings fixes the ranking problem.** Paid leave, blocked task and password moved from
+  3rd to 1st; flights from 2nd to 1st.
+- **Parent-child ranks best (10/10, precision 1.00) but sends ~3x the text of C.** It also fixes the one
+  question C got worse at (phishing, whose answer spans two short sections). Compared with today it
+  still sends ~40% less text (3 parents vs 6 pieces).
+- **C sends the least text** (~860 characters per question, ~80% less than today), so it should lift
+  Context Relevancy the most; it ranked the answer 1st in 9/10.
+- **Merging small sections back together gives part of the gain back** (8/10), so don't merge.
+- **More pieces costs little:** embedding is priced and rate-limited by the amount of text, not the
+  number of pieces, and heading cuts embed about the same text as today (~16,700-20,600 vs ~19,000
+  characters, since today's 200-character overlap embeds some text twice). Requests are batched 32 at
+  a time. HNSW search time grows very slowly (roughly logarithmically) with the number of pieces;
+  database search is milliseconds next to the seconds the Gemini calls take.
+
+**Which to pick:** C if Context Relevancy is the priority; E if precision and complete answers for
+multi-section questions matter more. Both return 3 pieces.
+
+Limits: 10 easy questions on short documents; PDF headings were found only because the test PDF has
+numbered headings ("1. Passwords and sign-in"); relevance is judged by marker phrases, and a bigger
+parent contains the marker more easily, so E's precision is a little flattered. The real scores need a
+live rerun after the change.
+
 ## 1. How documents are cut into pieces (biggest effect: Context Precision)
 
 Today: 1,000-character pieces with 200 overlap for most files, 500 / 100 for slides (ticket 11).
@@ -74,12 +116,20 @@ Today: the 6 most similar pieces the user may see.
 | **A different judge for the final numbers** (another provider, or one paid Flash run) | The agent's own model grades it today. | Maybe, before the final report. |
 | **Rerun after every change, keep a before/after table** | Shows each decision had a measurable effect. | Yes, costs nothing extra. |
 
-## Recommended order
+## Decided plan (16 October, ticket 12 D58; not built yet)
 
-1. Smaller pieces (500) with the document title and section name in each piece, then re-index the 12 test documents.
-2. Rerun the evaluation and compare with this run (precision 0.75, relevancy 0.13, recall 1.00).
-3. Return 4 pieces instead of 6, rerun.
-4. Measure time per step; then skip the grader when search is clearly good.
-5. Add harder questions and the "must not answer" pass / fail check.
+- **Cut documents at headings, with a ~200-character minimum:** Markdown `#`, Word heading styles (kept
+  when extracting text), numbered lines in PDF and txt; sections under ~200 characters joined to a
+  neighbour; sections over 1,000 cut with today's splitter; "Document title > Section" at the top of
+  each piece; no headings → today's 1,000-character cuts. Slides unchanged. About 51 pieces for the 12
+  test documents (today 28; a piece per heading would be 79).
+- **Search returns 4 pieces instead of 6.**
+- **Keep the 1,024-dimension embeddings.**
+- Why the minimum: the free embedding quota is 1,000 pieces a day per project and every piece counts,
+  so a piece per heading with no minimum costs too much quota.
+- Not measured offline for this exact variant (the quota ran out); expected between the 400-minimum
+  option (8/10 ranked first) and a piece per heading (9/10).
+- Then: re-index the existing documents, rerun the evaluation (`run_agent.py`, `score.py`) and compare
+  with the first run (precision 0.75, relevancy 0.13, recall 1.00).
 
-Everything else above can be skipped for this project.
+Other options above (fewer AI calls, answer polish, harder questions) stay open.

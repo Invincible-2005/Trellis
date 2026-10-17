@@ -1,5 +1,5 @@
 """
-app/schemas/tasks.py — Task and team summary shapes (Ticket 05 §5/§7, Ticket 12 D24/D32/D33)
+app/schemas/tasks.py — Task, hand-in and team summary shapes (Ticket 05 §5/§7, Ticket 12 D24/D32/D33/D59)
 
 Shared by /api/v1/tasks, the future /api/v1/dashboard route and the chat
 agent's get_tasks / get_team_summary / create_task tools.
@@ -85,10 +85,73 @@ class TaskResult(AppBaseModel):
     # Button flags (D33): managers edit, reassign, delete; the assignee only moves the status
     can_edit: bool = False
     can_change_status: bool = False
+    # Hand-ins (D59): only the assignee hands in; the assignee and managers see them
+    can_submit: bool = False
+    can_view_submissions: bool = False
+    # Hand-ins you can see on this task; None when can_view_submissions is false
+    submission_count: Optional[int] = None
+    # Comments on this task; everyone who sees the task sees them (D60)
+    comment_count: int = 0
 
 
 class TaskListResponse(BaseModel):
     tasks: List[TaskResult]
+
+
+# ── hand-ins (D59) ────────────────────────────────────────────────────────────
+
+MAX_SUBMISSION_BYTES = 16 * 1024 * 1024   # same as the upload route
+
+
+class CreateSubmissionRequest(BaseModel):
+    """A file already uploaded to UploadThing, handed in on a task with an optional note."""
+
+    file_url: str
+    file_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    file_size: Optional[int] = Field(default=None, ge=0, le=MAX_SUBMISSION_BYTES)
+    notes: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]] = None
+
+
+class SubmissionResult(AppBaseModel):
+    id: UUID
+    task_id: UUID
+    submitted_by_user_id: UUID
+    submitted_by_name: str
+    file_url: str
+    file_name: str
+    file_size: Optional[int] = None
+    notes: Optional[str] = None
+    submitted_at: datetime
+    can_delete: bool = False   # only the person who handed it in
+
+
+class SubmissionListResponse(BaseModel):
+    submissions: List[SubmissionResult]
+
+
+# ── comments (D60) ────────────────────────────────────────────────────────────
+
+class CommentRequest(BaseModel):
+    """Posting or editing a comment: plain text, trimmed."""
+
+    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
+class CommentResult(AppBaseModel):
+    id: UUID
+    task_id: UUID
+    author_user_id: UUID
+    author_name: str
+    content: str
+    created_at: datetime
+    edited_at: Optional[datetime] = None   # set = show "(edited)"
+    # Only the author edits or deletes (D60 b)
+    can_edit: bool = False
+    can_delete: bool = False
+
+
+class CommentListResponse(BaseModel):
+    comments: List[CommentResult]
 
 
 class TaskSummary(BaseModel):

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, ForeignKey, Enum, DateTime, Text
+from sqlalchemy import String, ForeignKey, Enum, DateTime, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -41,9 +41,9 @@ class Task(Base):
 
 class TaskSubmission(Base):
     """
-    Work deliverable uploaded by a team member for a task (like Google Classroom).
-    No 'upload_document' permission required — any member can submit to their own tasks.
-    File stored externally (S3/Vercel Blob/Uploadthing), URL recorded here.
+    Work handed in on a task by its assignee (like Google Classroom), Ticket 12 D59.
+    No 'upload_document' permission required. One file per row, stored in UploadThing;
+    several rows per task are kept as history. Never embedded or searched by the chat.
     """
     __tablename__ = "task_submissions"
 
@@ -51,17 +51,20 @@ class TaskSubmission(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id"), nullable=False)
     submitted_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     file_url: Mapped[str] = mapped_column(String, nullable=False)  # External storage URL
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # bytes
     notes: Mapped[Optional[str]] = mapped_column(Text)
     submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     task: Mapped["Task"] = relationship(back_populates="submissions")
+    submitted_by: Mapped["User"] = relationship()
 
 
 class TaskComment(Base):
     """
-    Contextual comment thread on a task. Enables team members to discuss blockers,
-    clarifications, and progress directly on the deliverable without a noisy chatroom.
-    Also retrievable by the AI agent to answer queries like "Why is Task X blocked?".
+    Comments on a task (Ticket 12 D60): anyone who can see the task reads and posts;
+    only the author edits or deletes their own. Plain text. Deleted with the task.
+    The AI agent will read them in a follow-up ("Why is Task X blocked?").
     """
     __tablename__ = "task_comments"
 
@@ -70,6 +73,7 @@ class TaskComment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    edited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # shown as "(edited)"
 
     task: Mapped["Task"] = relationship(back_populates="comments")
     user: Mapped["User"] = relationship()

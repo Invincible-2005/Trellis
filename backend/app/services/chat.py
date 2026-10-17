@@ -248,6 +248,7 @@ _STATUS_ON_START = {
 _STATUS_FOR_TOOL = {
     "search_documents": "searching_documents",
     "get_tasks": "looking_up_tasks",
+    "get_task_comments": "reading_comments",
     "get_team_summary": "looking_up_teams",
     "find_people": "looking_up_people",
     "get_person_documents": "checking_document_access",

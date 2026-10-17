@@ -2,10 +2,10 @@
 // Document changes from Admin → Documents (trellis/12 D18, D23).
 // Expected failures come back as { ok: false, message } for a toast.
 import { refresh, revalidatePath } from 'next/cache';
-import { UTApi } from 'uploadthing/server';
 import { limit } from '@/lib/middleware/limit';
 import { api } from '../client';
 import { ApiError, unwrap } from '../errors';
+import { deleteStoredFile } from '../storage';
 import { firstError, zCreateDocumentRequest, zUpdateDocumentRequest } from '../schemas/documents';
 import type { components } from '../v1';
 import type { ActionResult } from './roles';
@@ -96,20 +96,6 @@ export async function deleteDocument(documentId: string): Promise<ActionResult<n
     return { ok: true, data: null };
   } catch (err) {
     return toFailure(err);
-  }
-}
-
-// UploadThing links end in /f/<file key> (<app>.ufs.sh/f/<key> or utfs.io/f/<key>).
-// The document is already gone from Trellis by now, so a failure here is only logged:
-// the leftover file costs storage but nobody can reach it through the app.
-async function deleteStoredFile(fileUrl: string) {
-  try {
-    const key = new URL(fileUrl).pathname.match(/^\/f\/([^/]+)$/)?.[1];
-    if (!key) throw new Error('no file key in the link');
-    const { success } = await new UTApi().deleteFiles(decodeURIComponent(key));
-    if (!success) throw new Error('UploadThing refused the delete');
-  } catch (err) {
-    console.error(`[documents] Could not delete ${fileUrl} from UploadThing:`, err);
   }
 }
 

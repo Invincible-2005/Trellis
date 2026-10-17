@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trellis Frontend
 
-## Getting Started
+The Next.js app for Trellis. It is the only thing the browser talks to: it shows the pages and also acts as the **BFF** (backend for frontend), calling the FastAPI backend from the server with the user's Clerk token.
 
-First, run the development server:
+For what Trellis is and how to set up the whole project, see the [root README](../README.md).
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Needs `frontend/.env` (Clerk, `FASTAPI_INTERNAL_URL`, Arcjet, UploadThing keys). The full list is in the root README, section 7.3. The backend must be running first.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Start the dev server. |
+| `pnpm build` / `pnpm start` | Production build and run. |
+| `pnpm lint` | Run ESLint. |
+| `pnpm api:generate` | Regenerate the typed API client (`lib/api/v1.d.ts`) and the zod schemas (`lib/api/schemas/zod.gen.ts`) from `../backend/openapi.json`. Run it after every backend endpoint change. |
+| `pnpm api:generate:live` | Same, but reads from a running backend at `127.0.0.1:8000`. |
 
-## Learn More
+## Folder guide
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/
+  (marketing)/    public landing page
+  (auth)/         sign-in, sign-up, org selection, onboarding
+  (dashboard)/    the signed-in app: dashboard, chat, tasks, teams, feedback, admin/*
+  api/            chat stream proxy and UploadThing route
+  <page>/_components/   UI that belongs to just that page
+components/
+  ui/             shadcn building blocks
+  shared/         our own pieces used in several pages (created when first needed)
+lib/
+  api/queries/    server-side data loaders (reads)
+  api/actions/    Server Actions (writes, return { ok, message } for a toast)
+  api/schemas/    zod form checks, one file per area (built on the generated ones)
+  query/          TanStack Query setup for instant (optimistic) updates
+  middleware/     Arcjet rate limits and bot protection
+proxy.ts          route protection (Next.js 16's name for middleware)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How data flows
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Read:** a page's Server Component calls a loader in `lib/api/queries/`, which calls FastAPI with the user's token.
+- **Write:** a form calls a Server Action in `lib/api/actions/`. It validates with zod, calls FastAPI, then refreshes the page data. Errors show as toasts.
+- **Chat:** the browser posts to `app/api/chat/...`, which forwards to FastAPI and streams the answer back (SSE).
+- The browser never calls FastAPI directly.
 
-## Deploy on Vercel
+## Rules to remember
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Never edit `lib/api/v1.d.ts` or `lib/api/schemas/zod.gen.ts` by hand. They are generated.
+- Show or hide navigation using the permissions from `GET /api/v1/auth/context`, never a Clerk role. The backend still enforces every action.
+- Do not call `router.refresh()` after a Server Action; the action already refreshes the page.
+- This is Next.js 16, which differs from older versions. Check `node_modules/next/dist/docs/` before using a Next.js feature.
+- Before adding or moving files, check [`.scratch/frontend-scaffold/spec.md`](../.scratch/frontend-scaffold/spec.md) (the agreed file tree) and `CLAUDE.md` in this folder.
