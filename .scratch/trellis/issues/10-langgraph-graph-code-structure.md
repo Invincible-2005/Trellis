@@ -111,7 +111,7 @@ The graph operates as an intentional hybrid: a **ReAct execution engine bounded 
 
 #### Node 4: Relevancy Grader & Query Rewrite Loop
 * **Duty:** Verifies retrieved chunks address the user prompt.
-* **Max Rewrite Limit (2x):** If after 2 rewrites the context is still insufficient, the graph routes to a **Plain LLM Refusal Node** (no tools bound).
+* **Max Rewrite Limit (2x):** If after 2 rewrites the context is still insufficient, the graph routes to a **Plain LLM Refusal Node** (no tools bound). *(2026-10-14, ticket 12 D52: only when no other lookup ran this turn; otherwise back to the read agent without the search tool, answering from the other results.)*
 * **400 Error Prevention:** Transitioning to a plain LLM prevents dangling `tool_calls` without matching `ToolMessage`s, avoiding API provider 400 Bad Request errors.
 
 #### Node 5: Write Node (`write_action`)

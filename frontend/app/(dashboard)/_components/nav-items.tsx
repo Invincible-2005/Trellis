@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Network,
   UserPlus,
-  Flag,
   FileText,
   ClipboardList,
   type LucideIcon,
@@ -47,7 +46,6 @@ const ADMIN_TABS: Record<AdminTab, { label: string; icon: LucideIcon }> = {
   roles: { label: "Roles", icon: Network },
   members: { label: "Members", icon: UserPlus },
   documents: { label: "Documents", icon: FileText },
-  strikes: { label: "Strikes", icon: Flag },
 }
 
 const ITEMS = [
@@ -57,12 +55,17 @@ const ITEMS = [
   { label: "Chat", href: "/chat", icon: Bot },
 ]
 
+// Strikes, commendations and appeals (trellis/12 D54); only for people with a Feedback tab
+const FEEDBACK_ITEM = { label: "Feedback", href: "/feedback", icon: MessageSquareText }
+
 interface NavItemsProps {
   /** Admin sections this user may open; the Admin entry is hidden when empty. */
   adminTabs: AdminTab[]
+  /** The user has at least one Feedback tab (auth/context `feedback_tabs`). */
+  showFeedback: boolean
 }
 
-export function NavItems({ adminTabs }: NavItemsProps) {
+export function NavItems({ adminTabs, showFeedback }: NavItemsProps) {
   const pathname = usePathname()
   const { setOpenMobile, isMobile, state } = useSidebar()
   const compact = state === "collapsed" && !isMobile
@@ -72,12 +75,13 @@ export function NavItems({ adminTabs }: NavItemsProps) {
     if (isMobile) setOpenMobile(false)
   }
 
+  const items = showFeedback ? [...ITEMS, FEEDBACK_ITEM] : ITEMS
   const adminLinks = adminTabs.map((tab) => ({ href: `/admin/${tab}`, ...ADMIN_TABS[tab] }))
   const adminActive = pathname.startsWith("/admin")
 
   return (
     <SidebarMenu className="gap-1.5">
-      {ITEMS.map((item) => (
+      {items.map((item) => (
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.label}>
             <Link href={item.href} onClick={closeOnMobile}>

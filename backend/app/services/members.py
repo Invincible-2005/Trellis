@@ -38,8 +38,10 @@ from app.models.user import User
 from app.schemas.admin import (
     AddMemberRequest,
     AddMemberResponse,
+    DirectoryPerson,
     MemberListResponse,
     MemberResponse,
+    PersonTeam,
     UpdateMemberRequest,
 )
 from app.schemas.auth import InvitationResponse
@@ -56,6 +58,60 @@ _recently_removed: TTLCache = TTLCache(maxsize=10_000, ttl=600)
 
 def was_removed(user_id: uuid.UUID, org_id: uuid.UUID) -> bool:
     return (user_id, org_id) in _recently_removed
+
+
+DIRECTORY_LIMIT = 10
+
+
+async def find_people(
+    db: AsyncSession,
+    scope: AccessScope,
+    query: str | None = None,
+    user_id: uuid.UUID | None = None,
+) -> list[DirectoryPerson]:
+    """
+    The chat's company directory (D51): anyone in the caller's org, found by id or
+    by a word in their name, email or org role. Gives name, email, org role and
+    the teams they're on that the caller can see (D13), with their role there.
+    Read-only, open to every org member; nothing else about the person is shown.
+    """
+    stmt = (
+        select(User.id, User.name, User.email, Role.name.label("org_role_name"))
+        .join(OrgMember, OrgMember.user_id == User.id)
+        .outerjoin(Role, Role.id == OrgMember.role_id)
+        .where(OrgMember.org_id == scope.org_id)
+        .order_by(func.lower(User.name))
+        .limit(DIRECTORY_LIMIT)
+    )
+    if user_id is not None:
+        stmt = stmt.where(User.id == user_id)
+    if query:
+        like = f"%{query.strip()}%"
+        stmt = stmt.where(User.name.ilike(like) | User.email.ilike(like) | Role.name.ilike(like))
+    people = (await db.execute(stmt)).all()
+    if not people:
+        return []
+
+    visible_teams = list(scope.viewable_team_ids)
+    teams: dict[uuid.UUID, list[PersonTeam]] = {}
+    if visible_teams:
+        rows = await db.execute(
+            select(TeamMember.user_id, Team.name, Role.name)
+            .join(Team, Team.id == TeamMember.team_id)
+            .join(Role, Role.id == TeamMember.role_id)
+            .where(TeamMember.team_id.in_(visible_teams), TeamMember.user_id.in_([p.id for p in people]))
+            .order_by(Team.name)
+        )
+        for person_id, team_name, role_name in rows:
+            teams.setdefault(person_id, []).append(PersonTeam(team_name=team_name, role_name=role_name))
+
+    return [
+        DirectoryPerson(
+            user_id=p.id, name=p.name, email=p.email,
+            org_role_name=p.org_role_name, teams=teams.get(p.id, []),
+        )
+        for p in people
+    ]
 
 
 async def list_members(db: AsyncSession, scope: AccessScope) -> MemberListResponse:

@@ -3,7 +3,6 @@
 import React from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import { Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { updateMemberRole } from "@/lib/api/actions/members";
 import type { Member } from "@/lib/api/queries/members";
 import type { Role } from "@/lib/api/queries/roles";
 import { zChangeMemberRoleForm } from "@/lib/api/schemas/members";
@@ -25,17 +23,18 @@ interface ChangeRoleDialogProps {
   /** A row with manageable: true (trellis/12 D38). */
   member: Member;
   assignableRoles: Role[];
+  /** Shows the new role at once; the server's answer comes later (use-member-changes.ts). */
+  onSave: (roleId: string | null, roleName: string | null) => void;
   onClose: () => void;
 }
 
-export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRoleDialogProps) {
+export function ChangeRoleDialog({ member, assignableRoles, onSave, onClose }: ChangeRoleDialogProps) {
   const currentRoleId = member.org_role_id ?? "";
   // Checks come from the backend's own rules (generated zod schema, trellis/12 D49).
   const form = useForm({
     resolver: zodResolver(zChangeMemberRoleForm),
     defaultValues: { role_id: currentRoleId },
   });
-  const isSubmitting = form.formState.isSubmitting;
   const roleId = useWatch({ control: form.control, name: "role_id" }) ?? "";
 
   // Their current role may hold a permission you lack, so it isn't always in the
@@ -44,20 +43,10 @@ export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRol
   const selectedRole = assignableRoles.find((r) => r.id === roleId);
 
   // `values.role_id` is already checked: "No role" is null.
-  const handleSave = form.handleSubmit(async (values) => {
-    try {
-      const res = await updateMemberRole(member.user_id, values.role_id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-      toast.success(
-        `${member.name || member.email} now has ${res.data.org_role_name ? `the ${res.data.org_role_name} role` : "no org role"}.`
-      );
-      onClose();
-    } catch {
-      toast.error("An unexpected error occurred while changing the role.");
-    }
+  const handleSave = form.handleSubmit((values) => {
+    const newRole = assignableRoles.find((r) => r.id === values.role_id);
+    onSave(values.role_id, newRole?.name ?? null);
+    onClose();
   });
 
   return (
@@ -127,11 +116,11 @@ export function ChangeRoleDialog({ member, assignableRoles, onClose }: ChangeRol
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || roleId === currentRoleId}>
-              {isSubmitting ? "Saving..." : "Save Role"}
+            <Button type="submit" disabled={roleId === currentRoleId}>
+              Save Role
             </Button>
           </DialogFooter>
         </form>

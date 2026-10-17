@@ -48,6 +48,7 @@ from app.core.database import async_session
 from app.core.errors import api_error
 from app.models.audit import AuditLog
 from app.models.chat import ChatSession
+from app.models.organization import OrgMember
 from app.models.team import Team, TeamMember
 from app.models.user import User
 from app.schemas.chat import (
@@ -174,33 +175,40 @@ async def delete_chat(
 
 async def list_mentions(db: AsyncSession, scope: AccessScope) -> MentionsResponse:
     """
-    Who the user can pick with `@` and `/` in the chat box (D43): the teams they
-    can see (D13) and the people on those teams, names A–Z. The ids are only
-    hints for the agent; its tools still check scope (D1).
+    Who the user can pick in the chat box: `@` = every org member (D51), people
+    on a team the user can see first; `/` = the teams they can see (D13). Names
+    A–Z within each group. The ids are only hints for the agent; its tools still
+    check scope (D1).
     """
     team_ids = list(scope.viewable_team_ids)
-    if not team_ids:
-        return MentionsResponse(people=[], teams=[])
-
-    teams = (
-        await db.execute(
-            select(Team.id, Team.name)
-            .where(Team.id.in_(team_ids), Team.org_id == scope.org_id)
-            .order_by(Team.name)
+    teams = []
+    teammate_ids: set[uuid.UUID] = set()
+    if team_ids:
+        teams = (
+            await db.execute(
+                select(Team.id, Team.name)
+                .where(Team.id.in_(team_ids), Team.org_id == scope.org_id)
+                .order_by(Team.name)
+            )
+        ).all()
+        teammate_ids = set(
+            await db.scalars(select(TeamMember.user_id).where(TeamMember.team_id.in_(team_ids)))
         )
-    ).all()
-    people = (
+
+    members = (
         await db.execute(
             select(User.id, User.name, User.email)
-            .join(TeamMember, TeamMember.user_id == User.id)
-            .join(Team, Team.id == TeamMember.team_id)
-            .where(TeamMember.team_id.in_(team_ids), Team.org_id == scope.org_id)
-            .distinct()
-            .order_by(User.name)
+            .join(OrgMember, OrgMember.user_id == User.id)
+            .where(OrgMember.org_id == scope.org_id)
         )
     ).all()
+    people = [
+        MentionPerson(id=p.id, name=p.name, email=p.email, on_my_team=p.id in teammate_ids)
+        for p in members
+    ]
+    people.sort(key=lambda p: (not p.on_my_team, p.name.lower()))
     return MentionsResponse(
-        people=[MentionPerson(id=p.id, name=p.name, email=p.email) for p in people],
+        people=people,
         teams=[MentionTeam(id=t.id, name=t.name) for t in teams],
     )
 
@@ -241,6 +249,8 @@ _STATUS_FOR_TOOL = {
     "search_documents": "searching_documents",
     "get_tasks": "looking_up_tasks",
     "get_team_summary": "looking_up_teams",
+    "find_people": "looking_up_people",
+    "get_person_documents": "checking_document_access",
 }
 _ANSWER_NODES = {"read_agent", "not_found", "write_agent"}   # nodes whose LLM text is the answer
 _CODE_REPLY_NODES = {"prepare_action", "confirm_action"}     # nodes whose reply is written by code

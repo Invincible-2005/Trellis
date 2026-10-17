@@ -1,8 +1,9 @@
 "use client";
 
-// The list that opens above the message box (trellis/12 D43): `@` → people you can
-// mention ("name · email"), `/` → teams you can see. The box handles the keys
-// (↑ ↓ Enter Tab Esc); this only draws the list.
+// The list that opens above the message box (trellis/12 D43): `@` → everyone in
+// the org ("name · email"), under "Your teams" then "Others in the org" (D51);
+// `/` → teams you can see. The box handles the keys (↑ ↓ Enter Tab Esc); this
+// only draws the list.
 
 import { User, Users } from "lucide-react";
 
@@ -14,6 +15,7 @@ export interface MentionOption {
   label: string; // name
   detail?: string; // email, for people
   display: string; // what goes in the box: "@riya@acme.com" or "/Team Alpha"
+  group?: string; // people only: "Your teams" or "Others in the org" (D51)
 }
 
 interface MentionPopoverProps {
@@ -36,7 +38,16 @@ export function MentionPopover({ trigger, options, activeIndex, onPick, onHover 
         </p>
       ) : (
         <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
-          {options.map((option, i) => (
+          {options.map((option, i) => [
+            option.group && option.group !== options[i - 1]?.group && (
+              <li
+                key={`group-${option.group}`}
+                role="presentation"
+                className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase"
+              >
+                {option.group}
+              </li>
+            ),
             <li
               key={option.id}
               role="option"
@@ -59,8 +70,8 @@ export function MentionPopover({ trigger, options, activeIndex, onPick, onHover 
               )}
               <span className="truncate font-medium">{option.label}</span>
               {option.detail && <span className="truncate text-xs text-muted-foreground">{option.detail}</span>}
-            </li>
-          ))}
+            </li>,
+          ])}
         </ul>
       )}
     </div>

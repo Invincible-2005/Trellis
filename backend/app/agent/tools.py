@@ -27,8 +27,9 @@ from app.agent.state import AgentContext, RetrievedChunk
 from app.core.database import async_session
 from app.schemas.tasks import TaskFilters
 from app.scope.resolver import AccessScope
-from app.services.documents import search_chunks
+from app.services.documents import documents_visible_to, search_chunks
 from app.services.embeddings import EmbeddingError
+from app.services.members import find_people as directory_lookup
 from app.services.tasks import list_tasks, team_summary
 
 
@@ -149,7 +150,68 @@ async def get_team_summary() -> str:
     return "\n".join(lines)
 
 
-READ_TOOLS = [search_documents, get_tasks, get_team_summary]
+@tool
+async def find_people(query: Optional[str] = None, user_id: Optional[str] = None) -> str:
+    """
+    Look people up in the organization's directory: who someone is, their org
+    role and the teams they're on. Pass user_id from an @ mention, or query with
+    a word from a name, email or role (e.g. "HR", "Jayant"). Only teams the user
+    can see are listed.
+    """
+    try:
+        person_id = uuid.UUID(user_id) if user_id else None
+    except ValueError:
+        return "That person id isn't valid."
+    if person_id is None and not (query or "").strip():
+        return "Give a name, email or role to search for, or a person from an @ mention."
+
+    async with async_session() as db:
+        people = await directory_lookup(db, _scope(), query, person_id)
+
+    if not people:
+        return "Nobody in the organization matches."
+    lines = []
+    for p in people:
+        teams = ", ".join(f"{t.team_name} ({t.role_name})" for t in p.teams) or "none the user can see"
+        lines.append(
+            f"- {p.name} | email: {p.email} | user_id {p.user_id}"
+            f" | org role: {p.org_role_name or 'none'} | teams: {teams}"
+        )
+    return "\n".join(lines)
+
+
+# D56: the same note for everyone, so it never hints whether anything is hidden.
+PERSON_DOCUMENTS_NOTE = (
+    "Note (always tell the user): only documents the user can also see are listed;"
+    " this person may have access to others."
+)
+
+
+@tool
+async def get_person_documents(user_id: str) -> str:
+    """
+    Which documents a person can see (user_id from an @ mention or find_people).
+    Lists only documents the user can see too, with who each is shared with.
+    """
+    try:
+        person_id = uuid.UUID(user_id)
+    except ValueError:
+        return "That person id isn't valid."
+    async with async_session() as db:
+        documents = await documents_visible_to(db, _scope(), person_id)
+
+    if documents is None:
+        return "That person isn't in this organization."
+    if not documents:
+        return f"They can't see any of the documents the user can see. {PERSON_DOCUMENTS_NOTE}"
+    return PERSON_DOCUMENTS_NOTE + "\n" + "\n".join(
+        f"- {d['title']} | shared with: {d['audience']}"
+        + ("" if d["status"] == "ready" else f" | status: {d['status']}")
+        for d in documents
+    )
+
+
+READ_TOOLS = [search_documents, get_tasks, get_team_summary, find_people, get_person_documents]
 
 
 # ── Write tools (D22/D45) ────────────────────────────────────────────────────

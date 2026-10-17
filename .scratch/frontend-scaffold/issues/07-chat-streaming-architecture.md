@@ -3,7 +3,7 @@
 > **Added 2026-10-09 (system ticket 12 D20/D22):** answers stream live; the final `citations` event carries only verified sources. A new `confirm` event means the agent wants to save a task/strike/commendation: show a card with the summary and **Confirm** / **Cancel**; the click POSTs `{"resume": "confirm" | "cancel"}` to the same message route and streams the result.
 > **Added 2026-10-12 (system ticket 12 D41):** screen shape settled. `/chat` = new chat, `/chat/[sessionId]` = an existing chat; `(dashboard)/chat/layout.tsx` holds a hideable chat-list panel (plain panel, not a second shadcn Sidebar). Task discussions are "Comments" inside a task, not part of Chat.
 
-> **Built 2026-10-12 (chat slice D):** browser side = plain `fetch` + `response.body` reader in `chat/_components/use-chat-stream.ts` (no library: `EventSource` can't POST). The BFF route passes FastAPI's JSON errors through unchanged; `req.signal` is forwarded so leaving the page stops the backend run. Events and step names: trellis ticket 09.
+> **Built 2026-10-12 (chat slice D):** browser side = plain `fetch` + `response.body` reader in `chat/[sessionId]/_components/use-chat-stream.ts` (no library: `EventSource` can't POST). The BFF route passes FastAPI's JSON errors through unchanged; `req.signal` is forwarded so leaving the page stops the backend run. Events and step names: trellis ticket 09.
 
 Type: grilling
 Blocked by: 01, 03

@@ -14,8 +14,9 @@ Both call the same service functions as the REST endpoints (ticket 03 §1a), so
 the chat can never do more than the app's pages allow. Problems are raised as
 ActionRefused with a message that is safe to show the user.
 
-The only LLM call in here is give_strike's policy check (D46): it searches the
-policy documents the giver can see and judges the reason. Its result is a
+The only LLM call here is give_strike's policy check (D46, services/strikes.py::
+check_policy, shared with the /feedback page): it searches the policy documents
+the giver can see and judges the reason. Its result is a
 warning on the card, never a block, and is saved with the strike.
 
 Supported: create_task, give_commendation, give_strike.
@@ -23,23 +24,25 @@ Supported: create_task, give_commendation, give_strike.
 
 import uuid
 from datetime import date, datetime, time
-from typing import Any, Awaitable, Callable, Literal, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-from app.agent import prompts
 from app.agent.state import CardLine, PendingAction
-from app.agent.tools import citation_tag
 from app.core.database import async_session
 from app.schemas.commendations import CreateCommendationRequest
 from app.schemas.strikes import CreateStrikeRequest
 from app.schemas.tasks import CreateTaskRequest
 from app.scope.resolver import AccessScope
 from app.services.commendations import check_give_commendation, give_commendation
-from app.services.documents import search_chunks
-from app.services.embeddings import EmbeddingError
-from app.services.strikes import ESCALATION_THRESHOLD, check_give_strike, give_strike
+from app.services.strikes import (
+    ESCALATION_THRESHOLD,
+    check_give_strike,
+    check_policy,
+    evaluation_text,
+    give_strike,
+)
 from app.services.tasks import check_create_task, create_task
 
 
@@ -168,22 +171,6 @@ async def _execute_commendation(scope: AccessScope, action: PendingAction) -> st
 
 # ── give_strike ───────────────────────────────────────────────────────────────
 
-POLICY_PASSAGES = 6
-EXCERPT_CHARS = 300
-
-_VERDICT_LABEL = {
-    "supported": "Policy supports this",
-    "not_covered": "No policy found that covers this reason",
-    "unchecked": "The policy check couldn't run",
-}
-
-
-class PolicyVerdict(BaseModel):
-    verdict: Literal["supported", "not_covered"]
-    explanation: str
-    source_tags: list[str] = []
-
-
 def _strike_request(args: dict[str, Any]) -> CreateStrikeRequest:
     """LLM tool args (or stored card args) → the request the service checks."""
     try:
@@ -199,55 +186,6 @@ def _strike_request(args: dict[str, Any]) -> CreateStrikeRequest:
         )
 
 
-async def _policy_check(scope: AccessScope, reason: str) -> dict[str, Any]:
-    """
-    D46: search the policy documents the giver can see for the reason, then one
-    LLM call judges it. Only passages that were really retrieved can be shown
-    (same idea as the citation check, D20). Never raises: a failure is "unchecked".
-    """
-    try:
-        async with async_session() as db:
-            hits = await search_chunks(db, scope, reason, k=POLICY_PASSAGES)
-    except EmbeddingError:
-        return {"verdict": "unchecked", "explanation": "Document search is unavailable right now.",
-                "sources": [], "chunk_ids": []}
-    if not hits:
-        return {"verdict": "not_covered", "explanation": "None of the documents you can see mention this.",
-                "sources": [], "chunk_ids": []}
-
-    by_tag = {citation_tag(h["chunk_id"]): h for h in hits}
-    passages = "\n\n".join(f"[{tag}] {h['title']}\n{h['text']}" for tag, h in by_tag.items())
-    # Imported here: graph.py imports this module
-    from app.agent.graph import _router_model
-    try:
-        result = await _router_model().with_structured_output(PolicyVerdict).ainvoke(
-            prompts.POLICY_CHECK_PROMPT.format(reason=reason, passages=passages[:12000])
-        )
-    except Exception:
-        return {"verdict": "unchecked", "explanation": "The AI couldn't check the policy right now.",
-                "sources": [], "chunk_ids": []}
-
-    used = [by_tag[t.strip("[] ").lower()] for t in result.source_tags if t.strip("[] ").lower() in by_tag]
-    verdict, explanation = result.verdict, result.explanation.strip()
-    if verdict == "supported" and not used:
-        verdict, explanation = "not_covered", "No specific policy passage was found for this reason."
-    return {
-        "verdict": verdict,
-        "explanation": explanation,
-        "sources": [
-            {
-                "tag": citation_tag(h["chunk_id"]),
-                "document_id": h["document_id"],
-                "title": h["title"],
-                "chunk_index": h["chunk_index"],
-                "excerpt": h["text"][:EXCERPT_CHARS],
-            }
-            for h in used
-        ],
-        "chunk_ids": [h["chunk_id"] for h in used],
-    }
-
-
 async def _prepare_strike(scope: AccessScope, args: dict[str, Any]) -> PendingAction:
     body = _strike_request(args)
     try:
@@ -256,7 +194,7 @@ async def _prepare_strike(scope: AccessScope, args: dict[str, Any]) -> PendingAc
     except HTTPException as exc:
         raise ActionRefused(_reason(exc))
 
-    policy = await _policy_check(scope, body.reason)
+    policy = await check_policy(scope, body.reason)
     count = f"{active} so far"
     if active + 1 >= ESCALATION_THRESHOLD:
         count += f" (this one makes {active + 1}, so it will be marked as escalated)"
@@ -277,10 +215,10 @@ async def _prepare_strike(scope: AccessScope, args: dict[str, Any]) -> PendingAc
 async def _execute_strike(scope: AccessScope, action: PendingAction) -> str:
     body = CreateStrikeRequest.model_validate(action["args"])
     policy = action.get("policy") or {}
-    evaluation = f"{_VERDICT_LABEL.get(policy.get('verdict'), 'Not checked')}: {policy.get('explanation', '')}"
+    evaluation = evaluation_text(policy)
     try:
         async with async_session() as db:
-            saved = await give_strike(db, scope, body, policy.get("chunk_ids", []), evaluation.strip())
+            saved = await give_strike(db, scope, body, policy.get("chunk_ids", []), evaluation)
     except HTTPException as exc:
         raise ActionRefused(f"I couldn't save the strike: {_reason(exc)}")
     reply = f"Done. I recorded the strike for {saved.given_to_name} in {saved.team_name}."

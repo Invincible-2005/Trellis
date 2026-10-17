@@ -16,6 +16,7 @@ Before creating or moving any file in `backend/`, check this map. If the right p
 | `alembic/versions/` | Database migrations. Any table or column change needs one. | |
 | `tests/` | Optional checks, named `test_<thing>.py`. Only add tests when the user asks. | |
 | `scripts/` | Small developer helpers run by hand. | `export_openapi.py` |
+| `evaluation/` | The chat's answer-quality evaluation (DeepEval, ticket 12 D57): the questions, the two scripts, and their `results/`. | `score.py` |
 
 ## Rules of thumb
 - A new endpoint = router in `api/v1/` + schemas in `schemas/` + logic in `services/`. Register the router in `api/v1/__init__.py`.

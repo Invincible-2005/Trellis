@@ -3,8 +3,7 @@
 import React from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
-import { Loader2, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { addMember } from "@/lib/api/actions/members";
 import type { Role } from "@/lib/api/queries/roles";
 import { zInviteMemberForm } from "@/lib/api/schemas/members";
+import { useMemberChanges } from "./use-member-changes";
 
 const EMPTY_FORM = { email: "", role_id: "" };
 
@@ -40,7 +39,7 @@ export function InviteMemberDialog({
     resolver: zodResolver(zInviteMemberForm),
     defaultValues: EMPTY_FORM,
   });
-  const isSubmitting = form.formState.isSubmitting;
+  const { invite } = useMemberChanges();
 
   const selectedRoleId = useWatch({ control: form.control, name: "role_id" });
   const selectedRole = assignableRoles.find((r) => r.id === selectedRoleId);
@@ -51,27 +50,12 @@ export function InviteMemberDialog({
   };
 
   // `values` is already checked: email trimmed + lower-cased, "No role" is null.
-  const handleSubmit = form.handleSubmit(async (values) => {
-    try {
-      const res = await addMember(values);
-
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-
-      if (res.data.status === "added") {
-        const name = res.data.member?.name || values.email;
-        toast.success(`${name} has been added to the organization.`);
-      } else {
-        toast.success(`Invitation email sent to ${values.email}.`);
-      }
-
-      // addMember already refreshes the page; no router.refresh() (it collides with that update).
-      handleOpenChange(false);
-    } catch {
-      toast.error("An unexpected error occurred while adding member.");
-    }
+  // The dialog closes at once and a greyed "Sending…" row appears under Pending
+  // invitations until the server answers (use-member-changes.ts).
+  const handleSubmit = form.handleSubmit((values) => {
+    const role = assignableRoles.find((r) => r.id === values.role_id);
+    invite.mutate({ input: values, roleName: role?.name ?? null });
+    handleOpenChange(false);
   });
 
   return (
@@ -159,24 +143,10 @@ export function InviteMemberDialog({
           </div>
 
           <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleOpenChange(false)}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Invite"
-              )}
-            </Button>
+            <Button type="submit">Send Invite</Button>
           </DialogFooter>
         </form>
       </DialogContent>

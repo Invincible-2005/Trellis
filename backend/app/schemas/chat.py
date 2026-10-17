@@ -110,11 +110,12 @@ class ChatDetail(ChatSummary):
 
 
 class MentionPerson(BaseModel):
-    """`@` in the chat box (D43): picked by email, sent with the exact id."""
+    """`@` in the chat box (D43): picked by email, sent with the exact id. Every org member (D51)."""
 
     id: UUID
     name: str
     email: str
+    on_my_team: bool = False   # on a team you can see: listed first, under "Your teams" (D51)
 
 
 class MentionTeam(BaseModel):
@@ -125,7 +126,7 @@ class MentionTeam(BaseModel):
 
 
 class MentionsResponse(BaseModel):
-    """Only teams the user can see (D13) and the people on them."""
+    """Every org member, your teammates first (D51); only teams the user can see (D13)."""
 
     people: List[MentionPerson]
     teams: List[MentionTeam]

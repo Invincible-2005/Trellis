@@ -7,6 +7,8 @@ The Trellis LangGraph agent (ticket 10 as updated by ticket 12 D19–D22, D45).
               │                  │                grade ─ relevant ────────→ read_agent
               │                  │                  ├─ not, rewrites < 2 → rewrite → grade
               │                  │                  └─ not, rewrites used → not_found
+              │                  │                     (or back to read_agent, without the
+              │                  │                      search tool, if other lookups ran: D52)
               │                  ▼ (no tool calls: final answer)            │
               │            check_citations ←────────────────────────────────┘
               │                  ▼
@@ -148,6 +150,9 @@ async def read_agent(state: AgentState) -> dict:
     if state["step_count"] >= MAX_STEPS:
         model = _chat_model()                       # no tools: must answer now
         system += "\n\n" + prompts.FINAL_ANSWER_NOTE
+    elif state.get("documents_exhausted"):
+        # Searches failed but other lookups found something (D52): no more searching
+        model = _chat_model().bind_tools([t for t in READ_TOOLS if t.name != "search_documents"])
     else:
         model = _chat_model().bind_tools(READ_TOOLS)
     response = await model.ainvoke([SystemMessage(system), *_trim(state["messages"])])
@@ -194,7 +199,22 @@ async def grade(state: AgentState) -> Command[Literal["read_agent", "rewrite", "
         return Command(goto="read_agent")
     if state["rewrite_count"] < MAX_REWRITES:
         return Command(goto="rewrite")
-    return Command(goto="not_found")
+
+    # Rewrites used up. If other lookups (people, tasks, teams) ran this turn, keep
+    # their results: the read agent answers from them and says no documents matched
+    # (D52). Otherwise the plain "couldn't find it" answer (ticket 10 Node 4).
+    others = [
+        m for m in _current_turn(state["messages"])
+        if isinstance(m, ToolMessage) and m.name != "search_documents"
+    ]
+    if not others:
+        return Command(goto="not_found")
+    no_documents = [
+        ToolMessage(content=prompts.NO_DOCUMENTS_NOTE, name="search_documents",
+                    tool_call_id=m.tool_call_id, id=m.id)
+        for m in searches
+    ]
+    return Command(goto="read_agent", update={"messages": no_documents, "documents_exhausted": True})
 
 
 async def rewrite(state: AgentState, runtime: Runtime[AgentContext]) -> dict:

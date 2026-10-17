@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -14,26 +12,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { deleteChat } from "@/lib/api/actions/chat";
 import type { ChatSummary } from "@/lib/api/queries/chat";
 
-export function DeleteChatDialog({ chat, onClose }: { chat: ChatSummary; onClose: () => void }) {
+interface DeleteChatDialogProps {
+  chat: ChatSummary;
+  /** Removes the chat from the list at once; the server's answer comes later (use-chat-changes.ts). */
+  onDelete: () => void;
+  onClose: () => void;
+}
+
+export function DeleteChatDialog({ chat, onDelete, onClose }: DeleteChatDialogProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [deleting, setDeleting] = useState(false);
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.preventDefault(); // keep the dialog open until the delete finishes
-    setDeleting(true);
-    const result = await deleteChat(chat.id);
-    setDeleting(false);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    onClose();
-    // The open chat is gone: start a new one
+  const handleDelete = () => {
+    // The open chat is going away: start a new one right now, before the delete is sent
     if (pathname === `/chat/${chat.id}`) router.push("/chat");
+    onDelete();
+    onClose();
   };
 
   return (
@@ -46,9 +42,9 @@ export function DeleteChatDialog({ chat, onClose }: { chat: ChatSummary; onClose
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete"}
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={handleDelete}>
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

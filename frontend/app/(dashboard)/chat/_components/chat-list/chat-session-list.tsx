@@ -22,14 +22,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ChatSummary } from "@/lib/api/queries/chat";
+import { useServerData } from "@/lib/query/use-server-data";
 import { RenameChatDialog } from "./rename-chat-dialog";
 import { DeleteChatDialog } from "./delete-chat-dialog";
+import { CHATS_KEY, useChatChanges, type ChatRow } from "../use-chat-changes";
 
 interface ChatSessionListProps {
   chats: ChatSummary[];
 }
 
-export function ChatSessionList({ chats }: ChatSessionListProps) {
+export function ChatSessionList(props: ChatSessionListProps) {
+  // The server's list, kept in TanStack so changes show instantly (use-chat-changes.ts).
+  const chats = useServerData<ChatRow[]>(CHATS_KEY, props.chats);
+  const { rename, remove } = useChatChanges();
   const [open, setOpen] = useState(true); // desktop panel
   const [drawerOpen, setDrawerOpen] = useState(false); // phones
   const [renaming, setRenaming] = useState<ChatSummary | null>(null);
@@ -105,8 +110,20 @@ export function ChatSessionList({ chats }: ChatSessionListProps) {
         </SheetContent>
       </Sheet>
 
-      {renaming && <RenameChatDialog chat={renaming} onClose={() => setRenaming(null)} />}
-      {deleting && <DeleteChatDialog chat={deleting} onClose={() => setDeleting(null)} />}
+      {renaming && (
+        <RenameChatDialog
+          chat={renaming}
+          onRename={(title) => rename.mutate({ chat: renaming, title })}
+          onClose={() => setRenaming(null)}
+        />
+      )}
+      {deleting && (
+        <DeleteChatDialog
+          chat={deleting}
+          onDelete={() => remove.mutate(deleting)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </>
   );
 }
@@ -123,7 +140,7 @@ function NewChatButton() {
 }
 
 interface ChatListProps {
-  chats: ChatSummary[];
+  chats: ChatRow[];
   onNavigate: () => void;
   onRename: (chat: ChatSummary) => void;
   onDelete: (chat: ChatSummary) => void;
@@ -141,6 +158,14 @@ function ChatList({ chats, onNavigate, onRename, onDelete }: ChatListProps) {
       <ul className="flex flex-col gap-0.5 p-2">
         {chats.map((chat) => {
           const active = pathname === `/chat/${chat.id}`;
+          // Still being saved: no link or menu until the server gives it a real id
+          if (chat.pending) {
+            return (
+              <li key={chat.id} className="truncate rounded-md py-2 pr-9 pl-3 text-sm opacity-60">
+                New chat
+              </li>
+            );
+          }
           return (
             <li key={chat.id} className="group relative">
               <Link

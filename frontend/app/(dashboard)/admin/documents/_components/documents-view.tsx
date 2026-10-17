@@ -6,8 +6,10 @@ import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Document, DocumentTagOptions } from "@/lib/api/queries/documents";
+import { useServerData } from "@/lib/query/use-server-data";
 import { DocUploadDropzone } from "./doc-upload-dropzone";
 import { DocumentsTable } from "./documents-table";
+import { DOCUMENTS_KEY, type DocumentRow } from "./use-document-changes";
 
 interface DocumentsViewProps {
   documents: Document[];
@@ -16,8 +18,11 @@ interface DocumentsViewProps {
   presetRoleId?: string;
 }
 
-export function DocumentsView({ documents, tagOptions, presetRoleId }: DocumentsViewProps) {
+export function DocumentsView({ documents: serverDocuments, tagOptions, presetRoleId }: DocumentsViewProps) {
   const router = useRouter();
+  // The server's list, kept in TanStack so changes show instantly (use-document-changes.ts).
+  // The "Indexing…" check's refresh() brings a fresh copy that replaces it.
+  const documents = useServerData<DocumentRow[]>(DOCUMENTS_KEY, serverDocuments);
   const [uploadOpen, setUploadOpen] = useState(!!presetRoleId);
   // Upload only when there's somewhere this user may tag a document (D23)
   const canTag = tagOptions.org || tagOptions.roles.length > 0 || tagOptions.teams.length > 0;

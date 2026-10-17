@@ -43,7 +43,7 @@ frontend/
 │   │       └── page.tsx                          # Server Component: POST /api/v1/orgs/provision → redirect('/dashboard')
 │   │
 │   ├── (dashboard)/                              # Authenticated application shell
-│   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check
+│   │   ├── layout.tsx                            # Sidebar + Header wrapper with Clerk auth check; wraps everything in QueryProvider keyed by org (D50, 2026-10-14)
 │   │   ├── _components/                          # Shell-level private components
 │   │   │   ├── app-sidebar.tsx                   # Collapsible icon sidebar; collapse button fixed top-left, <OrganizationSwitcher /> beside it (2026-10-11)
 │   │   │   ├── app-header.tsx                    # Breadcrumbs, Active Role badge, Command search trigger
@@ -58,7 +58,7 @@ frontend/
 │   │   │       ├── task-status-chart.tsx         # Client: the one Recharts bar chart (my tasks by status)
 │   │   │       ├── role-metrics-cards.tsx        # Team cards (D24) + org totals (view_aggregate only)
 │   │   │       ├── deadline-tracker.tsx          # Next 5 deadlines
-│   │   │       ├── personal-strikes-card.tsx     # My strikes (read-only; Appeal comes with /admin/strikes)
+│   │   │       ├── personal-strikes-card.tsx     # My strikes (teammates build it read-only first); Piyush + Claude add the Appeal button (rows with can_appeal → note dialog, zAppealForm → appealStrike) afterwards (2026-10-15, D54)
 │   │   │       └── commendations-card.tsx        # My latest 5 commendations
 │   │   │       Data: lib/api/queries/dashboard.ts (getDashboard, added 2026-10-13)
 │   │   │
@@ -87,23 +87,43 @@ frontend/
 │   │   │
 │   │   ├── chat/                                 # Route: /chat (agent chat; task discussions are "Comments" inside a task, trellis/12 D41)
 │   │   │   ├── layout.tsx                        # Chat-list panel + chat area, full height under the header (D41, 2026-10-12)
-│   │   │   ├── page.tsx                          # /chat: new chat (empty screen + input)
+│   │   │   ├── page.tsx                          # /chat: new chat (the same chat screen, empty; imports it from [sessionId]/_components)
 │   │   │   ├── [sessionId]/
 │   │   │   │   ├── page.tsx                      # /chat/[sessionId]: an existing chat (history loaded on open)
-│   │   │   │   └── not-found.tsx                 # "Chat not found" (deleted, someone else's) + New chat (2026-10-12)
-│   │   │   └── _components/
-│   │   │       ├── use-chat-stream.ts            # Client hook: POST to the stream route, read SSE → messages / current step (built 2026-10-12)
-│   │   │       ├── chat-conversation.tsx         # One chat: messages + input; a new chat is created on its first message (D42) (2026-10-12)
-│   │   │       ├── chat-session-list.tsx         # New chat + your chats, rename/delete; hideable panel, drawer on phones (plain panel, not a shadcn Sidebar)
-│   │   │       ├── rename-chat-dialog.tsx        # Rename (2026-10-12)
-│   │   │       ├── delete-chat-dialog.tsx        # Delete with confirmation (2026-10-12)
-│   │   │       ├── mention-popover.tsx           # The @ people / / teams list above the input (D43, 2026-10-12)
-│   │   │       ├── mentions.ts                   # Mention tokens: chips in sent messages, display → token on send (D43)
-│   │   │       ├── chat-message-list.tsx         # Message bubbles with markdown rendering
-│   │   │       ├── chat-input-box.tsx            # Input: Enter sends, @ / mentions, 4,000-char counter (file context toggle dropped 2026-10-12)
-│   │   │       ├── citation-badge.tsx            # Clickable SOP source references
-│   │   │       ├── thinking-stepper.tsx          # Agent reasoning & tool-call indicator
-│   │   │       └── confirm-action-card.tsx       # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
+│   │   │   │   ├── not-found.tsx                 # "Chat not found" (deleted, someone else's) + New chat (2026-10-12)
+│   │   │   │   └── _components/                  # The chat screen, kept with the page that shows it, grouped by part (Piyush, 2026-10-16)
+│   │   │   │       ├── chat-conversation.tsx     # One chat: messages + input; a new chat is created on its first message (D42) (2026-10-12)
+│   │   │   │       ├── use-chat-stream.ts        # Client hook: POST to the stream route, read SSE → messages / current step (built 2026-10-12)
+│   │   │   │       ├── mentions.ts               # Mention tokens: chips in sent messages, display → token on send, colors while typing (D43); used by messages/ and input/
+│   │   │   │       ├── messages/                 # The conversation area
+│   │   │   │       │   ├── chat-message-list.tsx # Message bubbles with markdown rendering
+│   │   │   │       │   ├── citation-badge.tsx    # Clickable SOP source references
+│   │   │   │       │   ├── thinking-stepper.tsx  # Agent reasoning & tool-call indicator
+│   │   │   │       │   └── confirm-action-card.tsx # Confirm / Cancel card for the SSE `confirm` event (trellis/12 D22)
+│   │   │   │       └── input/                    # The message box
+│   │   │   │           ├── chat-input-box.tsx    # Input: Enter sends, @ / mentions, picked mentions colored while typing (2026-10-15), 4,000-char counter (file context toggle dropped 2026-10-12)
+│   │   │   │           └── mention-popover.tsx   # The @ people / / teams list above the input (D43, 2026-10-12)
+│   │   │   └── _components/                      # Used by layout.tsx
+│   │   │       ├── use-chat-changes.ts           # Instant chat-list changes (D50); also used by chat-conversation.tsx
+│   │   │       └── chat-list/                    # The side panel
+│   │   │           ├── chat-session-list.tsx     # New chat + your chats, rename/delete; hideable panel, drawer on phones (plain panel, not a shadcn Sidebar)
+│   │   │           ├── rename-chat-dialog.tsx    # Rename (2026-10-12)
+│   │   │           └── delete-chat-dialog.tsx    # Delete with confirmation (2026-10-12)
+│   │   │
+│   │   ├── feedback/                             # Route: /feedback (added 2026-10-15, trellis/12 D54; replaces /admin/strikes)
+│   │   │   ├── page.tsx                          # Shown if you can give a strike, commend someone or review appeals; loads options, given, appeals
+│   │   │   └── _components/                      # Layout settled 2026-10-15 (Piyush + Claude build it)
+│   │   │       ├── feedback-view.tsx             # Heading + shadcn Tabs: Give · Given by you · Appeals to review (count); only tabs you can use; ?tab= in the URL
+│   │   │       ├── give-feedback-form.tsx        # ONE form: Commendation / Strike switch (Strike only with give_strike), Team, Person, Reason (zGiveFeedbackForm).
+│   │   │       │                                 #   Strike: Check policy → policy box (reused from chat's confirm card) + escalation line → Confirm strike; any edit drops the check.
+│   │   │       │                                 #   Commendation: Give + "Are you sure?"
+│   │   │       ├── given-feedback-list.tsx       # Newest first; status label: commendation / active / appealed, waiting / upheld or dismissed by X
+│   │   │       ├── appeal-card.tsx               # Full card (no drawer): person, team, giver, date, escalated, reason, appeal note, saved policy check; Uphold / Dismiss with confirm
+│   │   │       ├── policy-check-box.tsx          # Green / amber / grey policy verdict + passages (Feedback's own copy of chat's box, Piyush 2026-10-15)
+│   │   │       ├── source-badge.tsx              # Clickable policy passage badge (own copy of chat's citation badge)
+│   │   │       └── use-feedback-changes.ts       # Instant changes (D50): decided appeal leaves the list, a new strike/commendation shows in Given
+│   │   │       Data: lib/api/queries/feedback.ts, lib/api/actions/feedback.ts, lib/api/schemas/feedback.ts (added 2026-10-15)
+│   │   │       Sidebar: "Feedback" link when auth/context feedback_tabs isn't empty (nav-items.tsx)
 │   │   │
 │   │   │   (organization/ (D34) dropped 2026-10-11 by trellis/12 D37: no documents page outside Admin)
 │   │   │
@@ -135,11 +155,7 @@ frontend/
 │   │       │       ├── doc-upload-dropzone.tsx   # Two-step dialog: Uploadthing dropzone → tag → createDocument
 │   │       │       ├── edit-document-dialog.tsx  # Edit title / description / who sees it (rows with deletable: true; D39, 2026-10-11)
 │   │       │       └── tag-scope-select.tsx      # Tag picker: whole org / a role / a team
-│   │       └── strikes/                          # Route: /admin/strikes
-│   │           ├── page.tsx                      # Strike appeal review & policy validation audit
-│   │           └── _components/
-│   │               ├── appeal-review-table.tsx   # Pending appeals for review_strike roles
-│   │               └── strike-audit-drawer.tsx   # Drawer showing agent RAG validation rationale
+│   │       (strikes/ tab dropped 2026-10-15, trellis/12 D54 → see /feedback above)
 │   │
 │   └── api/
 │       ├── uploadthing/                          # Added 2026-10-09 (documents effort)
@@ -162,10 +178,15 @@ frontend/
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
 │   │       (chat: queries/chat.ts getChats/getChat/getMentions, actions/chat.ts createChat/renameChat/deleteChat, 2026-10-12)
+│   │       (feedback: queries/feedback.ts getFeedbackOptions/getGivenFeedback/getAppeals, actions/feedback.ts checkStrike/giveStrike/giveCommendation/appealStrike/decideAppeal, schemas/feedback.ts zGiveFeedbackForm/zAppealForm, 2026-10-15, trellis/12 D54)
 │   │   └── schemas/                              # zod schemas for forms, one file per area (trellis/12 D49)
 │   │       ├── zod.gen.ts                        # Auto-generated from openapi.json by `pnpm api:generate`; never edit, never import directly
 │   │       ├── shared.ts                         # Friendly error wording (z.config), firstError() for toasts, emptyAsNull() for "None" pickers
 │   │       └── roles.ts, members.ts, teams.ts, tasks.ts, documents.ts, chat.ts, orgs.ts  # that area's generated schemas + form versions (e.g. zInviteMemberForm)
+│   ├── query/                                    # TanStack Query, only for instant (optimistic) changes (trellis/12 D50, added 2026-10-14)
+│   │   ├── provider.tsx                          # QueryProvider: one cache per tab (fresh per org); never fetches on its own
+│   │   ├── use-server-data.ts                    # useServerData(key, serverData): page data from the Server Component → cache; the server's fresh copy wins
+│   │   └── action.ts                             # fromAction(action): a Server Action's { ok: false, message } becomes a thrown error, so onError rolls back
 │   ├── middleware/                               # Arcjet request protection (trellis/12 D27, added 2026-10-10)
 │   │   ├── arcjet.ts                             # All rules + per-user limits (read, write, heavyRead, heavyWrite)
 │   │   ├── gate.ts                               # gate(): front gate run by proxy.ts (shield, bots, read limit)

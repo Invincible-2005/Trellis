@@ -1,0 +1,492 @@
+[
+  {
+    "id": 1,
+    "ask_as": "TEST-HR",
+    "question": "How many floating holidays do we get in 2026?",
+    "expected_answer": "Everyone may take 2 floating holidays in 2026, chosen from Eid al-Fitr, Raksha Bandhan, Onam, Pongal and Dussehra. Ask your manager at least 7 days before.",
+    "source": "org-holiday-calendar-2026.docx",
+    "asked_as_user": "Student Test",
+    "route": "read",
+    "searches": [
+      "floating holidays 2026"
+    ],
+    "rewrites": 0,
+    "answer": "Everyone gets 2 floating holidays in 2026, which can be chosen from Eid al-Fitr, Raksha Bandhan, Onam, Pongal, and Dussehra [3de78fa8].",
+    "answer_clean": "Everyone gets 2 floating holidays in 2026, which can be chosen from Eid al-Fitr, Raksha Bandhan, Onam, Pongal, and Dussehra.",
+    "retrieval_context": [
+      {
+        "title": "org-holiday-calendar-2026",
+        "part": 1,
+        "text": "Holiday Calendar 2026 (Test Document)\nShare with: the whole organization.\n1. Fixed holidays\nThe office is closed on these 10 days. They are paid holidays and do not use your leave.\n2. Floating holidays\nEveryone may take 2 floating holidays in 2026, chosen from: Eid al-Fitr, Raksha Bandhan, Onam, Pongal and Dussehra. Apply for a floating holiday like paid leave: ask your manager at least 7 days before. Unused floating holidays do not carry over to 2027.\n3. Year-end shutdown\nThe office is closed from 28 to 31 December 2026. These four days are paid holidays and do not use your leave.\n4. Other rules\nA holiday that falls on a Saturday or Sunday is not moved to a working day.\nWorking on a holiday needs your manager's approval beforehand and earns one compensatory day off, to be taken within 30 days.\nHoliday | Date | Day\nNew Year's Day | 01 January 2026 | Thursday\nRepublic Day | 26 January 2026 | Monday\nHoli | 04 March 2026 | Wednesday\nGood Friday | 03 April 2026 | Friday"
+      },
+      {
+        "title": "org-holiday-calendar-2026",
+        "part": 2,
+        "text": "Holiday | Date | Day\nNew Year's Day | 01 January 2026 | Thursday\nRepublic Day | 26 January 2026 | Monday\nHoli | 04 March 2026 | Wednesday\nGood Friday | 03 April 2026 | Friday\nLabour Day | 01 May 2026 | Friday\nIndependence Day | 15 August 2026 | Saturday\nGandhi Jayanti | 02 October 2026 | Friday\nDiwali | 08 November 2026 | Sunday\nDiwali (day after) | 09 November 2026 | Monday\nChristmas | 25 December 2026 | Friday"
+      },
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 1,
+        "text": "COMPENSATION AND PAYROLL (TEST DOCUMENT) - CONFIDENTIAL\r\n\r\nShare with: the TEST-HR role only. HR and the Admin can read it. Never share salary bands with employees or managers.\r\n\r\n1. SALARY BANDS (annual CTC)\r\n\r\n  L1 Associate         Rs 4.5 to 6 lakh per year\r\n  L2 Engineer          Rs 6 to 10 lakh per year\r\n  L3 Senior Engineer   Rs 10 to 16 lakh per year\r\n  M1 Manager           Rs 16 to 24 lakh per year\r\n\r\n2. PAYROLL\r\n\r\n  - Salaries are paid on the last working day of each month.\r\n  - The payroll cut-off is the 25th: changes after the 25th are paid the next month.\r\n  - Payslips are emailed on the 1st of the next month.\r\n\r\n3. ANNUAL INCREMENT\r\n\r\n  - Increments take effect every April.\r\n  - The average increment budget for 2026 is 8 percent.\r\n\r\n4. PERFORMANCE BONUS\r\n\r\n  - Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis."
+      },
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 2,
+        "text": "- Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis.\r\n  - At exit, up to 10 days of unused paid leave are paid out."
+      },
+      {
+        "title": "org-travel-and-expense-policy",
+        "part": 1,
+        "text": "# Travel and Expense Policy (Test Document)\r\n\r\nShare with: **the whole organization**.\r\n\r\n## 1. Before you travel\r\n\r\n- Every work trip needs your **manager's approval before booking**.\r\n- Trips that cost more than **Rs 25,000** in total also need the **Admin's approval**.\r\n- Book through the company travel desk when possible.\r\n\r\n## 2. How to travel\r\n\r\n- Trains: AC 2-tier.\r\n- Flights: economy class, and only when the train journey is longer than **8 hours**.\r\n- Using your own car: reimbursed at **Rs 12 per km**.\r\n\r\n## 3. Hotels\r\n\r\n| City type | Maximum per night |\r\n|---|---|\r\n| Metro cities (Delhi, Mumbai, Bengaluru, Chennai, Kolkata, Hyderabad) | **Rs 4,500** |\r\n| All other cities | **Rs 3,000** |\r\n\r\n## 4. Daily allowance\r\n\r\n- Meals and local travel are covered up to **Rs 2,000 per day** on approved trips (same as the Employee Handbook).\r\n\r\n## 5. Claiming money back\r\n\r\n- Submit receipts **within 30 days** of the trip."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 27.3
+  },
+  {
+    "id": 2,
+    "ask_as": "TEST-Employee",
+    "question": "Can I fly to a client meeting?",
+    "expected_answer": "Only in economy class, and only when the train journey is longer than 8 hours. Every trip needs your manager's approval before booking, and trips costing more than Rs 25,000 in total also need the Admin's approval.",
+    "source": "org-travel-and-expense-policy.md",
+    "asked_as_user": "Piyush Kumar",
+    "route": "read",
+    "searches": [
+      "fly client meeting travel flight expense"
+    ],
+    "rewrites": 0,
+    "answer": "Yes, you can fly to a client meeting under the following conditions:\n\n* **Approval:** Every work trip requires your manager's approval before booking. If the total trip cost exceeds **Rs 25,000**, it also needs Admin's approval [f35b6789].\n* **Booking:** You should book through the company travel desk when possible [f35b6789].\n* **Flight Eligibility:** Flights must be economy class, and you are only permitted to fly when the corresponding train journey is longer than **8 hours** [f35b6789].",
+    "answer_clean": "Yes, you can fly to a client meeting under the following conditions:\n\n* **Approval:** Every work trip requires your manager's approval before booking. If the total trip cost exceeds **Rs 25,000**, it also needs Admin's approval.\n* **Booking:** You should book through the company travel desk when possible.\n* **Flight Eligibility:** Flights must be economy class, and you are only permitted to fly when the corresponding train journey is longer than **8 hours**.",
+    "retrieval_context": [
+      {
+        "title": "org-travel-and-expense-policy",
+        "part": 2,
+        "text": "- Meals and local travel are covered up to **Rs 2,000 per day** on approved trips (same as the Employee Handbook).\r\n\r\n## 5. Claiming money back\r\n\r\n- Submit receipts **within 30 days** of the trip.\r\n- Claims submitted by the **20th** of a month are paid with that month's salary; later claims are paid the month after.\r\n\r\n## 6. Not reimbursed\r\n\r\n- Alcohol, traffic fines, room upgrades, personal entertainment and travel for family members."
+      },
+      {
+        "title": "org-travel-and-expense-policy",
+        "part": 1,
+        "text": "# Travel and Expense Policy (Test Document)\r\n\r\nShare with: **the whole organization**.\r\n\r\n## 1. Before you travel\r\n\r\n- Every work trip needs your **manager's approval before booking**.\r\n- Trips that cost more than **Rs 25,000** in total also need the **Admin's approval**.\r\n- Book through the company travel desk when possible.\r\n\r\n## 2. How to travel\r\n\r\n- Trains: AC 2-tier.\r\n- Flights: economy class, and only when the train journey is longer than **8 hours**.\r\n- Using your own car: reimbursed at **Rs 12 per km**.\r\n\r\n## 3. Hotels\r\n\r\n| City type | Maximum per night |\r\n|---|---|\r\n| Metro cities (Delhi, Mumbai, Bengaluru, Chennai, Kolkata, Hyderabad) | **Rs 4,500** |\r\n| All other cities | **Rs 3,000** |\r\n\r\n## 4. Daily allowance\r\n\r\n- Meals and local travel are covered up to **Rs 2,000 per day** on approved trips (same as the Employee Handbook).\r\n\r\n## 5. Claiming money back\r\n\r\n- Submit receipts **within 30 days** of the trip."
+      },
+      {
+        "title": "employee-handbook",
+        "part": 3,
+        "text": "## 5. Equipment and security\n\n- Every employee receives a laptop on day one. Report a lost or stolen laptop to IT within **24 hours**.\n- Passwords must be at least **12 characters** and are changed every **90 days**.\n- Never share company documents outside the organization.\n\n## 6. Expenses\n\n- Travel and meal expenses are reimbursed up to **₹2,000 per day** for approved work trips.\n- Submit receipts within **30 days** of the trip.\n\n## 7. Who to contact\n\n- Leave and payroll: **HR**\n- Laptop and accounts: **IT support**\n- Task questions: **your team manager**"
+      },
+      {
+        "title": "team-alpha-project-charter",
+        "part": 2,
+        "text": "1. the code is reviewed by one teammate,\r\n2. all tests pass,\r\n3. it is deployed to staging.\r\n\r\n## 5. On-call\r\n\r\n- One person is on call each week, from **Monday 10:00** to the next Monday 10:00.\r\n- On-call allowance: **Rs 1,500 per week**."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 34.5
+  },
+  {
+    "id": 3,
+    "ask_as": "TEST-Manager",
+    "question": "I clicked a phishing link. What do I do?",
+    "expected_answer": "Report it to IT support within 1 hour of noticing it.",
+    "source": "org-it-security-policy.pdf",
+    "asked_as_user": "Jayant Kumar Thakur",
+    "route": "read",
+    "searches": [
+      "phishing link"
+    ],
+    "rewrites": 0,
+    "answer": "A clicked phishing link is considered a security incident [feb707bd]. You should:\n\n* Report the security incident to IT support within **1 hour** of noticing it [feb707bd].",
+    "answer_clean": "A clicked phishing link is considered a security incident. You should:\n\n* Report the security incident to IT support within **1 hour** of noticing it.",
+    "retrieval_context": [
+      {
+        "title": "org-it-security-policy",
+        "part": 2,
+        "text": "- Install only approved software. Request anything else through an IT ticket; requests are\nanswered within 3 working days.\n5. Phishing\n- Do not click links or open attachments in unexpected emails.\n- Forward suspicious emails to the security team and delete them.\n6. Security incidents\n- A security incident is anything that may expose company or client data: a lost laptop, a\nshared password, a clicked phishing link.\n- Report a security incident to IT support within 1 hour of noticing it. IT informs the Admin."
+      },
+      {
+        "title": "org-it-security-policy",
+        "part": 1,
+        "text": "IT Security Policy (Test Document)\nShare with: the whole organization.\n1. Passwords and sign-in\n- Passwords must be at least 12 characters and are changed every 90 days.\n- Multi-factor authentication (MFA) is mandatory for email and for Trellis.\n- IT will never ask for your password. Anyone who does is attempting fraud.\n2. Laptops and devices\n- Every employee gets a company laptop on day one. Company data stays on company\nlaptops.\n- Report a lost or stolen laptop to IT support within 24 hours.\n- Screens lock automatically after 5 minutes without use. Lock your screen when you step\naway.\n- USB storage drives are blocked on company laptops.\n3. Networks\n- On public Wi-Fi (cafes, airports, hotels) always connect through the company VPN ﬁrst.\n4. Software\n- Install only approved software. Request anything else through an IT ticket; requests are\nanswered within 3 working days.\n5. Phishing\n- Do not click links or open attachments in unexpected emails."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      },
+      {
+        "title": "employee-handbook",
+        "part": 3,
+        "text": "## 5. Equipment and security\n\n- Every employee receives a laptop on day one. Report a lost or stolen laptop to IT within **24 hours**.\n- Passwords must be at least **12 characters** and are changed every **90 days**.\n- Never share company documents outside the organization.\n\n## 6. Expenses\n\n- Travel and meal expenses are reimbursed up to **₹2,000 per day** for approved work trips.\n- Submit receipts within **30 days** of the trip.\n\n## 7. Who to contact\n\n- Leave and payroll: **HR**\n- Laptop and accounts: **IT support**\n- Task questions: **your team manager**"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 21.5
+  },
+  {
+    "id": 4,
+    "ask_as": "TEST-Employee",
+    "question": "Can I share my password with a teammate?",
+    "expected_answer": "No. Never share your password or let someone else use your account, not even a teammate; it leads to a strike and IT resets the account.",
+    "source": "org-code-of-conduct.md",
+    "asked_as_user": "Piyush Kumar",
+    "route": "read",
+    "searches": [
+      "password sharing"
+    ],
+    "rewrites": 0,
+    "answer": "No, you must never share your password or let someone else use your account, not even a teammate who is \"just checking something\" [f9825725]. \n\nSharing your password is considered a security incident [feb707bd], and the usual outcome is a strike and an IT account reset [cff13f0c].",
+    "answer_clean": "No, you must never share your password or let someone else use your account, not even a teammate who is \"just checking something\". \n\nSharing your password is considered a security incident, and the usual outcome is a strike and an IT account reset.",
+    "retrieval_context": [
+      {
+        "title": "org-it-security-policy",
+        "part": 1,
+        "text": "IT Security Policy (Test Document)\nShare with: the whole organization.\n1. Passwords and sign-in\n- Passwords must be at least 12 characters and are changed every 90 days.\n- Multi-factor authentication (MFA) is mandatory for email and for Trellis.\n- IT will never ask for your password. Anyone who does is attempting fraud.\n2. Laptops and devices\n- Every employee gets a company laptop on day one. Company data stays on company\nlaptops.\n- Report a lost or stolen laptop to IT support within 24 hours.\n- Screens lock automatically after 5 minutes without use. Lock your screen when you step\naway.\n- USB storage drives are blocked on company laptops.\n3. Networks\n- On public Wi-Fi (cafes, airports, hotels) always connect through the company VPN ﬁrst.\n4. Software\n- Install only approved software. Request anything else through an IT ticket; requests are\nanswered within 3 working days.\n5. Phishing\n- Do not click links or open attachments in unexpected emails."
+      },
+      {
+        "title": "org-it-security-policy",
+        "part": 2,
+        "text": "- Install only approved software. Request anything else through an IT ticket; requests are\nanswered within 3 working days.\n5. Phishing\n- Do not click links or open attachments in unexpected emails.\n- Forward suspicious emails to the security team and delete them.\n6. Security incidents\n- A security incident is anything that may expose company or client data: a lost laptop, a\nshared password, a clicked phishing link.\n- Report a security incident to IT support within 1 hour of noticing it. IT informs the Admin."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 1,
+        "text": "# Code of Conduct (Test Document)\r\n\r\nShare with: **the whole organization**. This code applies to everyone at Trellis: employees, managers, HR, consultants and the Admin.\r\n\r\n## 1. Respect at work\r\n\r\n- Treat colleagues with respect in meetings, chat and email. Shouting, insults and mocking someone's background are not allowed.\r\n- **Harassment and discrimination** (based on gender, religion, caste, region, age, disability or any other personal trait) are never acceptable.\r\n- Report harassment to **HR within 7 days** of it happening, or anonymously through the ethics form on the intranet. Reports are kept confidential.\r\n\r\n## 2. Confidentiality\r\n\r\n- Company documents, client data and internal plans stay inside the organization. **Never share company documents outside Trellis**, including by forwarding them to a personal email address.\r\n- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "employee-handbook",
+        "part": 3,
+        "text": "## 5. Equipment and security\n\n- Every employee receives a laptop on day one. Report a lost or stolen laptop to IT within **24 hours**.\n- Passwords must be at least **12 characters** and are changed every **90 days**.\n- Never share company documents outside the organization.\n\n## 6. Expenses\n\n- Travel and meal expenses are reimbursed up to **₹2,000 per day** for approved work trips.\n- Submit receipts within **30 days** of the trip.\n\n## 7. Who to contact\n\n- Leave and payroll: **HR**\n- Laptop and accounts: **IT support**\n- Task questions: **your team manager**"
+      }
+    ],
+    "cited_parts": 3,
+    "seconds": 17.8
+  },
+  {
+    "id": 5,
+    "ask_as": "TEST-Employee",
+    "question": "How many paid leave days do I get?",
+    "expected_answer": "18 paid leave days a year.",
+    "source": "employee-handbook.md",
+    "asked_as_user": "Piyush Kumar",
+    "route": "read",
+    "searches": [
+      "paid leave days"
+    ],
+    "rewrites": 0,
+    "answer": "You get **18 days** of paid (annual) leave per year [24c41de9]. \n\nAdditionally, you receive:\n- **10 days** of sick leave per year [24c41de9].\n- **5 days** of bereavement leave [24c41de9].\n- **2 floating holidays** for 2026 [3de78fa8].",
+    "answer_clean": "You get **18 days** of paid (annual) leave per year. \n\nAdditionally, you receive:\n- **10 days** of sick leave per year.\n- **5 days** of bereavement leave.\n- **2 floating holidays** for 2026.",
+    "retrieval_context": [
+      {
+        "title": "employee-handbook",
+        "part": 2,
+        "text": "- Unused paid leave: up to **5 days** carry over to the next year; the rest expires on **31 March**.\n- During the probation period (the first **3 months**), only sick leave can be taken.\n\n## 3. Tasks and deadlines\n\n- Every task has one assignee and a deadline set by the manager.\n- If a deadline can't be met, mark the task **Blocked** and tell your manager at least **24 hours** before the deadline.\n- A missed deadline without notice can lead to a **strike**. Three active strikes in a team trigger a review with HR.\n\n## 4. Strikes and appeals\n\n- An employee can **appeal a strike once**, with a short note explaining what happened.\n- The person who gave the strike never reviews its appeal.\n- A dismissed strike no longer counts toward the limit of three.\n\n## 5. Equipment and security"
+      },
+      {
+        "title": "org-holiday-calendar-2026",
+        "part": 1,
+        "text": "Holiday Calendar 2026 (Test Document)\nShare with: the whole organization.\n1. Fixed holidays\nThe office is closed on these 10 days. They are paid holidays and do not use your leave.\n2. Floating holidays\nEveryone may take 2 floating holidays in 2026, chosen from: Eid al-Fitr, Raksha Bandhan, Onam, Pongal and Dussehra. Apply for a floating holiday like paid leave: ask your manager at least 7 days before. Unused floating holidays do not carry over to 2027.\n3. Year-end shutdown\nThe office is closed from 28 to 31 December 2026. These four days are paid holidays and do not use your leave.\n4. Other rules\nA holiday that falls on a Saturday or Sunday is not moved to a working day.\nWorking on a holiday needs your manager's approval beforehand and earns one compensatory day off, to be taken within 30 days.\nHoliday | Date | Day\nNew Year's Day | 01 January 2026 | Thursday\nRepublic Day | 26 January 2026 | Monday\nHoli | 04 March 2026 | Wednesday\nGood Friday | 03 April 2026 | Friday"
+      },
+      {
+        "title": "employee-handbook",
+        "part": 1,
+        "text": "# Employee Handbook (Test Document)\n\nThis handbook applies to everyone in the **Employee** role. Share it with the Employee role, so Employees and every role above them can read it.\n\n## 1. Working hours\n\n- Core hours are **10:00 to 16:00**, Monday to Friday. Outside core hours, employees choose their own start and end time.\n- A full working week is **40 hours**.\n- Employees may work from home on **Tuesdays and Thursdays**. Any other remote day needs the manager's approval at least **2 working days** in advance.\n\n## 2. Leave\n\n| Type of leave | Days per year | How to apply |\n|---|---|---|\n| Paid (annual) leave | **18 days** | Ask your manager at least **7 days** before |\n| Sick leave | **10 days** | Tell your manager on the same day; a doctor's note is needed for more than **2 days** in a row |\n| Bereavement leave | **5 days** | Tell your manager as soon as you can |"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "team-alpha-project-charter",
+        "part": 2,
+        "text": "1. the code is reviewed by one teammate,\r\n2. all tests pass,\r\n3. it is deployed to staging.\r\n\r\n## 5. On-call\r\n\r\n- One person is on call each week, from **Monday 10:00** to the next Monday 10:00.\r\n- On-call allowance: **Rs 1,500 per week**."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      }
+    ],
+    "cited_parts": 2,
+    "seconds": 26.2
+  },
+  {
+    "id": 6,
+    "ask_as": "TEST-Employee",
+    "question": "What time is the Alpha standup?",
+    "expected_answer": "The TEST-Alpha standup is at 10:15, lasts 15 minutes, and is held on Google Meet.",
+    "source": "team-alpha-project-charter.md",
+    "asked_as_user": "Piyush Kumar",
+    "route": "read",
+    "searches": [
+      "Alpha standup time"
+    ],
+    "rewrites": 0,
+    "answer": "The daily standup for the Alpha team is at **10:15** on Google Meet [3f62530f].",
+    "answer_clean": "The daily standup for the Alpha team is at **10:15** on Google Meet.",
+    "retrieval_context": [
+      {
+        "title": "team-alpha-project-charter",
+        "part": 1,
+        "text": "# TEST-Alpha Project Charter (Test Document)\r\n\r\nShare with: **the team TEST-Alpha**. Members of TEST-Alpha and the people who oversee the team can read it.\r\n\r\n## 1. The project\r\n\r\n- **Project Lighthouse**: a self-service portal where customers can see their orders and raise support tickets.\r\n- Goal: cut support emails by **30 percent** by March 2027.\r\n\r\n## 2. Milestones (2026)\r\n\r\n| Milestone | Date |\r\n|---|---|\r\n| Design freeze | 30 October |\r\n| Beta for 20 pilot customers | 27 November |\r\n| Public launch | 15 December |\r\n\r\n## 3. How the team works\r\n\r\n- Daily standup at **10:15**, 15 minutes, on Google Meet.\r\n- Team chat channel: **#alpha-team**.\r\n- No deployments on Fridays after **15:00**.\r\n\r\n## 4. Definition of done\r\n\r\nA task is Done in Trellis only when:\r\n1. the code is reviewed by one teammate,\r\n2. all tests pass,\r\n3. it is deployed to staging.\r\n\r\n## 5. On-call\r\n\r\n- One person is on call each week, from **Monday 10:00** to the next Monday 10:00."
+      },
+      {
+        "title": "team-alpha-project-charter",
+        "part": 2,
+        "text": "1. the code is reviewed by one teammate,\r\n2. all tests pass,\r\n3. it is deployed to staging.\r\n\r\n## 5. On-call\r\n\r\n- One person is on call each week, from **Monday 10:00** to the next Monday 10:00.\r\n- On-call allowance: **Rs 1,500 per week**."
+      },
+      {
+        "title": "org-holiday-calendar-2026",
+        "part": 1,
+        "text": "Holiday Calendar 2026 (Test Document)\nShare with: the whole organization.\n1. Fixed holidays\nThe office is closed on these 10 days. They are paid holidays and do not use your leave.\n2. Floating holidays\nEveryone may take 2 floating holidays in 2026, chosen from: Eid al-Fitr, Raksha Bandhan, Onam, Pongal and Dussehra. Apply for a floating holiday like paid leave: ask your manager at least 7 days before. Unused floating holidays do not carry over to 2027.\n3. Year-end shutdown\nThe office is closed from 28 to 31 December 2026. These four days are paid holidays and do not use your leave.\n4. Other rules\nA holiday that falls on a Saturday or Sunday is not moved to a working day.\nWorking on a holiday needs your manager's approval beforehand and earns one compensatory day off, to be taken within 30 days.\nHoliday | Date | Day\nNew Year's Day | 01 January 2026 | Thursday\nRepublic Day | 26 January 2026 | Monday\nHoli | 04 March 2026 | Wednesday\nGood Friday | 03 April 2026 | Friday"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      },
+      {
+        "title": "employee-handbook",
+        "part": 2,
+        "text": "- Unused paid leave: up to **5 days** carry over to the next year; the rest expires on **31 March**.\n- During the probation period (the first **3 months**), only sick leave can be taken.\n\n## 3. Tasks and deadlines\n\n- Every task has one assignee and a deadline set by the manager.\n- If a deadline can't be met, mark the task **Blocked** and tell your manager at least **24 hours** before the deadline.\n- A missed deadline without notice can lead to a **strike**. Three active strikes in a team trigger a review with HR.\n\n## 4. Strikes and appeals\n\n- An employee can **appeal a strike once**, with a short note explaining what happened.\n- The person who gave the strike never reviews its appeal.\n- A dismissed strike no longer counts toward the limit of three.\n\n## 5. Equipment and security"
+      },
+      {
+        "title": "employee-handbook",
+        "part": 1,
+        "text": "# Employee Handbook (Test Document)\n\nThis handbook applies to everyone in the **Employee** role. Share it with the Employee role, so Employees and every role above them can read it.\n\n## 1. Working hours\n\n- Core hours are **10:00 to 16:00**, Monday to Friday. Outside core hours, employees choose their own start and end time.\n- A full working week is **40 hours**.\n- Employees may work from home on **Tuesdays and Thursdays**. Any other remote day needs the manager's approval at least **2 working days** in advance.\n\n## 2. Leave\n\n| Type of leave | Days per year | How to apply |\n|---|---|---|\n| Paid (annual) leave | **18 days** | Ask your manager at least **7 days** before |\n| Sick leave | **10 days** | Tell your manager on the same day; a doctor's note is needed for more than **2 days** in a row |\n| Bereavement leave | **5 days** | Tell your manager as soon as you can |"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 16.9
+  },
+  {
+    "id": 7,
+    "ask_as": "TEST-Manager",
+    "question": "How quickly must I respond to a blocked task?",
+    "expected_answer": "Within 1 working day.",
+    "source": "manager-playbook.md",
+    "asked_as_user": "Jayant Kumar Thakur",
+    "route": "read",
+    "searches": [
+      "blocked task SLA response time policy"
+    ],
+    "rewrites": 0,
+    "answer": "When someone marks a task as blocked, you must reply within **1 working day** with help, a new deadline, or a reassignment [bb7010dc].",
+    "answer_clean": "When someone marks a task as blocked, you must reply within **1 working day** with help, a new deadline, or a reassignment.",
+    "retrieval_context": [
+      {
+        "title": "manager-playbook",
+        "part": 2,
+        "text": "- A task marked Blocked at least 24 hours before its deadline is **never** a reason for a strike.\r\n\r\n## 4. Before giving a strike\r\n\r\n1. Check the Code of Conduct: the reason must match something it covers.\r\n2. Talk to the person privately **within 2 working days** of the incident and hear their side.\r\n3. Write a specific reason (\"Missed the 12 Oct deadline for the Q3 report without notice\"), not a general one (\"careless\").\r\n4. Give the strike in Trellis; the policy check on the confirm card shows whether a policy supports it.\r\n\r\n## 5. Third strike\r\n\r\n- The third active strike in a team triggers an HR review automatically.\r\n- The manager sends HR a short written summary of all three strikes **within 5 working days**.\r\n\r\n## 6. Commendations\r\n\r\n- Give at least **one commendation per team member per quarter** when it is earned.\r\n- Be specific: name the task and what was done well.\r\n\r\n## 7. Overtime\r\n\r\n- Approve at most **8 hours of overtime per person per month**."
+      },
+      {
+        "title": "employee-handbook",
+        "part": 2,
+        "text": "- Unused paid leave: up to **5 days** carry over to the next year; the rest expires on **31 March**.\n- During the probation period (the first **3 months**), only sick leave can be taken.\n\n## 3. Tasks and deadlines\n\n- Every task has one assignee and a deadline set by the manager.\n- If a deadline can't be met, mark the task **Blocked** and tell your manager at least **24 hours** before the deadline.\n- A missed deadline without notice can lead to a **strike**. Three active strikes in a team trigger a review with HR.\n\n## 4. Strikes and appeals\n\n- An employee can **appeal a strike once**, with a short note explaining what happened.\n- The person who gave the strike never reviews its appeal.\n- A dismissed strike no longer counts toward the limit of three.\n\n## 5. Equipment and security"
+      },
+      {
+        "title": "manager-playbook",
+        "part": 1,
+        "text": "# Manager Playbook (Test Document)\r\n\r\nShare with: **the TEST-Manager role**. Managers and the roles above them can read it; employees cannot. Do not forward it to your team.\r\n\r\n## 1. Assigning tasks\r\n\r\n- Every task has one assignee and a deadline. Give at least **2 working days** for a new task unless it is urgent, and say why when it is.\r\n- Write what \"done\" means in the task description, so the assignee knows when to mark it Done.\r\n- Do not assign more than **5 open tasks** to one person at the same time.\r\n\r\n## 2. Weekly 1:1s\r\n\r\n- Hold a **30-minute 1:1 every week** with each person who reports to you.\r\n- Use it to check blocked tasks, workload and leave plans.\r\n\r\n## 3. Blocked tasks\r\n\r\n- When someone marks a task **Blocked**, reply within **1 working day** with help, a new deadline or a reassignment.\r\n- A task marked Blocked at least 24 hours before its deadline is **never** a reason for a strike.\r\n\r\n## 4. Before giving a strike"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      },
+      {
+        "title": "manager-playbook",
+        "part": 3,
+        "text": "- Be specific: name the task and what was done well.\r\n\r\n## 7. Overtime\r\n\r\n- Approve at most **8 hours of overtime per person per month**.\r\n- Overtime is paid back as compensatory time off, taken within **30 days**."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 20.4
+  },
+  {
+    "id": 8,
+    "ask_as": "TEST-Manager",
+    "question": "What does someone need to get promoted?",
+    "expected_answer": "Two reviews in a row rated 4 or higher, and the manager nominates them by 15 February.",
+    "source": "manager-performance-reviews.pptx",
+    "asked_as_user": "Jayant Kumar Thakur",
+    "route": "read",
+    "searches": [
+      "promoted promotion requirements"
+    ],
+    "rewrites": 0,
+    "answer": "To get promoted, someone needs:\n\n* Two performance reviews in a row rated 4 (\"Exceeds expectations\") or higher [6be66414].\n* A manager nomination by 15 February [6be66414].\n* Approval from Admin (with HR updating the salary band) [6be66414].",
+    "answer_clean": "To get promoted, someone needs:\n\n* Two performance reviews in a row rated 4 (\"Exceeds expectations\") or higher.\n* A manager nomination by 15 February.\n* Approval from Admin (with HR updating the salary band).",
+    "retrieval_context": [
+      {
+        "title": "manager-performance-reviews",
+        "part": 3,
+        "text": "[Slide 5] Promotions Needs two reviews in a row rated 4 or higher\nThe manager nominates by 15 February\nAdmin approves promotions; HR updates the salary band\n\n[Slide 6] Performance improvement plan (PIP) A rating of 1 or 2 starts a 60-day PIP with HR\nCheck-ins every 2 weeks, written down\nAt the end: PIP closed, extended once by 30 days, or exit discussion with HR"
+      },
+      {
+        "title": "manager-playbook",
+        "part": 3,
+        "text": "- Be specific: name the task and what was done well.\r\n\r\n## 7. Overtime\r\n\r\n- Approve at most **8 hours of overtime per person per month**.\r\n- Overtime is paid back as compensatory time off, taken within **30 days**."
+      },
+      {
+        "title": "manager-performance-reviews",
+        "part": 2,
+        "text": "[Slide 3] Rating scale 1 = Needs improvement, 2 = Partly meets, 3 = Meets expectations\n4 = Exceeds expectations, 5 = Exceptional\nHR runs a calibration meeting with all managers before ratings are shared\n\n[Slide 4] What to look at Tasks completed and deadlines met (from Trellis)\nCommendations received\nActive strikes; dismissed strikes do not count\nFeedback from teammates"
+      },
+      {
+        "title": "manager-performance-reviews",
+        "part": 1,
+        "text": "[Slide 1] Performance Review Guide 2026 For managers only (TEST-Manager role)\nTest document for Trellis\n\n[Slide 2] Review cycle Two reviews a year: mid-year in July and year-end in January\nEmployees submit a self-review 10 days before their review meeting\nManagers finish all reviews within 3 weeks of the cycle opening"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      },
+      {
+        "title": "manager-playbook",
+        "part": 1,
+        "text": "# Manager Playbook (Test Document)\r\n\r\nShare with: **the TEST-Manager role**. Managers and the roles above them can read it; employees cannot. Do not forward it to your team.\r\n\r\n## 1. Assigning tasks\r\n\r\n- Every task has one assignee and a deadline. Give at least **2 working days** for a new task unless it is urgent, and say why when it is.\r\n- Write what \"done\" means in the task description, so the assignee knows when to mark it Done.\r\n- Do not assign more than **5 open tasks** to one person at the same time.\r\n\r\n## 2. Weekly 1:1s\r\n\r\n- Hold a **30-minute 1:1 every week** with each person who reports to you.\r\n- Use it to check blocked tasks, workload and leave plans.\r\n\r\n## 3. Blocked tasks\r\n\r\n- When someone marks a task **Blocked**, reply within **1 working day** with help, a new deadline or a reassignment.\r\n- A task marked Blocked at least 24 hours before its deadline is **never** a reason for a strike.\r\n\r\n## 4. Before giving a strike"
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 21.0
+  },
+  {
+    "id": 9,
+    "ask_as": "TEST-HR",
+    "question": "What is the L3 salary band?",
+    "expected_answer": "Rs 10 to 16 lakh per year (L3 Senior Engineer).",
+    "source": "hr-compensation-and-payroll.txt",
+    "asked_as_user": "Student Test",
+    "route": "read",
+    "searches": [
+      "L3 salary band"
+    ],
+    "rewrites": 0,
+    "answer": "The L3 Senior Engineer salary band is Rs 10 to 16 lakh per year (annual CTC) [bd135b7e].",
+    "answer_clean": "The L3 Senior Engineer salary band is Rs 10 to 16 lakh per year (annual CTC).",
+    "retrieval_context": [
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 1,
+        "text": "COMPENSATION AND PAYROLL (TEST DOCUMENT) - CONFIDENTIAL\r\n\r\nShare with: the TEST-HR role only. HR and the Admin can read it. Never share salary bands with employees or managers.\r\n\r\n1. SALARY BANDS (annual CTC)\r\n\r\n  L1 Associate         Rs 4.5 to 6 lakh per year\r\n  L2 Engineer          Rs 6 to 10 lakh per year\r\n  L3 Senior Engineer   Rs 10 to 16 lakh per year\r\n  M1 Manager           Rs 16 to 24 lakh per year\r\n\r\n2. PAYROLL\r\n\r\n  - Salaries are paid on the last working day of each month.\r\n  - The payroll cut-off is the 25th: changes after the 25th are paid the next month.\r\n  - Payslips are emailed on the 1st of the next month.\r\n\r\n3. ANNUAL INCREMENT\r\n\r\n  - Increments take effect every April.\r\n  - The average increment budget for 2026 is 8 percent.\r\n\r\n4. PERFORMANCE BONUS\r\n\r\n  - Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis."
+      },
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 2,
+        "text": "- Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis.\r\n  - At exit, up to 10 days of unused paid leave are paid out."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      },
+      {
+        "title": "org-travel-and-expense-policy",
+        "part": 2,
+        "text": "- Meals and local travel are covered up to **Rs 2,000 per day** on approved trips (same as the Employee Handbook).\r\n\r\n## 5. Claiming money back\r\n\r\n- Submit receipts **within 30 days** of the trip.\r\n- Claims submitted by the **20th** of a month are paid with that month's salary; later claims are paid the month after.\r\n\r\n## 6. Not reimbursed\r\n\r\n- Alcohol, traffic fines, room upgrades, personal entertainment and travel for family members."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "hr-recruitment-and-onboarding",
+        "part": 1,
+        "text": "# Recruitment and Onboarding (Test Document)\r\n\r\nShare with: **the TEST-HR role**. HR and the Admin can read it.\r\n\r\n## 1. Hiring stages\r\n\r\n1. Application screen by HR (within **5 working days** of applying).\r\n2. A **30-minute** HR call.\r\n3. Role interview with the hiring manager.\r\n4. Final interview with the Admin.\r\n\r\n- Every candidate hears back within **5 working days** of their final interview.\r\n\r\n## 2. Offers\r\n\r\n- The offer salary must sit inside the salary band for the level (see Compensation and Payroll).\r\n- An offer above the band needs the **Admin's approval**.\r\n- A background check is completed before the person's first day.\r\n\r\n## 3. Onboarding checklist (first week)\r\n\r\n- Day 1: laptop handed over (see the IT Security Policy), MFA set up.\r\n- Day 1: invite the person to Trellis from **Admin → Members** with their role; the manager adds them to their team.\r\n- Assign an onboarding **buddy** from the same team for the first month."
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 20.6
+  },
+  {
+    "id": 10,
+    "ask_as": "TEST-HR",
+    "question": "What's the notice period for a manager?",
+    "expected_answer": "60 days.",
+    "source": "hr-recruitment-and-onboarding.md",
+    "asked_as_user": "Student Test",
+    "route": "read",
+    "searches": [
+      "notice period manager"
+    ],
+    "rewrites": 0,
+    "answer": "The notice period for a manager is **60 days** [a45fc4ef].",
+    "answer_clean": "The notice period for a manager is **60 days**.",
+    "retrieval_context": [
+      {
+        "title": "hr-recruitment-and-onboarding",
+        "part": 2,
+        "text": "- Day 1: invite the person to Trellis from **Admin → Members** with their role; the manager adds them to their team.\r\n- Assign an onboarding **buddy** from the same team for the first month.\r\n- The new joiner reads: Code of Conduct, IT Security Policy, Employee Handbook.\r\n\r\n## 4. Probation\r\n\r\n- Probation lasts **3 months** (the same as the Employee Handbook).\r\n- HR and the manager hold a probation review in the last week of month 3.\r\n- Probation can be extended **once**, by up to 3 more months.\r\n\r\n## 5. Leaving Trellis\r\n\r\n- Notice period: **30 days** for employees, **60 days** for managers.\r\n- HR holds an exit interview in the last week.\r\n- On the last day, remove the person from Trellis (**Admin → Members → Remove**) and collect the laptop."
+      },
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 2,
+        "text": "- Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis.\r\n  - At exit, up to 10 days of unused paid leave are paid out."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 3,
+        "text": "- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media\r\n\r\n- Do not post about clients, unreleased work or internal discussions on social media.\r\n- You may share public Trellis announcements.\r\n\r\n## 7. What happens when the code is broken\r\n\r\n| What happened | Usual outcome |\r\n|---|---|\r\n| A missed deadline without telling the manager at least 24 hours before | A strike |\r\n| Sharing your password or letting someone else use your account | A strike, and IT resets the account |\r\n| Late after 10:30 more than 3 times in a month, after a warning | A strike |\r\n| Sharing company documents outside the organization | A strike and an HR review |\r\n| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR."
+      },
+      {
+        "title": "hr-compensation-and-payroll",
+        "part": 1,
+        "text": "COMPENSATION AND PAYROLL (TEST DOCUMENT) - CONFIDENTIAL\r\n\r\nShare with: the TEST-HR role only. HR and the Admin can read it. Never share salary bands with employees or managers.\r\n\r\n1. SALARY BANDS (annual CTC)\r\n\r\n  L1 Associate         Rs 4.5 to 6 lakh per year\r\n  L2 Engineer          Rs 6 to 10 lakh per year\r\n  L3 Senior Engineer   Rs 10 to 16 lakh per year\r\n  M1 Manager           Rs 16 to 24 lakh per year\r\n\r\n2. PAYROLL\r\n\r\n  - Salaries are paid on the last working day of each month.\r\n  - The payroll cut-off is the 25th: changes after the 25th are paid the next month.\r\n  - Payslips are emailed on the 1st of the next month.\r\n\r\n3. ANNUAL INCREMENT\r\n\r\n  - Increments take effect every April.\r\n  - The average increment budget for 2026 is 8 percent.\r\n\r\n4. PERFORMANCE BONUS\r\n\r\n  - Paid in May to people rated 4 or 5 in the year-end review.\r\n  - Up to 10 percent of annual CTC.\r\n\r\n5. LEAVE ENCASHMENT\r\n\r\n  - Unused paid leave is not paid out while working at Trellis."
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 2,
+        "text": "- Client data is never stored on a personal device.\r\n- Confidentiality continues for **2 years** after someone leaves Trellis.\r\n\r\n## 3. Accounts and passwords\r\n\r\n- Your login is personal. **Never share your password or let someone else use your account**, not even a teammate who is \"just checking something\".\r\n- If you think someone knows your password, change it immediately and tell IT support.\r\n\r\n## 4. Attendance and punctuality\r\n\r\n- Be online by **10:30** on working days (core hours are 10:00 to 16:00, see the Employee Handbook).\r\n- Arriving after 10:30 without notice **3 times in one month** leads to a conversation with your manager. If it continues after that warning, it can lead to a strike.\r\n- Join your team's daily standup unless you are on leave.\r\n\r\n## 5. Conflicts of interest\r\n\r\n- Tell HR about any side job or freelance work **within 14 days** of starting it.\r\n- Gifts from clients or vendors worth more than **Rs 5,000** must be declared to HR.\r\n\r\n## 6. Social media"
+      },
+      {
+        "title": "org-code-of-conduct",
+        "part": 4,
+        "text": "| Harassment or discrimination | An immediate HR investigation; it can lead to dismissal |\r\n\r\n- Three active strikes in one team trigger a review with HR.\r\n- Anyone who receives a strike can appeal it once (see the Employee Handbook).\r\n\r\n## 8. Questions\r\n\r\nAsk your manager or HR. When in doubt, ask before acting."
+      }
+    ],
+    "cited_parts": 1,
+    "seconds": 36.9
+  }
+]

@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-import { toast } from "sonner";
+import React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,35 +11,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { removeMember } from "@/lib/api/actions/members";
 import type { Member } from "@/lib/api/queries/members";
 
 interface RemoveMemberDialogProps {
   /** A row with manageable: true (trellis/12 D38). */
   member: Member;
+  /** Removes the row at once; the server's answer comes later (use-member-changes.ts). */
+  onRemove: () => void;
   onClose: () => void;
 }
 
-export function RemoveMemberDialog({ member, onClose }: RemoveMemberDialogProps) {
-  const [isRemoving, setIsRemoving] = useState(false);
+export function RemoveMemberDialog({ member, onRemove, onClose }: RemoveMemberDialogProps) {
   const name = member.name || member.email;
 
-  const handleRemove = async () => {
-    setIsRemoving(true);
-    try {
-      const res = await removeMember(member.user_id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-      // removeMember refreshes /admin/members, so the row disappears by itself.
-      toast.success(`${name} was removed from the organization.`);
-      onClose();
-    } catch {
-      toast.error("An unexpected error occurred while removing the member.");
-    } finally {
-      setIsRemoving(false);
-    }
+  const handleRemove = () => {
+    onRemove();
+    onClose();
   };
 
   return (
@@ -65,11 +51,11 @@ export function RemoveMemberDialog({ member, onClose }: RemoveMemberDialogProps)
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isRemoving}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Keep Member
           </Button>
-          <Button type="button" variant="destructive" onClick={handleRemove} disabled={isRemoving}>
-            {isRemoving ? "Removing..." : "Remove Member"}
+          <Button type="button" variant="destructive" onClick={handleRemove}>
+            Remove Member
           </Button>
         </DialogFooter>
       </DialogContent>
