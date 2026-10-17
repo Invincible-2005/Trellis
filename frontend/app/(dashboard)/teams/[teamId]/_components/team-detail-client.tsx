@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, ClipboardList, Plus, UserPlus, Users } from 'lucide-react';
 
@@ -8,11 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { TeamCandidates, TeamDetail } from '@/lib/api/queries/teams';
 import type { Task } from '@/lib/api/queries/tasks';
+import { useServerData } from '@/lib/query/use-server-data';
 import { TaskDataTable } from '@/app/(dashboard)/tasks/_components/task-data-table';
 import { CreateTaskDialog, type AssignableTeam } from '@/app/(dashboard)/tasks/_components/create-task-dialog';
+import { tasksKey, type TaskRow } from '@/app/(dashboard)/tasks/_components/use-task-changes';
 import { AddMemberDialog } from './add-member-dialog';
 import { DeleteTeamButton } from './delete-team-button';
 import { TeamMembersTable } from './team-members-table';
+import { teamMembersKey, type MemberRow } from './use-team-member-changes';
 
 interface TeamDetailClientProps {
   team: TeamDetail;
@@ -24,11 +27,17 @@ interface TeamDetailClientProps {
 export function TeamDetailClient({
   team,
   candidates,
-  tasks,
+  tasks: serverTasks,
   assignableMembers,
 }: TeamDetailClientProps) {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+
+  // Cached copies of this page's two lists, so changes show at once (D50)
+  const membersKey = useMemo(() => teamMembersKey(team.id), [team.id]);
+  const taskListKey = useMemo(() => tasksKey.team(team.id), [team.id]);
+  const members = useServerData<MemberRow[]>(membersKey, team.members);
+  const tasks = useServerData<TaskRow[]>(taskListKey, serverTasks);
 
   // The create-task dialog expects an AssignableTeam[] — wrap this team
   const createTaskTeams: AssignableTeam[] = team.can_assign_task
@@ -124,7 +133,7 @@ export function TeamDetailClient({
         <TeamMembersTable
           teamId={team.id}
           teamName={team.name}
-          members={team.members}
+          members={members}
           canAddMember={team.can_add_member}
           onAddMember={() => setAddMemberOpen(true)}
         />
@@ -136,7 +145,7 @@ export function TeamDetailClient({
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
           Tasks
         </h2>
-        <TaskDataTable tasks={tasks} hideTeam />
+        <TaskDataTable tasks={tasks} tasksKey={taskListKey} hideTeam assignableTeams={createTaskTeams} />
       </section>
 
       {/* ── Dialogs ────────────────────────────────────────────────── */}
@@ -145,6 +154,7 @@ export function TeamDetailClient({
           open={addMemberOpen}
           onOpenChange={setAddMemberOpen}
           teamId={team.id}
+          teamName={team.name}
           candidates={candidates}
         />
       )}
@@ -155,6 +165,7 @@ export function TeamDetailClient({
           onOpenChange={setCreateTaskOpen}
           teams={createTaskTeams}
           fixedTeamId={team.id}
+          tasksKey={taskListKey}
         />
       )}
     </div>

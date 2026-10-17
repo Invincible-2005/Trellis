@@ -94,6 +94,16 @@ For `.pptx`: text is extracted per-slide with slide number prepended as context:
 - **Embedding Model:** ~~`mxbai-embed-large-v1` (1024 dims) — context window 512 tokens.~~ **`gemini-embedding-001` at 1024 dims (ticket 12 D14, 2026-10-09)** — 2,048-token input, so the 1000-char chunks fit easily.
 
 #### A. Standard Docs (`.pdf`, `.docx`, `.txt`, `.md`):
+
+> **Planned change (ticket 12 D58, decided 2026-10-16, not built yet):** cut at headings instead of every
+> 1,000 characters. Headings: Markdown `#` lines, Word "Heading" styles (kept as `## ` markers when the
+> text is extracted; today they are dropped), numbered lines like "1. Passwords and sign-in" in PDF and
+> txt. A section under ~200 characters is joined to its neighbour; a section over 1,000 is cut with the
+> recursive splitter below; every piece starts with "Document title > Section". No headings found →
+> the splitter below as today. Slides (B) unchanged. Search returns 4 pieces instead of 6.
+> Reason: evaluation 2026-10-16 (`backend/evaluation/results/`).
+> The 1,000 / 200 rule below is superseded for documents with headings once D58 is built.
+
 - **Chunk Size:** 1000 characters
 - **Chunk Overlap:** 200 characters
 

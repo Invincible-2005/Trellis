@@ -39,6 +39,7 @@ export const STEP_LABELS: Record<string, string> = {
   thinking: "Thinking…",
   searching_documents: "Searching documents…",
   looking_up_tasks: "Looking up tasks…",
+  reading_comments: "Reading comments…",
   looking_up_teams: "Looking up teams…",
   looking_up_people: "Looking up people…",
   checking_document_access: "Checking document access…",

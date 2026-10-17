@@ -13,10 +13,11 @@ import {
 
 const chartConfig = {
   count: { label: "Tasks" },
-  todo: { label: "To do", color: "var(--chart-1, #3b82f6)" },
-  in_progress: { label: "In progress", color: "var(--chart-2, #f59e0b)" },
-  blocked: { label: "Blocked", color: "var(--chart-3, #ef4444)" },
-  done: { label: "Done", color: "var(--chart-4, #10b981)" },
+  // Theme colours: grey = not started, orange = moving, red = stuck, teal = finished
+  todo: { label: "To do", color: "var(--chart-4)" },
+  in_progress: { label: "In progress", color: "var(--chart-2)" },
+  blocked: { label: "Blocked", color: "var(--destructive)" },
+  done: { label: "Done", color: "var(--chart-1)" },
 } satisfies ChartConfig
 
 export function TaskStatusChart({ summary }: { summary: TaskSummary }) {
@@ -37,10 +38,10 @@ export function TaskStatusChart({ summary }: { summary: TaskSummary }) {
   }
 
   const chartData = [
-    { status: "To do", count: summary.todo, fill: "var(--color-todo, #3b82f6)" },
-    { status: "In progress", count: summary.in_progress, fill: "var(--color-in_progress, #f59e0b)" },
-    { status: "Blocked", count: summary.blocked, fill: "var(--color-blocked, #ef4444)" },
-    { status: "Done", count: summary.done, fill: "var(--color-done, #10b981)" },
+    { status: "To do", count: summary.todo, fill: "var(--color-todo)" },
+    { status: "In progress", count: summary.in_progress, fill: "var(--color-in_progress)" },
+    { status: "Blocked", count: summary.blocked, fill: "var(--color-blocked)" },
+    { status: "Done", count: summary.done, fill: "var(--color-done)" },
   ]
 
   return (

@@ -15,7 +15,7 @@ const STATUS_LABELS: Record<UpcomingTask["status"], { label: string; variant: "d
 function formatDeadline(dateStr: string | null | undefined): string {
   if (!dateStr) return "No deadline"
   const date = new Date(dateStr)
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",

@@ -4,11 +4,9 @@ import React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
-import type { Task } from '@/lib/api/queries/tasks';
 
-// The teams that appear in the Team filter come from the tasks themselves
-// (not a separate fetch) — we derive unique teams from the visible task list.
-interface FilterableTeam {
+// The Team filter's options: every team the caller can see (from getTeams on the page).
+export interface FilterableTeam {
   id: string;
   name: string;
 }
@@ -114,13 +112,4 @@ export function TaskFilterToolbar({ teams }: TaskFilterToolbarProps) {
       </Button>
     </div>
   );
-}
-
-// Helper used by page.tsx to derive teams from task list
-export function teamsFromTasks(tasks: Task[]): FilterableTeam[] {
-  const seen = new Map<string, string>();
-  for (const t of tasks) {
-    if (!seen.has(t.team_id)) seen.set(t.team_id, t.team_name);
-  }
-  return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
 }

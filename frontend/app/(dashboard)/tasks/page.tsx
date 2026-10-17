@@ -7,7 +7,6 @@
  * "Create task" button shown only when the caller can assign on ≥1 team.
  */
 import React from 'react';
-import { Plus } from 'lucide-react';
 
 import { getTasks } from '@/lib/api/queries/tasks';
 import { getTeams, getTeam } from '@/lib/api/queries/teams';
@@ -58,15 +57,15 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   const canCreateTask = createTaskTeams.length > 0;
 
+  // Team filter lists every team the caller can see, not just teams in the current results
+  const filterTeams = teamsData.teams.map((t) => ({ id: t.id, name: t.name }));
+
   return (
     <TasksPageClient
       tasks={tasks}
+      filterTeams={filterTeams}
       createTaskTeams={createTaskTeams}
       canCreateTask={canCreateTask}
-      currentMine={assignedToMe}
-      currentTeam={teamId ?? ''}
-      currentStatus={status ?? ''}
-      currentOverdue={overdueOnly}
     />
   );
 }
