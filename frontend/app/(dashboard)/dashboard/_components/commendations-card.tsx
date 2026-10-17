@@ -2,7 +2,7 @@ import type { Commendation } from "@/lib/api/queries/dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 function formatDate(dateStr: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
   }).format(new Date(dateStr))

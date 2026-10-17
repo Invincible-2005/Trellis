@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { QueryKey } from '@tanstack/react-query';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { CalendarIcon, ClipboardList } from 'lucide-react';
 import type { z } from 'zod';
 
@@ -20,16 +20,16 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { createTask } from '@/lib/api/actions/tasks';
 import { zCreateTaskForm } from '@/lib/api/schemas/tasks';
+import { useTaskChanges, type TaskRow } from './use-task-changes';
 
 type CreateTaskFormInput = z.input<typeof zCreateTaskForm>;
 type CreateTaskFormOutput = z.output<typeof zCreateTaskForm>;
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 }
@@ -54,6 +54,10 @@ interface CreateTaskDialogProps {
   teams: AssignableTeam[];
   /** When on the team page, this locks the team selector. */
   fixedTeamId?: string;
+  /** The task list on this page (tasksKey.page / tasksKey.team): the new task shows there at once. */
+  tasksKey: QueryKey;
+  /** Whether a new task belongs in that list (e.g. never under "My tasks": you can't assign yourself). */
+  accepts?: (task: TaskRow) => boolean;
 }
 
 const SELECT_CLASS =
@@ -64,8 +68,11 @@ export function CreateTaskDialog({
   onOpenChange,
   teams,
   fixedTeamId,
+  tasksKey,
+  accepts,
 }: CreateTaskDialogProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const { create } = useTaskChanges(tasksKey, accepts);
 
   const defaultTeamId = fixedTeamId ?? teams[0]?.id ?? '';
 
@@ -101,13 +108,15 @@ export function CreateTaskDialog({
     onOpenChange(next);
   };
 
-  const onSubmit = form.handleSubmit(async (values: CreateTaskFormOutput) => {
-    const result = await createTask(values);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    toast.success('Task created.');
+  // Instant: the dialog closes and a greyed "Saving…" row appears until the server
+  // answers; a refusal removes it with a toast (use-task-changes.ts).
+  const onSubmit = form.handleSubmit((values: CreateTaskFormOutput) => {
+    const team = teams.find((t) => t.id === values.team_id);
+    create.mutate({
+      input: values,
+      teamName: team?.name ?? '',
+      assigneeName: team?.members.find((m) => m.user_id === values.assigned_to_user_id)?.name ?? '',
+    });
     handleOpenChange(false);
   });
 
@@ -242,7 +251,7 @@ export function CreateTaskDialog({
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full justify-start text-left font-normal text-sm gap-2"
+                          className="min-w-0 flex-1 justify-start text-left font-normal text-sm gap-2"
                         >
                           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                           {field.value

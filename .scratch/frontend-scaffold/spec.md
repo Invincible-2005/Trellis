@@ -66,13 +66,15 @@ frontend/
 │   │   │   ├── page.tsx                          # Teams you can see (D13); Create team if can_org(create_team)
 │   │   │   ├── _components/
 │   │   │   │   ├── team-list.tsx                 # Cards: name · "You: <role>" or "Overseeing" · N members · open/overdue tasks
-│   │   │   │   └── create-team-dialog.tsx        # Create new team
+│   │   │   │   ├── create-team-dialog.tsx        # Create new team
+│   │   │   │   └── use-team-list-changes.ts      # Instant Create team (trellis/12 D50, 2026-10-17)
 │   │   │   └── [teamId]/                         # Route: /teams/[teamId]
 │   │   │       ├── page.tsx                      # Members + team tasks (task-data-table + create-task-dialog from tasks/_components)
 │   │   │       └── _components/
 │   │   │           ├── team-members-table.tsx    # Name, team role
 │   │   │           ├── add-member-dialog.tsx     # Existing org member + team role (D25); shown if can(add_member, team)
-│   │   │           └── delete-team-button.tsx    # Confirm + deleteTeam; shown if deletable (D31)
+│   │   │           ├── delete-team-button.tsx    # Confirm + deleteTeam; shown if deletable (D31)
+│   │   │           └── use-team-member-changes.ts # Instant add/remove member (D50, 2026-10-17)
 │   │   │       (Create task reuses tasks/_components/create-task-dialog.tsx; shown if can(assign_task, team))
 │   │   │       Data: lib/api/queries/teams.ts, lib/api/actions/teams.ts (added 2026-10-10)
 │   │   │
@@ -82,8 +84,12 @@ frontend/
 │   │   │       ├── task-data-table.tsx           # Rows; status dropdown if can_change_status, Edit/Delete if can_edit (also on team page)
 │   │   │       ├── task-filter-toolbar.tsx       # Mine/All, team, status, overdue
 │   │   │       ├── create-task-dialog.tsx        # Team, title, description, assignee (assignable members), deadline (no dependency selector yet)
-│   │   │       └── edit-task-dialog.tsx          # Same fields prefilled; only for can_edit
-│   │   │       Data: lib/api/queries/tasks.ts, lib/api/actions/tasks.ts (added 2026-10-10)
+│   │   │       ├── edit-task-dialog.tsx          # Same fields prefilled incl. Assign to (reassign, 2026-10-17); only for can_edit
+│   │   │       ├── use-task-changes.ts           # Instant status/edit/delete/create for /tasks and the team page (D50, 2026-10-17)
+│   │   │       ├── comments-panel.tsx            # Comments side panel (trellis/12 D60, 2026-10-17): list oldest first, write box, edit/delete own
+│   │   │       ├── use-comment-changes.ts        # Loads a task's comments; instant post/edit/delete (D50)
+│   │   │       └── submissions-dialog.tsx        # Hand-ins on a task (trellis/12 D59, 2026-10-17): list, Hand in work (can_submit), Delete own (can_delete); opened from task-data-table when can_view_submissions
+│   │   │       Data: lib/api/queries/tasks.ts, lib/api/actions/tasks.ts (added 2026-10-10; hand-ins getSubmissions/loadSubmissions/createSubmission/deleteSubmission + schemas/tasks.ts zHandInForm, 2026-10-17)
 │   │   │
 │   │   ├── chat/                                 # Route: /chat (agent chat; task discussions are "Comments" inside a task, trellis/12 D41)
 │   │   │   ├── layout.tsx                        # Chat-list panel + chat area, full height under the header (D41, 2026-10-12)
@@ -159,7 +165,7 @@ frontend/
 │   │
 │   └── api/
 │       ├── uploadthing/                          # Added 2026-10-09 (documents effort)
-│       │   ├── core.ts                           # Upload rules: file types, 16 MB, gate = signed in + upload_document
+│       │   ├── core.ts                           # Upload rules: policyDocument (gate = upload_document) and taskSubmission (D59: work files, gate = the task's can_submit); 16 MB
 │       │   └── route.ts                          # UploadThing endpoint (public in proxy.ts for UploadThing's callback)
 │       └── chat/
 │           └── sessions/
@@ -175,6 +181,7 @@ frontend/
 │   ├── api/
 │   │   ├── v1.d.ts                               # Auto-generated OpenAPI TypeScript types
 │   │   ├── client.ts                             # Singleton openapi-fetch client with Clerk auth middleware
+│   │   ├── storage.ts                            # deleteStoredFile(): remove an UploadThing file after its record is deleted (documents, hand-ins; 2026-10-17)
 │   │   ├── queries/                              # cache()-wrapped Server Component data fetchers (reads)
 │   │   └── actions/                              # 'use server' Server Actions for form writes; return { ok, message } (trellis/12 D18)
 │   │       (chat: queries/chat.ts getChats/getChat/getMentions, actions/chat.ts createChat/renameChat/deleteChat, 2026-10-12)

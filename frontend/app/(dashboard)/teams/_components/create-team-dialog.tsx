@@ -3,7 +3,6 @@
 import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import type { z } from 'zod';
 
@@ -18,8 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { createTeam } from '@/lib/api/actions/teams';
 import { zCreateTeamForm } from '@/lib/api/schemas/teams';
+import { useTeamListChanges } from './use-team-list-changes';
 
 type CreateTeamFormValues = z.input<typeof zCreateTeamForm>;
 
@@ -35,14 +34,12 @@ export function CreateTeamDialog({ open, onOpenChange }: CreateTeamDialogProps) 
   });
 
   const isSubmitting = form.formState.isSubmitting;
+  const { create } = useTeamListChanges();
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    const result = await createTeam(values);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    toast.success(`Team "${result.data.name}" created.`);
+  // Instant: the dialog closes and a greyed "Creating…" card appears until the server
+  // answers; a refusal (e.g. the name is taken) removes it with a toast.
+  const onSubmit = form.handleSubmit((values) => {
+    create.mutate(values);
     form.reset();
     onOpenChange(false);
   });

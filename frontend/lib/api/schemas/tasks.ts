@@ -1,12 +1,22 @@
-// Task forms (Create task, Edit task, status change).
+// Task forms (Create task, Edit task, status change, Hand in work, Comments).
 // Generated from the backend's rules (zod.gen.ts, `pnpm api:generate`); never retype them here.
 // Frontend-only adjustments go here as `.extend()` on these schemas (trellis/12 D49).
 import { z } from 'zod';
 import './shared';
-import { zCreateTaskRequest, zUpdateTaskRequest } from './zod.gen';
+import {
+  zCommentRequest,
+  zCreateSubmissionRequest,
+  zCreateTaskRequest,
+  zUpdateTaskRequest,
+} from './zod.gen';
 
 export { firstError } from './shared';
-export { zCreateTaskRequest, zUpdateTaskRequest };
+export { zCommentRequest, zCreateSubmissionRequest, zCreateTaskRequest, zUpdateTaskRequest };
+
+/** Post or edit a comment (D60): trimmed first, then the backend's rule (1–2000 characters). */
+export const zCommentForm = zCommentRequest.extend({
+  content: z.string().trim().pipe(zCommentRequest.shape.content),
+});
 
 // The date picker gives a day (a Date, or undefined when empty). The task is due at
 // the end of that day in the user's time zone; the backend gets an ISO string or null.
@@ -36,3 +46,17 @@ export const zEditTaskForm = zCreateTaskForm.omit({ team_id: true });
 
 // Status dropdown in the table: no form; call updateTask(id, { status }) directly
 // (the Server Action checks it with zUpdateTaskRequest).
+
+/**
+ * Hand in work (D59): the form holds only the note; the file comes from the
+ * upload. The note is trimmed and an empty one becomes null, then the backend's
+ * rule (at most 1000 characters) applies. createSubmission re-checks with
+ * zCreateSubmissionRequest on the server.
+ */
+export const zHandInForm = zCreateSubmissionRequest.pick({ notes: true }).extend({
+  notes: z
+    .string()
+    .trim()
+    .transform((note) => note || null)
+    .pipe(zCreateSubmissionRequest.shape.notes.unwrap()), // the backend rule, minus "may be left out"
+});

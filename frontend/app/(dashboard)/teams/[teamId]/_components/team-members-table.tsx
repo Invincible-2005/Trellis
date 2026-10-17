@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import React, { useState } from 'react';
 import { Shield, Trash2, Users } from 'lucide-react';
 
 import {
@@ -16,13 +14,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { removeTeamMember } from '@/lib/api/actions/teams';
-import type { TeamMember } from '@/lib/api/queries/teams';
+import { useTeamMemberChanges, type MemberRow } from './use-team-member-changes';
 
 interface TeamMembersTableProps {
   teamId: string;
   teamName: string;
-  members: TeamMember[];
+  members: MemberRow[];
   canAddMember: boolean;
   onAddMember?: () => void;
 }
@@ -30,39 +27,17 @@ interface TeamMembersTableProps {
 export function TeamMembersTable({
   teamId,
   teamName,
-  members: initialMembers,
+  members,
   canAddMember,
   onAddMember,
 }: TeamMembersTableProps) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
+  const { remove } = useTeamMemberChanges(teamId, teamName);
+  const [memberToRemove, setMemberToRemove] = useState<MemberRow | null>(null);
 
-  const [members, setMembers] = useState<TeamMember[]>(initialMembers);
-  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
-  const [isRemoving, setIsRemoving] = useState(false);
-
-  React.useEffect(() => {
-    setMembers(initialMembers);
-  }, [initialMembers]);
-
-  const handleRemove = async () => {
-    if (!memberToRemove) return;
-    setIsRemoving(true);
-    try {
-      const res = await removeTeamMember(teamId, memberToRemove.user_id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-      toast.success(`${memberToRemove.name} removed from ${teamName}.`);
-      setMembers((prev) => prev.filter((m) => m.user_id !== memberToRemove.user_id));
-      setMemberToRemove(null);
-      startTransition(() => router.refresh());
-    } catch {
-      toast.error('Failed to remove member.');
-    } finally {
-      setIsRemoving(false);
-    }
+  // Instant: the row disappears now and comes back with a toast if refused.
+  const handleRemove = () => {
+    if (memberToRemove) remove.mutate(memberToRemove);
+    setMemberToRemove(null);
   };
 
   if (members.length === 0) {
@@ -102,7 +77,10 @@ export function TeamMembersTable({
             </thead>
             <tbody className="divide-y divide-border">
               {members.map((member) => (
-                <tr key={member.user_id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={member.user_id}
+                  className={`hover:bg-muted/30 transition-colors ${member.pending ? 'opacity-60' : ''}`}
+                >
                   {/* Name */}
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
@@ -126,16 +104,17 @@ export function TeamMembersTable({
 
                   {/* Joined date */}
                   <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(member.joined_at).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
+                    {new Date(member.joined_at).toLocaleDateString('en-GB', {
                       day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
                     })}
                   </td>
 
-                  {/* Remove button — only when removable */}
+                  {/* Remove button — only when removable; "Adding…" until the server confirms */}
                   <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                    {member.removable && (
+                    {member.pending && <span className="text-xs text-muted-foreground">Adding…</span>}
+                    {member.removable && !member.pending && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -169,13 +148,12 @@ export function TeamMembersTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRemoving}>Keep</AlertDialogCancel>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
-              disabled={isRemoving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isRemoving ? 'Removing...' : 'Remove'}
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

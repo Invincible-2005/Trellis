@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { toast } from 'sonner';
-import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import type { QueryKey } from '@tanstack/react-query';
+import { AlertTriangle, Inbox, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -16,9 +16,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { deleteTask, updateTask } from '@/lib/api/actions/tasks';
-import type { Task, TaskStatus } from '@/lib/api/queries/tasks';
+import type { TaskStatus } from '@/lib/api/queries/tasks';
+import { CommentsPanel } from './comments-panel';
 import { EditTaskDialog } from './edit-task-dialog';
+import { SubmissionsDialog } from './submissions-dialog';
+import type { AssignableTeam } from './create-task-dialog';
+import { useTaskChanges, type TaskRow } from './use-task-changes';
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -42,9 +45,9 @@ const SELECT_CLASS =
 function DeadlineCell({ deadline, overdue }: { deadline?: string | null; overdue: boolean }) {
   if (!deadline) return <span className="text-muted-foreground text-xs">—</span>;
 
-  const label = new Date(deadline).toLocaleDateString(undefined, {
-    month: 'short',
+  const label = new Date(deadline).toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 
@@ -64,10 +67,9 @@ function DeadlineCell({ deadline, overdue }: { deadline?: string | null; overdue
 }
 
 // ─── Status cell ────────────────────────────────────────────────────────────────
-function StatusCell({ task }: { task: Task }) {
-  const [pending, setPending] = useState(false);
-
-  if (!task.can_change_status) {
+// The value comes from the shared list, which changes at once and rolls back if refused.
+function StatusCell({ task, onChange }: { task: TaskRow; onChange: (status: TaskStatus) => void }) {
+  if (!task.can_change_status || task.pending) {
     return (
       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASS[task.status]}`}>
         {STATUS_LABELS[task.status]}
@@ -75,24 +77,10 @@ function StatusCell({ task }: { task: Task }) {
     );
   }
 
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const status = e.target.value as TaskStatus;
-    setPending(true);
-    try {
-      const res = await updateTask(task.id, { status });
-      if (!res.ok) toast.error(res.message);
-    } catch {
-      toast.error('Failed to update status.');
-    } finally {
-      setPending(false);
-    }
-  };
-
   return (
     <select
-      defaultValue={task.status}
-      onChange={handleChange}
-      disabled={pending}
+      value={task.status}
+      onChange={(e) => onChange(e.target.value as TaskStatus)}
       className={SELECT_CLASS}
       aria-label="Change task status"
     >
@@ -107,31 +95,25 @@ function StatusCell({ task }: { task: Task }) {
 
 // ─── Main table ─────────────────────────────────────────────────────────────────
 interface TaskDataTableProps {
-  tasks: Task[];
+  tasks: TaskRow[];
+  /** The cache key of this list (tasksKey.page / tasksKey.team), for instant changes. */
+  tasksKey: QueryKey;
   hideTeam?: boolean;
+  /** Teams the caller can assign on, with their assignable members (same list as Create task). */
+  assignableTeams: AssignableTeam[];
 }
 
-export function TaskDataTable({ tasks, hideTeam = false }: TaskDataTableProps) {
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+export function TaskDataTable({ tasks, tasksKey, hideTeam = false, assignableTeams }: TaskDataTableProps) {
+  const { changeStatus, edit, remove } = useTaskChanges(tasksKey);
+  const [taskToDelete, setTaskToDelete] = useState<TaskRow | null>(null);
+  const [taskToEdit, setTaskToEdit] = useState<TaskRow | null>(null);
+  const [taskForHandIns, setTaskForHandIns] = useState<TaskRow | null>(null);
+  const [taskForComments, setTaskForComments] = useState<TaskRow | null>(null);
 
-  const handleDelete = async () => {
-    if (!taskToDelete) return;
-    setIsDeleting(true);
-    try {
-      const res = await deleteTask(taskToDelete.id, taskToDelete.team_id);
-      if (!res.ok) {
-        toast.error(res.message);
-        return;
-      }
-      toast.success(`"${taskToDelete.title}" deleted.`);
-      setTaskToDelete(null);
-    } catch {
-      toast.error('Failed to delete task.');
-    } finally {
-      setIsDeleting(false);
-    }
+  // Instant: the row disappears now and comes back with a toast if refused.
+  const handleDelete = () => {
+    if (taskToDelete) remove.mutate(taskToDelete);
+    setTaskToDelete(null);
   };
 
   if (tasks.length === 0) {
@@ -157,7 +139,10 @@ export function TaskDataTable({ tasks, hideTeam = false }: TaskDataTableProps) {
             </thead>
             <tbody className="divide-y divide-border">
               {tasks.map((task) => (
-                <tr key={task.id} className="hover:bg-muted/30 transition-colors align-top">
+                <tr
+                  key={task.id}
+                  className={`hover:bg-muted/30 transition-colors align-top ${task.pending ? 'opacity-60' : ''}`}
+                >
                   {/* Title + description */}
                   <td className="px-5 py-3.5 max-w-[280px]">
                     <p className="font-medium text-foreground leading-snug">{task.title}</p>
@@ -187,35 +172,61 @@ export function TaskDataTable({ tasks, hideTeam = false }: TaskDataTableProps) {
 
                   {/* Status */}
                   <td className="px-5 py-3.5">
-                    <StatusCell task={task} />
+                    <StatusCell task={task} onChange={(status) => changeStatus.mutate({ task, status })} />
                   </td>
 
                   {/* Actions */}
                   <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                    <div className="inline-flex items-center gap-1">
-                      {task.can_edit && (
-                        <>
+                    {task.pending ? (
+                      <span className="text-xs text-muted-foreground">Saving…</span>
+                    ) : (
+                      <div className="inline-flex items-center gap-1">
+                        {/* Comments (D60): everyone who can see the task */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTaskForComments(task)}
+                          className="text-xs text-muted-foreground hover:text-foreground gap-1"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Comments{task.comment_count ? ` (${task.comment_count})` : ''}
+                        </Button>
+                        {/* Hand-ins (D59): only the person doing the task and their managers */}
+                        {task.can_view_submissions && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setTaskToEdit(task)}
+                            onClick={() => setTaskForHandIns(task)}
                             className="text-xs text-muted-foreground hover:text-foreground gap-1"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
+                            <Inbox className="h-3.5 w-3.5" />
+                            Hand-ins{task.submission_count ? ` (${task.submission_count})` : ''}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setTaskToDelete(task)}
-                            className="text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive gap-1"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                        )}
+                        {task.can_edit && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTaskToEdit(task)}
+                              className="text-xs text-muted-foreground hover:text-foreground gap-1"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTaskToDelete(task)}
+                              className="text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive gap-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -241,24 +252,45 @@ export function TaskDataTable({ tasks, hideTeam = false }: TaskDataTableProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit dialog */}
+      {/* Edit dialog: saving closes it at once and updates the row (instant) */}
       {taskToEdit && (
         <EditTaskDialog
           open={!!taskToEdit}
           onOpenChange={(open) => !open && setTaskToEdit(null)}
           task={taskToEdit}
+          assignableMembers={
+            assignableTeams.find((t) => t.id === taskToEdit.team_id)?.members ?? []
+          }
+          onSave={(patch, assigneeName) => edit.mutate({ task: taskToEdit, patch, assigneeName })}
+        />
+      )}
+
+      {/* Comments panel (mounted per task, so it loads fresh each time it opens) */}
+      {taskForComments && (
+        <CommentsPanel
+          open={!!taskForComments}
+          onOpenChange={(open) => !open && setTaskForComments(null)}
+          task={taskForComments}
+        />
+      )}
+
+      {/* Hand-ins dialog (mounted per task, so it loads fresh each time) */}
+      {taskForHandIns && (
+        <SubmissionsDialog
+          open={!!taskForHandIns}
+          onOpenChange={(open) => !open && setTaskForHandIns(null)}
+          task={taskForHandIns}
         />
       )}
     </>

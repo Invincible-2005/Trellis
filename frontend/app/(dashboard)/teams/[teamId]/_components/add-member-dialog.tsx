@@ -3,7 +3,6 @@
 import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
 import { UserPlus } from 'lucide-react';
 import type { z } from 'zod';
 
@@ -17,9 +16,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { addTeamMember } from '@/lib/api/actions/teams';
 import { zAddTeamMemberRequest } from '@/lib/api/schemas/teams';
 import type { TeamCandidates } from '@/lib/api/queries/teams';
+import { useTeamMemberChanges } from './use-team-member-changes';
 
 type AddMemberFormValues = z.input<typeof zAddTeamMemberRequest>;
 
@@ -27,6 +26,7 @@ interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teamId: string;
+  teamName: string;
   candidates: TeamCandidates;
 }
 
@@ -37,8 +37,10 @@ export function AddMemberDialog({
   open,
   onOpenChange,
   teamId,
+  teamName,
   candidates,
 }: AddMemberDialogProps) {
+  const { add } = useTeamMemberChanges(teamId, teamName);
   const form = useForm<AddMemberFormValues>({
     resolver: zodResolver(zAddTeamMemberRequest),
     defaultValues: { user_id: '', role_id: '' },
@@ -52,14 +54,17 @@ export function AddMemberDialog({
     onOpenChange(next);
   };
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    const selectedMember = candidates.members.find((m) => m.user_id === values.user_id);
-    const result = await addTeamMember(teamId, values);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    toast.success(`${selectedMember?.name ?? 'Member'} added to the team.`);
+  // Instant: the dialog closes and a greyed "Adding…" row appears until the server
+  // answers; a refusal removes it with a toast (use-team-member-changes.ts).
+  const onSubmit = form.handleSubmit((values) => {
+    const person = candidates.members.find((m) => m.user_id === values.user_id);
+    const role = candidates.roles.find((r) => r.id === values.role_id);
+    add.mutate({
+      input: values,
+      name: person?.name ?? '',
+      email: person?.email ?? '',
+      roleName: role?.name ?? '',
+    });
     form.reset();
     onOpenChange(false);
   });

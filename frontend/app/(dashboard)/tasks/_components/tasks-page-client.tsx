@@ -1,33 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus, ClipboardList } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { Task } from '@/lib/api/queries/tasks';
+import { useServerData } from '@/lib/query/use-server-data';
 import { TaskDataTable } from './task-data-table';
-import { TaskFilterToolbar, teamsFromTasks } from './task-filter-toolbar';
+import { TaskFilterToolbar, type FilterableTeam } from './task-filter-toolbar';
 import { CreateTaskDialog, type AssignableTeam } from './create-task-dialog';
+import { tasksKey, type TaskRow } from './use-task-changes';
 
 interface TasksPageClientProps {
   tasks: Task[];
+  filterTeams: FilterableTeam[];
   createTaskTeams: AssignableTeam[];
   canCreateTask: boolean;
-  currentMine: boolean;
-  currentTeam: string;
-  currentStatus: string;
-  currentOverdue: boolean;
 }
 
 export function TasksPageClient({
-  tasks,
+  tasks: serverTasks,
+  filterTeams,
   createTaskTeams,
   canCreateTask,
 }: TasksPageClientProps) {
   const [createOpen, setCreateOpen] = useState(false);
+  const searchParams = useSearchParams();
 
-  // Derive team filter options from tasks already loaded
-  const filterTeams = teamsFromTasks(tasks);
+  // One cached list per filter combination; changes show in it at once (D50).
+  const filters = searchParams.toString();
+  const key = useMemo(() => tasksKey.page(filters), [filters]);
+  const tasks = useServerData<TaskRow[]>(key, serverTasks);
+
+  // A new task shows straight away only if it matches the filters on screen.
+  // Never under "My tasks": you can't give a task to yourself (D32).
+  const accepts = (task: TaskRow) => {
+    const team = searchParams.get('team');
+    const status = searchParams.get('status');
+    return (
+      searchParams.get('mine') === '0' &&
+      (!team || task.team_id === team) &&
+      (!status || task.status === status) &&
+      (searchParams.get('overdue') !== '1' || task.overdue)
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -60,7 +77,7 @@ export function TasksPageClient({
           </p>
         </div>
       ) : (
-        <TaskDataTable tasks={tasks} hideTeam={false} />
+        <TaskDataTable tasks={tasks} tasksKey={key} hideTeam={false} assignableTeams={createTaskTeams} />
       )}
 
       {/* Create task dialog */}
@@ -69,6 +86,8 @@ export function TasksPageClient({
           open={createOpen}
           onOpenChange={setCreateOpen}
           teams={createTaskTeams}
+          tasksKey={key}
+          accepts={accepts}
         />
       )}
     </div>

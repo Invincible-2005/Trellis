@@ -11,6 +11,7 @@ import {
   Network,
   UserPlus,
   FileText,
+  MessageSquareText,
   ClipboardList,
   type LucideIcon,
 } from "lucide-react"

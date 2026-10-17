@@ -20,7 +20,6 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { updateTask } from '@/lib/api/actions/tasks';
 import type { UpdateTaskInput } from '@/lib/api/actions/tasks';
 import { zEditTaskForm } from '@/lib/api/schemas/tasks';
 import type { Task } from '@/lib/api/queries/tasks';
@@ -29,9 +28,9 @@ type EditTaskFormInput = z.input<typeof zEditTaskForm>;
 type EditTaskFormOutput = z.output<typeof zEditTaskForm>;
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 }
@@ -47,10 +46,23 @@ interface EditTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: Task;
+  /** People on the task's team ranked below the caller (same list as Create task). */
+  assignableMembers: { user_id: string; name: string }[];
+  /** Saves the changed fields instantly (use-task-changes.ts); the dialog closes at once. */
+  onSave: (patch: UpdateTaskInput, assigneeName?: string) => void;
 }
 
-export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps) {
+const SELECT_CLASS =
+  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2';
+
+export function EditTaskDialog({ open, onOpenChange, task, assignableMembers, onSave }: EditTaskDialogProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Keep the current assignee selectable even if they're no longer on the team,
+  // so an unchanged form doesn't silently pick someone else.
+  const currentAssigneeMissing =
+    !!task.assigned_to_user_id &&
+    !assignableMembers.some((m) => m.user_id === task.assigned_to_user_id);
 
   const initialValues: EditTaskFormInput = {
     title: task.title,
@@ -71,7 +83,7 @@ export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps
     onOpenChange(next);
   };
 
-  const onSubmit = form.handleSubmit(async (values: EditTaskFormOutput) => {
+  const onSubmit = form.handleSubmit((values: EditTaskFormOutput) => {
     // Send only changed fields (D33)
     const patch: UpdateTaskInput = {};
 
@@ -83,11 +95,11 @@ export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps
       patch.assigned_to_user_id = values.assigned_to_user_id;
     }
 
-    // Deadline: values.deadline is already transformed into an ISO string or null by zEditTaskForm
-    const newDeadlineIso = values.deadline;
-    const oldDeadlineIso = task.deadline ?? null;
-    if (newDeadlineIso !== oldDeadlineIso) {
-      patch.deadline = newDeadlineIso;
+    // Deadline: values.deadline is already an ISO string or null (zEditTaskForm). The picker
+    // works in days, so compare the day, not the exact time the backend stored.
+    const dayOf = (iso: string | null | undefined) => (iso ? new Date(iso).toDateString() : null);
+    if (dayOf(values.deadline) !== dayOf(task.deadline)) {
+      patch.deadline = values.deadline;
     }
 
     if (Object.keys(patch).length === 0) {
@@ -96,12 +108,9 @@ export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps
       return;
     }
 
-    const result = await updateTask(task.id, patch);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    toast.success('Task updated.');
+    // Instant: the row changes now; a refusal puts it back with a toast.
+    const assigneeName = assignableMembers.find((m) => m.user_id === patch.assigned_to_user_id)?.name;
+    onSave(patch, assigneeName);
     handleOpenChange(false);
   });
 
@@ -165,13 +174,35 @@ export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps
               )}
             />
 
-            {/* Assigned to (read-only display) */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-foreground">Assigned to</label>
-              <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                {task.assigned_to_name}
-              </div>
-            </div>
+            {/* Assign to (reassign, D33) */}
+            <Controller
+              name="assigned_to_user_id"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="edit-task-assignee">Assign to</FieldLabel>
+                  <select
+                    {...field}
+                    id="edit-task-assignee"
+                    aria-invalid={fieldState.invalid}
+                    className={SELECT_CLASS}
+                  >
+                    <option value="">Choose a person</option>
+                    {currentAssigneeMissing && (
+                      <option value={task.assigned_to_user_id ?? ''}>
+                        {task.assigned_to_name} (no longer on this team)
+                      </option>
+                    )}
+                    {assignableMembers.map((m) => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
 
             {/* Deadline */}
             <Controller
@@ -186,7 +217,7 @@ export function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full justify-start text-left font-normal text-sm gap-2"
+                          className="min-w-0 flex-1 justify-start text-left font-normal text-sm gap-2"
                         >
                           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                           {field.value
