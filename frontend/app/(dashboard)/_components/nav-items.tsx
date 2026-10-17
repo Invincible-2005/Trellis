@@ -11,7 +11,7 @@ import {
   Network,
   UserPlus,
   FileText,
-  MessageSquareText,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react"
 
@@ -51,6 +51,7 @@ const ADMIN_TABS: Record<AdminTab, { label: string; icon: LucideIcon }> = {
 const ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Teams", href: "/teams", icon: Users },
+  { label: "Tasks", href: "/tasks", icon: ClipboardList },
   { label: "Chat", href: "/chat", icon: Bot },
 ]
 
