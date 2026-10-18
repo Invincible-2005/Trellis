@@ -691,6 +691,15 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Built 2026-10-18:** `INTERNAL_API_KEY` setting plus a production-start check (`config.py`), `require_internal_key` (`deps.py`), wired first on `api_router`, and an `internalKey` middleware in `frontend/lib/api/client.ts`. Five tests in `backend/tests/test_internal_key.py` (missing, wrong and right key, check off when empty, production refuses to start without it). `openapi.json` unchanged. Still to do at deploy time: generate a value and set it on Render and Vercel (CI/CD step 3).
 - **Source tickets:** closes the "known gap" note on Arcjet guarding only the Next.js door (D27, line below D11).
 
+### D63. Which Clerk keys the online demo uses (added 2026-10-18, raised while planning the first deploy) — ✅ RESOLVED 2026-10-18
+- **Question:** Clerk offers development keys (`pk_test_` / `sk_test_`) and production keys (`pk_live_` / `sk_live_`). Production needs a domain we own with DNS records, starts with no users or orgs (nothing is copied from development), needs our own OAuth credentials for social sign-in, and our Neon rows (`clerk_user_id`, `clerk_org_id`) would no longer match any account. Development instances are not meant for real production use (Clerk docs) and an older Clerk page mentions a 500-user cap (not re-checked).
+- **Decided (Piyush, 2026-10-18): development keys for the online demo**, on the `*.vercel.app` address. It is a student demo, and it keeps the existing test accounts, orgs and Neon data.
+  - The online app therefore uses the same Neon database as local development (the data is tied to the development Clerk instance).
+  - To set at deploy time: backend `CLERK_AUTHORIZED_PARTIES` = the Vercel origin (JSON list) and `FRONTEND_URL` = the Vercel URL; Clerk dashboard allowed redirect/origin list gets the Vercel URL if the first sign-in asks for it. Not yet verified that a development instance works on a `*.vercel.app` address; the first deploy will show.
+  - Revisit if we get a real domain: swapping to production keys is a deployment change plus a fresh database, not a code change.
+- **Clarified 2026-10-18 (Piyush):** the development keys are the teammate's shared Clerk application (frontend-scaffold ticket 04, decided 2026-10-08), not Piyush's own. Piyush added himself as a member of that Clerk dashboard so he can edit its settings. An own Clerk app plus a fresh Neon database was considered and not chosen; it stays the fallback if the shared app ever goes away (the first-login email clash on a reused database is why a new Clerk app would need an empty database).
+- **Live addresses (2026-10-18):** backend `https://trellis-uttr.onrender.com`, frontend `https://trellis-tau-three.vercel.app`. Backend `CLERK_AUTHORIZED_PARTIES` and `FRONTEND_URL` point at the Vercel address.
+
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
 - Ticket 02: the wording for `scope_type='role'` visibility was inverted. It now says "role + ancestors"; the CTE was already correct.

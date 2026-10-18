@@ -3,7 +3,7 @@ import { AlertTriangle, Clock, Network, Database, FileSearch, RefreshCw, Shield 
 
 export default function Features() {
     return (
-        <section className="py-16 md:py-20">
+        <section id="features" className="scroll-mt-20 py-16 md:py-20">
             <div className="mx-auto max-w-7xl px-6">
                 <h2 className="text-muted-foreground max-w-4xl text-balance text-4xl font-medium tracking-tight lg:text-5xl">
                     <span className="text-foreground">Built for every level of your org.</span> <br /> Role-scoped views from Employee to Admin — one platform, one enforcement engine.

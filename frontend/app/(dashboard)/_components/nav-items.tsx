@@ -129,10 +129,14 @@ export function NavItems({ adminTabs, showFeedback }: NavItemsProps) {
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <SidebarMenuSub>
+                <SidebarMenuSub className="flex">
                   {adminLinks.map((link) => (
                     <SidebarMenuSubItem key={link.href}>
-                      <SidebarMenuSubButton asChild isActive={isActive(link.href)}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={isActive(link.href)}
+                        className="flex text-sm"
+                      >
                         <Link href={link.href} onClick={closeOnMobile}>
                           <link.icon />
                           <span>{link.label}</span>
