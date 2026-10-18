@@ -1,6 +1,6 @@
 # Trellis
 
-**Role-Aware Agentic RAG Workspace. Guardrails that support growth, not just block it.**
+**Role-aware AI workspace for organizations: your org's knowledge, searchable and scoped to who's asking.**
 
 ---
 
