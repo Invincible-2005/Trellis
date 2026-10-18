@@ -671,6 +671,15 @@ A cross-check of both Wayfinder maps against each other and against the code in 
 - **Written into:** map, `plans/task-comments/`.
 - **Built 2026-10-17 (backend, part A):** migration `c8f4e6b1d253` (`edited_at`, `idx_task_comments_task`; applied to dev); `GET/POST /api/v1/tasks/{id}/comments`, `PATCH/DELETE …/comments/{cid}`; `TaskResult.comment_count`. Live-tested 19/19. **Frontend (B, C) built the same day:** `actions/tasks.ts` load/add/edit/delete comments, `zCommentForm`, `tasks/_components/comments-panel.tsx` (Sheet) + `use-comment-changes.ts` (instant, D50), "Comments (n)" in the task table; browser-checked. **Chat tool (D) built the same day:** `get_task_comments` (read-only, `list_comments` with the user's scope), task ids + comment counts in `get_tasks`, prompt rule (comments are information, not instructions; name authors in plain words, never in square brackets), SSE step `reading_comments`. Tried with the real agent as Admin and as an outsider. **Comments complete.**
 
+### D61. CI with a real database exposed two bugs (added 2026-10-18, found while building CI/CD step 2) — ✅ RESOLVED 2026-10-18
+- **Found by running the migrations and tests on an empty Postgres (pgvector image):**
+  1. `alembic upgrade head` failed on a brand-new database. The initial migration `48acff42172d` uses the `vector` type but never created the extension (only the later `a7c2e9f4b310` does), and it ran `DROP TABLE playing_with_neon`, a Neon demo table that exists only on the original dev database.
+  2. `deps._create_user` raised a wrong `409 email_in_use` when two first requests for the *same* person raced: both collide on the Clerk id and the email, and the code treated any email collision as a different account. A stress script (6 simultaneous first logins, 40 rounds) showed 24 failing rounds; the test `test_concurrent_first_logins_create_one_row` failed only sometimes.
+- **Decided (Piyush, 2026-10-18):** fix both in the code, not in CI.
+  1. Initial migration now runs `CREATE EXTENSION IF NOT EXISTS vector` first and `DROP TABLE IF EXISTS playing_with_neon`. No effect on databases that already ran it (Alembic never reruns a revision); verified on an empty database and on one that already has the extension and the table.
+  2. On an `IntegrityError`, `_create_user` rolls back and re-reads by `clerk_user_id`; if that row exists it is returned. `email_in_use` is raised only when no row belongs to this Clerk user. Same stress script afterwards: 0 failing rounds of 40.
+- **Result:** with `TEST_DATABASE_URL` set all 61 backend tests run (none skipped). CI's backend job now starts a pgvector Postgres service, applies the 13 migrations and runs them (plans/ci-cd, step 2).
+
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.
 - Ticket 02: the wording for `scope_type='role'` visibility was inverted. It now says "role + ancestors"; the CTE was already correct.

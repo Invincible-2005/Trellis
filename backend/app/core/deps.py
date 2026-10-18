@@ -119,13 +119,17 @@ async def _create_user(db: AsyncSession, clerk_user_id: str) -> User:
     name = f"{first} {last}".strip() or email  # fallback to email if no name
 
     # A concurrent first request may insert the same user first: do nothing on
-    # that conflict and re-select (B1). A clash on the unique email instead means
-    # the address already belongs to a different Clerk user.
+    # that conflict and re-select (B1). A clash on the unique email can mean two things:
+    # the same person's other request won the race (their row has our Clerk id), or the
+    # address really belongs to a different Clerk user.
     try:
         await db.execute(_insert_user_if_absent(clerk_user_id, email, name))
         await db.commit()
     except IntegrityError:
         await db.rollback()
+        existing = await _get_user(db, clerk_user_id)
+        if existing is not None:
+            return existing
         logger.warning("Email %s already linked to another Clerk user", email)
         raise api_error(
             status.HTTP_409_CONFLICT,
