@@ -68,11 +68,19 @@ export function FeedbackView({ options, given: serverGiven, appeals: serverAppea
       </div>
 
       <Tabs value={tab} onValueChange={changeTab}>
-        <TabsList>
-          {canGive && <TabsTrigger value="give">Give</TabsTrigger>}
-          {canGive && <TabsTrigger value="given">Given by you</TabsTrigger>}
+        <TabsList className="gap-1 p-1 group-data-horizontal/tabs:h-10">
+          {canGive && (
+            <TabsTrigger value="give" className="px-3">
+              Give
+            </TabsTrigger>
+          )}
+          {canGive && (
+            <TabsTrigger value="given" className="px-3">
+              Given by you
+            </TabsTrigger>
+          )}
           {canReview && (
-            <TabsTrigger value="appeals">
+            <TabsTrigger value="appeals" className="px-3">
               Appeals to review
               {appeals.length > 0 && (
                 <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 text-xs text-primary">

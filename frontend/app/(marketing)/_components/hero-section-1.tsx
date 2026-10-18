@@ -1,29 +1,21 @@
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChevronRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
 import { HeroHeader } from '@/app/(marketing)/_components/hero-section-1-header'
-import { Spotify } from '@/app/(marketing)/_components/svgs/spotify'
-import { SupabaseFull } from '@/app/(marketing)/_components/svgs/supabase'
-import { Hulu } from '@/app/(marketing)/_components/svgs/hulu'
-import { Bolt } from '@/app/(marketing)/_components/svgs/bolt'
-import { FirebaseFull } from '@/app/(marketing)/_components/svgs/firebase'
-import { Beacon } from '@/app/(marketing)/_components/svgs/beacon'
-import { Claude } from '@/app/(marketing)/_components/svgs/claude'
-import { VercelFull } from '@/app/(marketing)/_components/svgs/vercel'
 
 export default function HeroSection() {
     return (
         <>
             <HeroHeader />
             <main className="overflow-hidden">
-                <section>
+                <section className="pb-8 md:pb-16">
                     <div className="relative pt-24 md:pt-36">
                         <div className="mx-auto max-w-7xl">
                             <div className="px-6 text-center sm:mx-auto lg:mr-auto lg:mt-0">
                                 <Link
-                                    href="#link"
+                                    href="#security"
                                     className="group mx-auto flex w-fit items-center gap-3 rounded-full p-1 pl-4 transition-colors duration-300">
                                     <span className="text-sm font-medium">New:</span>
                                     <span className="text-muted-foreground text-sm">Role-Aware AI Workspace for Organizations</span>
@@ -49,11 +41,11 @@ export default function HeroSection() {
 
                                 <div className="mt-6 flex flex-col items-center justify-center gap-2 md:flex-row">
                                     <Button key={1} asChild>
-                                        <Link href="#features"><span className="text-nowrap">Explore Architecture</span></Link>
+                                        <Link href="#security"><span className="text-nowrap">Explore Architecture</span></Link>
                                     </Button>
                                     <Button key={2} variant="ghost" asChild>
-                                        <Link href="#">
-                                            <span className="text-nowrap">Watch the flow</span>
+                                        <Link href="#features">
+                                            <span className="text-nowrap">See how it works</span>
                                         </Link>
                                     </Button>
                                 </div>
@@ -63,58 +55,15 @@ export default function HeroSection() {
                                 <div className="rounded-4xl mask-t-from-25% mask-t-to-65% bg-linear-to-b absolute inset-0 border to-zinc-600"></div>
                                 <div className="bg-background ring-foreground/6.5 before:mask-radial-at-top-left before:mask-radial-from-65% before:mask-radial-[100%_60%] before:ring-foreground before:border-foreground/10 relative rounded-2xl p-2 shadow-xl shadow-black/50 ring before:absolute before:-inset-px before:z-10 before:size-56 before:rounded-tl-2xl before:border-l before:border-t">
                                     <div className="bg-foreground/2 z-1 absolute inset-0 rounded-2xl"></div>
-                                    {/* <Image
-                                        className="bg-background aspect-15/8 relative rounded-2xl"
-                                        src="/mail2.png"
-                                        alt="app screen"
-                                        width="2700"
-                                        height="1440"
-                                    /> */}
-                                    <div className="bg-muted aspect-[15/8] relative rounded-2xl flex items-center justify-center border">
-                                        <span className="text-muted-foreground text-sm">Dashboard Preview</span>
-                                    </div>
+                                    <Image
+                                        className="bg-background relative h-auto w-full rounded-2xl"
+                                        src="/hero-preview.png"
+                                        alt="Trellis role hierarchy screen"
+                                        width={1918}
+                                        height={946}
+                                        priority
+                                    />
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="bg-background pb-16 pt-6 md:pb-32">
-                    <div className="group relative m-auto max-w-5xl px-6">
-                        <div className="absolute inset-0 z-10 flex scale-95 items-center justify-center opacity-0 duration-500 group-hover:scale-100 group-hover:opacity-100">
-                            <Link
-                                href="/"
-                                className="block text-sm duration-150 hover:opacity-75">
-                                <span> See the network</span>
-
-                                <ChevronRight className="ml-1 inline-block size-3" />
-                            </Link>
-                        </div>
-                        <div className="group-hover:blur-xs **:fill-foreground mx-auto mt-12 grid max-w-2xl grid-cols-3 gap-x-12 gap-y-8 transition-all duration-500 group-hover:opacity-50 sm:gap-x-16 sm:gap-y-14 md:grid-cols-4">
-                            <div className="flex items-center">
-                                <Bolt className="mx-auto h-5 w-full" />
-                            </div>
-                            <div className="flex items-center">
-                                <VercelFull className="mx-auto h-4 w-full" />
-                            </div>
-                            <div className="flex items-center">
-                                <SupabaseFull className="mx-auto h-6" />
-                            </div>
-                            <div className="flex items-center">
-                                <Hulu className="mx-auto h-4 w-full" />
-                            </div>
-                            <div className="flex items-center">
-                                <Spotify className="mx-auto h-6 w-full" />
-                            </div>
-                            <div className="flex items-center">
-                                <FirebaseFull className="mx-auto h-6 w-full" />
-                            </div>
-                            <div className="hidden items-center sm:flex">
-                                <Beacon className="mx-auto h-4 w-full" />
-                            </div>
-
-                            <div className="hidden items-center sm:flex">
-                                <Claude className="mx-auto h-5 w-full" />
                             </div>
                         </div>
                     </div>
