@@ -76,6 +76,11 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Next.js generates some types (like RouteContext) into .next/, which a fresh
+      # checkout does not have yet. Generate them first, or tsc reports errors.
+      - name: Generate Next.js route types
+        run: pnpm exec next typegen
+
       - name: Type-check
         run: pnpm exec tsc --noEmit
 
