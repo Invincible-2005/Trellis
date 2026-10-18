@@ -27,7 +27,7 @@ Role-aware AI workspace for organizations: your org's knowledge, searchable and 
   - `AccessScope` is a frozen value object built only by `resolve_scope()`.
   - It is enforced inside shared data-access functions that require `scope`; REST endpoints and agent tools call the same functions.
   - It is passed to LangGraph via **runtime context** (`context=AgentContext(...)`), **never** stored in `AgentState` and never in LLM tool schemas.
-- **Identity** (ticket 03 §2, D8): user and org come **only** from the verified Clerk JWT. The BFF sends only `Authorization: Bearer`; `X-Org-*` and `X-User-*` headers are never trusted. **Clerk proves identity; the Trellis DB decides permissions.** Clerk org roles grant nothing.
+- **Identity** (ticket 03 §2, D8): user and org come **only** from the verified Clerk JWT. The BFF sends only `Authorization: Bearer`; `X-Org-*` and `X-User-*` headers are never trusted. **Clerk proves identity; the Trellis DB decides permissions.** Clerk org roles grant nothing. The one extra header is a deployment gate, not identity: the Next.js server also sends `X-Internal-Key` (shared secret `INTERNAL_API_KEY`) and FastAPI refuses `/api/v1` calls without it (D62).
 - **Roles** (D9):
   - A user has an optional **org-level role** (`org_members.role_id`) plus per-team roles. Use `can_org(p)` for org-wide actions and `can(p, team)` for team actions.
   - **No privilege escalation:** users act only on roles strictly below their own and grant only permissions they hold.

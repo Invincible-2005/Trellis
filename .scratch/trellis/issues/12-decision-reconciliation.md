@@ -386,7 +386,7 @@ A cross-check of both Wayfinder maps against each other and against the code in 
     - heavyWrite 10 per 10 min (document indexing, invites).
   - **Code:** `frontend/lib/middleware/` (`arcjet.ts` rules + numbers, `gate.ts` front gate, `limit.ts` per-action). Not named `frontend/middleware/` because Next.js 16 deprecated that name for `proxy.ts`. Blocked → 429 `rate_limited` / 403 `blocked` in the D16 shape.
   - **No `ARCJET_KEY` → Arcjet is off** and everything passes, so teammates can run without a key.
-- **Known gap (ties to D11 deployment):** Arcjet guards only the Next.js door. If FastAPI's URL is public, a signed-in user could call it directly with their own token and skip the limits; keep FastAPI unreachable from outside when deploying.
+- ~~**Known gap (ties to D11 deployment):** Arcjet guards only the Next.js door.~~ Closed by D62 (2026-10-18): FastAPI refuses `/api/v1` calls without the shared secret. Original text: Arcjet guards only the Next.js door. If FastAPI's URL is public, a signed-in user could call it directly with their own token and skip the limits; keep FastAPI unreachable from outside when deploying.
 
 ### D28. Where does team work happen: a `/teams` page for everyone, or `/admin/teams` only? (added 2026-10-10, teams effort, raised by Piyush) — ✅ RESOLVED 2026-10-10
 - **Gap:** frontend tickets 01/06 and `spec.md` put teams only under `/admin/teams` (tab opens for `can_org("add_member")` or `can_org("create_team")`; `auth.py` `admin_tabs`). Piyush's idea: `/teams` lists teams, `/teams/[teamId]` has "Add member" and "Create task". With admin-only teams, a team-level manager (team role with `add_member`/`assign_task`, no org role) and plain team members can't open their own team.
@@ -679,6 +679,17 @@ A cross-check of both Wayfinder maps against each other and against the code in 
   1. Initial migration now runs `CREATE EXTENSION IF NOT EXISTS vector` first and `DROP TABLE IF EXISTS playing_with_neon`. No effect on databases that already ran it (Alembic never reruns a revision); verified on an empty database and on one that already has the extension and the table.
   2. On an `IntegrityError`, `_create_user` rolls back and re-reads by `clerk_user_id`; if that row exists it is returned. `email_in_use` is raised only when no row belongs to this Clerk user. Same stress script afterwards: 0 failing rounds of 40.
 - **Result:** with `TEST_DATABASE_URL` set all 61 backend tests run (none skipped). CI's backend job now starts a pgvector Postgres service, applies the 13 migrations and runs them (plans/ci-cd, step 2).
+
+### D62. A public FastAPI URL needs a shared secret (added 2026-10-18, found while planning the first deploy) — ✅ RESOLVED 2026-10-18 (built 2026-10-18)
+- **Conflict:** D27 and the D11 note say FastAPI must stay unreachable from outside, because Arcjet's limits and bot checks live only in the Next.js server. Deploying the frontend on Vercel and the backend on Render (CI/CD step 3, `plans/ci-cd/`) gives FastAPI a public address.
+- **Example:** a signed-in employee finds the backend address and sends hundreds of chat messages straight to it. The Clerk token still limits what they can read, but they skip the 5-messages-a-minute limit and burn the org's shared free Gemini quota.
+- **Decided (Piyush, 2026-10-18):** keep the rule's intent with a **shared secret**. The Next.js server sends `X-Internal-Key: <secret>` on every call to FastAPI, and FastAPI refuses every `/api/v1` request without the matching value (`403 forbidden`) before it looks at the token.
+  - Setting `INTERNAL_API_KEY` on both sides (Render and Vercel env vars, never `NEXT_PUBLIC_`). Empty means the check is off, so local development and the tests stay as they are. In production (`ENVIRONMENT=production`) the backend refuses to start without it, so a forgotten variable can't silently open the API.
+  - This is a deployment gate, **not identity**: the rule that user and org come only from the verified Clerk token (D8) is unchanged, and `X-User-*` / `X-Org-*` stay ignored.
+  - `/health`, `/docs` and `/openapi.json` stay open at the root (D3); Render's health check and the deploy smoke test need `/health`.
+- **Where:** `backend/app/core/config.py`, `backend/app/core/deps.py`, `backend/app/api/v1/__init__.py`, `frontend/lib/api/client.ts`. No change to `openapi.json` (the check reads the raw request header).
+- **Built 2026-10-18:** `INTERNAL_API_KEY` setting plus a production-start check (`config.py`), `require_internal_key` (`deps.py`), wired first on `api_router`, and an `internalKey` middleware in `frontend/lib/api/client.ts`. Five tests in `backend/tests/test_internal_key.py` (missing, wrong and right key, check off when empty, production refuses to start without it). `openapi.json` unchanged. Still to do at deploy time: generate a value and set it on Render and Vercel (CI/CD step 3).
+- **Source tickets:** closes the "known gap" note on Arcjet guarding only the Next.js door (D27, line below D11).
 
 ## Already fixed in docs during the audit (no decision needed)
 - D3: all FastAPI paths in ticket 05 now carry the `/api/v1` prefix.

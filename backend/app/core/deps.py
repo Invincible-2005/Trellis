@@ -34,13 +34,14 @@ Usage in any router:
 """
 import asyncio
 import logging
+import secrets
 import uuid
 from dataclasses import dataclass
 from typing import Optional
 
 import httpx
 from cachetools import TTLCache
-from fastapi import Depends, status
+from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -60,6 +61,28 @@ logger = logging.getLogger(__name__)
 
 # Bearer token extractor — a missing header is turned into a D16-shaped 401 below
 _bearer = HTTPBearer(auto_error=False)
+
+
+# ── Step 0: only the Trellis web app may call the API (ticket 12 D62) ─────────
+
+async def require_internal_key(request: Request) -> None:
+    """
+    Refuse the call unless it carries the shared secret the Next.js server sends.
+    This is a deployment gate, not identity: who the user is still comes only from the
+    Clerk token. Off when INTERNAL_API_KEY is empty (local development, tests).
+    Reads the raw header, so it adds nothing to openapi.json.
+    """
+    expected = settings.INTERNAL_API_KEY
+    if not expected:
+        return
+    sent = request.headers.get("x-internal-key", "")
+    # compare_digest takes the same time however many characters match (no timing leaks)
+    if not secrets.compare_digest(sent.encode(), expected.encode()):
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "forbidden",
+            "This API only accepts requests from the Trellis web app.",
+        )
 
 
 # ── Step 1: verify JWT + upsert User row ──────────────────────────────────────

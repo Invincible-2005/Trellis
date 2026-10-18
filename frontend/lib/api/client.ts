@@ -27,8 +27,20 @@ const clerkToken: Middleware = {
   },
 };
 
+// Proves to FastAPI that the call comes from this Next.js server and not straight from a
+// browser or script (ticket 12 D62). Server-only env var, never NEXT_PUBLIC_. Empty locally.
+// This is a deployment gate, not identity: who the user is still comes only from the token.
+const internalKey: Middleware = {
+  onRequest({ request }) {
+    const key = process.env.INTERNAL_API_KEY;
+    if (key) request.headers.set('X-Internal-Key', key);
+    return request;
+  },
+};
+
 export const api = createClient<paths>({
   baseUrl: process.env.FASTAPI_INTERNAL_URL ?? 'http://127.0.0.1:8000',
 });
 
 api.use(clerkToken);
+api.use(internalKey);

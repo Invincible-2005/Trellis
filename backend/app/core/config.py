@@ -1,7 +1,7 @@
 import os
 import urllib.parse
 from typing import Optional
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     CLERK_AUTHORIZED_PARTIES: list[str] = ["http://localhost:3000"]
     # Where the frontend runs. Clerk invite emails link to FRONTEND_URL/sign-up.
     FRONTEND_URL: str = "http://localhost:3000"
+    # Shared secret between the Next.js server and this API (ticket 12 D62). The web app
+    # sends it as X-Internal-Key and every /api/v1 route refuses calls without it, so a
+    # public backend URL can't be used to skip the Arcjet limits. Empty = check off
+    # (local development, tests). Required when ENVIRONMENT=production. Generate one with
+    # `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+    INTERNAL_API_KEY: str = ""
 
     # Embeddings (ticket 12 D14): Gemini API, authenticated with GOOGLE_API_KEY below
     EMBEDDING_MODEL: str = "gemini-embedding-001"
@@ -65,6 +71,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def _require_internal_key_in_production(self):
+        # A forgotten variable must stop the app, not silently leave the API open (D62).
+        if self.ENVIRONMENT.lower() == "production" and not self.INTERNAL_API_KEY:
+            raise ValueError("INTERNAL_API_KEY must be set when ENVIRONMENT=production.")
+        return self
 
     @field_validator("CLERK_ISSUER")
     @classmethod
