@@ -1,0 +1,21 @@
+# Keep secrets and developer-only files out of the image.
+.env
+.env.*
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.deepeval
+.git
+
+# Not needed to run the app (the migrations in alembic/ are kept on purpose).
+tests
+evaluation
+scripts
+openapi.json
+README.md
+CLAUDE.md
+requirements.txt
+Dockerfile
+.dockerignore

@@ -70,6 +70,17 @@ jobs:
           uv run python scripts/export_openapi.py
           git diff --exit-code openapi.json
 
+  # Builds the backend Docker image exactly as the host will. Nothing is pushed or run:
+  # the point is that a broken Dockerfile or a missing package turns the pipeline red.
+  docker:
+    name: Backend Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t trellis-backend ./backend
+
   frontend:
     name: Frontend (lint + types + build)
     runs-on: ubuntu-latest
