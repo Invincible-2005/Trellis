@@ -1,0 +1,83 @@
+# CI: runs on every push and every pull request.
+# Two jobs run in parallel on fresh Linux machines. If either fails, the commit shows a red X.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# A newer push to the same branch cancels the older run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (tests + API contract)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # uv installs Python (version from backend/.python-version) and the packages in uv.lock.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install packages (exact versions from uv.lock)
+        run: uv sync --frozen
+
+      # The tests fake Clerk and the database, so no secrets are needed.
+      - name: Run tests
+        run: uv run pytest
+
+      # Rebuild openapi.json from the code; fail if it differs from the committed file.
+      # The app reads DATABASE_URL when it loads, but never connects, so a dummy value is fine.
+      - name: API contract is up to date
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+        run: |
+          uv run python scripts/export_openapi.py
+          git diff --exit-code openapi.json
+
+  frontend:
+    name: Frontend (lint + types + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    # Placeholder values so the production build can start. Nothing here is a real key.
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+      CLERK_SECRET_KEY: sk_test_placeholder
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+      ARCJET_KEY: ajkey_placeholder
+      UPLOADTHING_TOKEN: placeholder
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm version comes from "packageManager" in frontend/package.json.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install packages (exact versions from pnpm-lock.yaml)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm build

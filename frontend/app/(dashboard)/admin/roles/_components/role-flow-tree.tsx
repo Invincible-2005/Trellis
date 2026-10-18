@@ -97,6 +97,7 @@ export function RoleFlowTree({
   // are identical. After mount the real resolvedTheme takes over without a
   // mismatch warning.
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional, see the hydration guard above
   useEffect(() => { setMounted(true); }, []);
   const flowColorMode = mounted && resolvedTheme === 'dark' ? 'dark' : 'light';
 

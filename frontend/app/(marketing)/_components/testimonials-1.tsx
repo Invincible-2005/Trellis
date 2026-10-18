@@ -21,7 +21,7 @@ export default function Testimonials() {
                         />
 
                         <div className="min-h-100 relative flex flex-col justify-between">
-                            <p className="max-w-lg text-3xl text-black">Congrats on your launch! Looks awesome! Still can't wait for your "animated AI gradient circle"</p>
+                            <p className="max-w-lg text-3xl text-black">Congrats on your launch! Looks awesome! Still can&apos;t wait for your &ldquo;animated AI gradient circle&rdquo;</p>
 
                             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
                                 <Openai className="**:fill-black size-10" />

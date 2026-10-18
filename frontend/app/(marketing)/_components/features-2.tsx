@@ -56,7 +56,7 @@ export default function Features() {
                         <span className="text-foreground mb-1.5 flex items-center gap-1.5 font-medium">
                             <Shield className="size-4" /> Dynamic Access Scoping
                         </span>
-                        Every query resolves the caller's exact role hierarchy before retrieval — preventing unauthorized document and task access at the source.
+                        Every query resolves the caller&apos;s exact role hierarchy before retrieval — preventing unauthorized document and task access at the source.
                     </p>
 
                     <p className="text-muted-foreground text-balance text-sm leading-relaxed">

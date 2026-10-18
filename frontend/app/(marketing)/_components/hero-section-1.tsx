@@ -44,7 +44,7 @@ export default function HeroSection() {
                                     Role-aware intelligence for every level of your organization.
                                 </h1>
                                 <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-balance md:text-lg">
-                                    Trellis is an intelligent organization workspace powered by strict hierarchical access control. Dynamically scope knowledge retrieval, team tasks, and AI assistance to each member's exact role tree with zero cross-team data leakage.
+                                    Trellis is an intelligent organization workspace powered by strict hierarchical access control. Dynamically scope knowledge retrieval, team tasks, and AI assistance to each member&apos;s exact role tree with zero cross-team data leakage.
                                 </p>
 
                                 <div className="mt-6 flex flex-col items-center justify-center gap-2 md:flex-row">
