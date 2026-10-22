@@ -1,7 +1,8 @@
 """
 Offline test: which way of cutting documents into pieces ranks the answer best?
 
-    uv run python evaluation/compare_splits.py
+    uv run python evaluation/compare_splits.py               # round 1 (12 test documents)
+    uv run python evaluation/compare_splits.py kestrel-org   # round 2 (Kestrel, ticket 12 D58)
 
 Cuts the 12 test documents (plans/documents/test-files) six ways, embeds the
 pieces with the app's own embedding call, and for each of the 10 evaluation
@@ -40,25 +41,38 @@ sys.path.insert(0, str(EVAL_DIR.parent))
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter  # noqa: E402
 
-from app.services.embeddings import _embed, embed_documents  # noqa: E402
-from app.services.ingestion import _chunk_text, _extract_text  # noqa: E402
+from app.services.embeddings import EmbeddingError, _embed  # noqa: E402
+from app.services.ingestion import _extract_text  # noqa: E402
 
-DOCS_DIR = EVAL_DIR.parent.parent / "plans" / "documents" / "test-files"
-ANSWERS = EVAL_DIR / "results" / "answers.json"
-REPORT = EVAL_DIR / "results" / "splitting_comparison.md"
+QUESTION_SET = sys.argv[1] if len(sys.argv) > 1 else None
+SET_DIR = EVAL_DIR / QUESTION_SET if QUESTION_SET else EVAL_DIR
+DOCS_DIR = SET_DIR / "documents" if QUESTION_SET else EVAL_DIR.parent.parent / "plans" / "documents" / "test-files"
+ANSWERS = SET_DIR / "results" / "answers.json"
+REPORT = SET_DIR / "results" / "splitting_comparison.md"
 CACHE = EVAL_DIR / ".cache" / "embeddings.json"   # git-ignored; reruns only embed new text
 
 
 async def cached_embed(texts: list[str], task_type: str) -> list[list[float]]:
-    """Embed only texts not embedded before (the free tier limits text per minute)."""
+    """
+    Embed only texts not embedded before. Saved after every batch of 32, and a
+    per-minute free-tier limit is waited out, so a long run never loses progress.
+    """
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     keys = [f"{task_type}|{t}" for t in texts]
     missing = list(dict.fromkeys(k for k in keys if k not in cache))
-    if missing:
-        vectors = await (_embed([k.split("|", 1)[1] for k in missing], task_type) if task_type == "RETRIEVAL_QUERY"
-                         else embed_documents([k.split("|", 1)[1] for k in missing]))
-        cache.update(zip(missing, vectors))
-        CACHE.parent.mkdir(exist_ok=True)
+    CACHE.parent.mkdir(exist_ok=True)
+    for start in range(0, len(missing), 32):
+        batch = missing[start : start + 32]
+        for attempt in range(1, 6):
+            try:
+                vectors = await _embed([k.split("|", 1)[1] for k in batch], task_type)
+                break
+            except EmbeddingError:
+                if attempt == 5:
+                    raise
+                print(f"  embedding limit, waiting 65 s ({start}/{len(missing)} done) ...", flush=True)
+                await asyncio.sleep(65)
+        cache.update(zip(batch, vectors))
         CACHE.write_text(json.dumps(cache), encoding="utf-8")
     return [cache[k] for k in keys]
 
@@ -66,6 +80,13 @@ MAX_PIECE = 1000
 MIN_MERGED = 400
 _LONG_SECTION = RecursiveCharacterTextSplitter(
     chunk_size=MAX_PIECE, chunk_overlap=200, separators=["\n\n", "\n", ".", " ", ""]
+)
+# Round 2 (D58, 2026-10-20): long sections split with ~12% overlap; parent-child children ~250
+_LONG_SECTION_12 = RecursiveCharacterTextSplitter(
+    chunk_size=MAX_PIECE, chunk_overlap=120, separators=["\n\n", "\n", ".", " ", ""]
+)
+_CHILD = RecursiveCharacterTextSplitter(
+    chunk_size=250, chunk_overlap=30, separators=["\n\n", "\n", ".", " ", ""]
 )
 
 # Who sees which document (test-files README §2; the employee account holds
@@ -142,12 +163,22 @@ def title_of(text: str) -> str:
 
 # ── The six ways of cutting ──────────────────────────────────────────────────
 
+# The app's cutting before D58 (ticket 11), kept here as option "A today"
+_OLD_STANDARD = RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200, separators=["\n\n", "\n", ".", " ", ""]
+)
+_OLD_PPTX = RecursiveCharacterTextSplitter(
+    chunk_size=500, chunk_overlap=100, separators=["\n\n", "\n", " • ", ". ", " ", ""]
+)
+
+
 def cut_today(text: str, file_type: str, title: str) -> list[str]:
-    return _chunk_text(text, file_type)
+    splitter = _OLD_PPTX if file_type == "pptx" else _OLD_STANDARD
+    return [c for c in splitter.split_text(text) if c.strip()]
 
 
 def cut_by_heading(text: str, file_type: str, title: str, with_title=False, merge=False,
-                   min_size=MIN_MERGED) -> list[str]:
+                   min_size=MIN_MERGED, splitter=_LONG_SECTION) -> list[str]:
     parts = sections(text, file_type)
     if merge:
         merged: list[tuple[str, str]] = []
@@ -160,7 +191,7 @@ def cut_by_heading(text: str, file_type: str, title: str, with_title=False, merg
         parts = merged
     pieces = []
     for heading, body in parts:
-        for piece in (_LONG_SECTION.split_text(body) if len(body) > MAX_PIECE else [body]):
+        for piece in (splitter.split_text(body) if len(body) > MAX_PIECE else [body]):
             if with_title:
                 piece = f"{title} > {heading}\n{piece}" if heading else f"{title}\n{piece}"
             pieces.append(piece)
@@ -188,6 +219,29 @@ def cut_parent_child(text: str, file_type: str, title: str) -> list[tuple[str, s
                 pairs.append((f"{title} > {heading}\n{piece}" if heading else f"{title}\n{piece}", parent))
     return pairs
 
+
+def cut_section_parent_child(text: str, file_type: str, title: str) -> list[tuple[str, str]]:
+    """
+    Round 2 parent-child: parents are the 400-1,000 section pieces (round 2's
+    option B); children are ~250-character pieces of each parent, with the same
+    "title > section" line, and are what gets embedded and searched.
+    """
+    pairs = []
+    for parent in cut_by_heading(text, file_type, title, with_title=True, merge=True,
+                                 min_size=400, splitter=_LONG_SECTION_12):
+        header, _, body = parent.partition("\n")
+        pairs += [(f"{header}\n{child}", parent) for child in _CHILD.split_text(body)]
+    return pairs
+
+
+ROUND2_STRATEGIES = {
+    "A today (1,000 cuts, 200 overlap)": cut_today,
+    "B sections 400-1,000 + titles": lambda t, f, ti: cut_by_heading(
+        t, f, ti, with_title=True, merge=True, min_size=400, splitter=_LONG_SECTION_12),
+    "C sections 200-1,000 + titles": lambda t, f, ti: cut_by_heading(
+        t, f, ti, with_title=True, merge=True, min_size=200, splitter=_LONG_SECTION_12),
+    "D parent-child (search ~250 children, return B's sections)": cut_section_parent_child,
+}
 
 STRATEGIES = {
     "A today (1,000 cuts)": cut_today,
@@ -253,17 +307,27 @@ def evaluate(pieces: list[dict], query_vectors: dict[int, list[float]], answers:
     }
 
 
+def load_round2() -> dict:
+    """Round 2 keeps markers and who-sees-what in its queries.json; only answerable questions count."""
+    global VISIBLE, MARKERS
+    data = json.loads((SET_DIR / "queries.json").read_text(encoding="utf-8"))
+    VISIBLE = data["visible"]
+    MARKERS = {q["id"]: q["markers"] for q in data["questions"] if "markers" in q}
+    return ROUND2_STRATEGIES
+
+
 async def main() -> None:
-    answers = json.loads(ANSWERS.read_text(encoding="utf-8"))
+    strategies = load_round2() if QUESTION_SET else STRATEGIES
+    answers = [a for a in json.loads(ANSWERS.read_text(encoding="utf-8")) if a["id"] in MARKERS]
     files = [f for f in sorted(DOCS_DIR.iterdir()) if f.suffix in (".md", ".txt", ".pdf", ".docx", ".pptx")
              and f.name != "README.md"]
 
-    print("Embedding the 10 search phrases ...")
+    print(f"Embedding the {len(answers)} search phrases ...")
     phrases = [a["searches"][0] for a in answers]
     query_vectors = dict(zip((a["id"] for a in answers), await cached_embed(phrases, "RETRIEVAL_QUERY")))
 
     results = {}
-    for name, cut in STRATEGIES.items():
+    for name, cut in strategies.items():
         pieces = []
         for f in files:
             file_type = f.suffix[1:]
@@ -287,10 +351,12 @@ async def main() -> None:
 
 
 def write_report(results: dict, answers: list[dict]) -> None:
+    n = len(answers)
     lines = [
         "# Splitting comparison (offline)",
         "",
-        "The 12 test documents cut six ways and searched with the agent's real search phrases, "
+        f"The {len(list(DOCS_DIR.glob('*.*'))) - (1 if (DOCS_DIR / 'README.md').exists() else 0)} test documents "
+        f"cut {len(results)} ways and searched with the agent's real search phrases, "
         "each question limited to the documents that person may see. Relevance comes from a marker phrase "
         "that only the answer piece contains (no AI judge), so these are stand-ins for the DeepEval measures. "
         "Made by `evaluation/compare_splits.py`; nothing in the app changed.",
@@ -302,15 +368,15 @@ def write_report(results: dict, answers: list[dict]) -> None:
         for k in (6, 4, 3):
             m = r[f"k{k}"]
             lines.append(
-                f"| {name} | {r['pieces']} | {r['avg_size']} | {k} | {m['first']}/10 | {m['precision']:.2f} | "
-                f"{m['useful']:.2f} | {m['chars']} | {m['found']}/10 |"
+                f"| {name} | {r['pieces']} | {r['avg_size']} | {k} | {m['first']}/{n} | {m['precision']:.2f} | "
+                f"{m['useful']:.2f} | {m['chars']} | {m['found']}/{n} |"
             )
     lines += [
         "",
-        "- **Answer 1st / Precision**: stand-ins for Context Precision (the live run scored 0.75).",
-        "- **Useful share / Chars sent**: stand-ins for Context Relevancy (live 0.13): more useful pieces and "
+        "- **Answer 1st / Precision**: stand-ins for Context Precision (live: round 1 0.75, Kestrel baseline 0.78).",
+        "- **Useful share / Chars sent**: stand-ins for Context Relevancy (live: round 1 0.13, Kestrel 0.19): more useful pieces and "
         "less text sent means less noise.",
-        "- **Found**: stand-in for Context Recall (live 1.00). Must stay 10/10.",
+        f"- **Found**: stand-in for Context Recall (live 1.00). Must stay {n}/{n}.",
         "- **Pieces / Avg size** count what is embedded (for E, the children); **Chars sent** counts what "
         "the agent receives (for E, the parents).",
         "",

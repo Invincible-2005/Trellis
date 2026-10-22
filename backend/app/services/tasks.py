@@ -34,7 +34,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core.errors import api_error
-from app.models.document import Document
 from app.models.strike import Strike
 from app.models.task import Task, TaskComment, TaskSubmission
 from app.models.team import Team, TeamMember
@@ -52,6 +51,7 @@ from app.schemas.tasks import (
     UpdateTaskRequest,
 )
 from app.scope.resolver import AccessScope
+from app.services.documents import file_in_use
 from app.services.ingestion import is_allowed_file_url
 
 logger = logging.getLogger(__name__)
@@ -391,10 +391,7 @@ async def create_submission(
         raise api_error(
             status.HTTP_400_BAD_REQUEST, "invalid_file_url", "That file link isn't an uploaded file."
         )
-    in_use = await db.scalar(
-        select(TaskSubmission.id).where(TaskSubmission.file_url == body.file_url).limit(1)
-    ) or await db.scalar(select(Document.id).where(Document.file_url == body.file_url).limit(1))
-    if in_use is not None:
+    if await file_in_use(db, body.file_url):
         raise api_error(status.HTTP_409_CONFLICT, "file_in_use", "This file has already been used.")
 
     submission = TaskSubmission(

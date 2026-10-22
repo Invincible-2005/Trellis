@@ -5,7 +5,8 @@
 // call the Server Action; a refusal puts the saved list back with a toast. On success the
 // server's fresh copy (revalidatePath) replaces ours, like the "Indexing…" check's refresh().
 // Upload: the file travels to UploadThing first (step 1, can't be skipped); only step 2's
-// Save (registering it with our server) is instant here.
+// Save (registering it with our server) is instant here. If Save fails, the file is
+// deleted from UploadThing again (trellis/12 D64).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import {
   createDocument,
   deleteDocument,
+  discardUpload,
   updateDocument,
   type CreateDocumentInput,
   type UpdateDocumentInput,
@@ -113,7 +115,10 @@ export function useDocumentChanges() {
       updateDocuments((list) => [placeholder, ...list]); // newest first, like the server
       return { ...saved, tempId };
     },
-    onError: undo,
+    onError: (error, input, sent) => {
+      undo(error, input, sent);
+      void discardUpload(input.file_url); // the dialog is closed; re-uploading starts over
+    },
     onSuccess: (created, _input, sent) => {
       // Swap the temporary row for the real one (it shows "Indexing…" until it's ready).
       updateDocuments((list) => list.map((d) => (d.id === sent?.tempId ? created : d)));

@@ -20,8 +20,10 @@ Placing (upload) and deleting follow "at or below yourself" (D23):
     team  → can("upload_document", team) and can_view_team(team)
 """
 import logging
+import re
 import uuid
 from typing import Optional
+from urllib.parse import unquote, urlsplit
 
 from fastapi import status
 from sqlalchemy import and_, delete, or_, select, text, update
@@ -32,11 +34,13 @@ from app.core.errors import api_error
 from app.models.document import Document, DocumentChunk
 from app.models.organization import OrgMember
 from app.models.role import Role
+from app.models.task import TaskSubmission
 from app.models.team import Team
 from app.schemas.documents import (
     CreateDocumentRequest,
     DocumentResponse,
     DocumentTagOptions,
+    FileUsageResponse,
     TagTarget,
     UpdateDocumentRequest,
 )
@@ -197,6 +201,51 @@ async def tag_options(db: AsyncSession, scope: AccessScope) -> DocumentTagOption
     )
 
 
+_FILE_PATH = re.compile(r"^/f/([^/]+)$")
+
+
+def file_key(file_url: str) -> Optional[str]:
+    """The UploadThing file key in a link (<app>.ufs.sh/f/<key> or utfs.io/f/<key>), else None."""
+    try:
+        match = _FILE_PATH.match(urlsplit(file_url).path)
+    except ValueError:
+        return None
+    return unquote(match.group(1)) if match else None
+
+
+async def file_in_use(db: AsyncSession, file_url: str) -> bool:
+    """
+    True when a document or a task hand-in (any org: every org shares one UploadThing
+    app) points at the same stored file. Compared by file key, not by the whole link:
+    one file has several valid links (two CDN hosts, D40), and an exact-link check
+    could be dodged by switching host.
+    """
+    key = file_key(file_url)
+    if key is None:
+        return False
+    for model in (Document, TaskSubmission):
+        links = await db.scalars(select(model.file_url).where(model.file_url.contains(key, autoescape=True)))
+        if any(file_key(link) == key for link in links):
+            return True
+    return False
+
+
+async def file_usage(db: AsyncSession, file_url: str) -> FileUsageResponse:
+    """
+    Whether an uploaded file is used by a document or hand-in (D64). The upload
+    dialogs ask this before deleting a file they uploaded but never saved, so they
+    can't remove a file that a real record points at.
+
+    Raises:
+        400 invalid_file_url — not an UploadThing file link
+    """
+    if not is_allowed_file_url(file_url) or file_key(file_url) is None:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "invalid_file_url", "That link isn't an uploaded file."
+        )
+    return FileUsageResponse(in_use=await file_in_use(db, file_url))
+
+
 async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocumentRequest) -> DocumentResponse:
     """
     Save a new document as 'processing'. The router then starts run_ingestion
@@ -206,7 +255,7 @@ async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocu
         400 invalid_file_url                — not an UploadThing CDN URL (SSRF guard, ticket 11)
         404 role_not_found / team_not_found — the tag isn't a role or team in this org
         403 forbidden                       — tag not at or below the caller (D23)
-        409 file_already_registered         — another document already uses this file (D40)
+        409 file_already_registered         — a document or hand-in already uses this file (D40)
     """
     if not is_allowed_file_url(body.file_url):
         raise api_error(
@@ -215,15 +264,13 @@ async def create_document(db: AsyncSession, scope: AccessScope, body: CreateDocu
             "The file must be uploaded through the app (UploadThing).",
         )
 
-    # One file belongs to one document (D40): deleting a document also deletes its
+    # One file belongs to one record (D40): deleting a document also deletes its
     # file from UploadThing, so a copy pointing at someone else's file must not exist.
-    # Checked across all orgs because every org shares one UploadThing app.
-    in_use = await db.scalar(select(Document.id).where(Document.file_url == body.file_url).limit(1))
-    if in_use is not None:
+    if await file_in_use(db, body.file_url):
         raise api_error(
             status.HTTP_409_CONFLICT,
             "file_already_registered",
-            "This file is already registered as a document. Upload it again to add another copy.",
+            "This file is already in use. Upload it again to add another copy.",
         )
 
     await _check_tag(db, scope, body.scope_type, body.role_id, body.team_id)
@@ -358,9 +405,11 @@ class ChunkHit(TypedDict):
     distance: float     # cosine distance: 0 = same meaning, larger = less related
 
 
-async def search_chunks(db: AsyncSession, scope: AccessScope, question: str, k: int = 6) -> list[ChunkHit]:
+async def search_chunks(db: AsyncSession, scope: AccessScope, question: str, k: int = 4) -> list[ChunkHit]:
     """
     The k document pieces closest in meaning to `question` that the user may see.
+    4 by default (D58): with one section per piece, 4 holds the answer as often as 6
+    did and sends the AI ~44% less text per question.
 
     Only pieces of 'ready' documents exist: ingestion writes chunks and
     status='ready' in one commit, and a failed document keeps no chunks.

@@ -99,6 +99,29 @@ export async function deleteDocument(documentId: string): Promise<ActionResult<n
   }
 }
 
+/**
+ * Delete a file the user uploaded but never saved: the upload or hand-in dialog was
+ * closed, they picked another file, or saving failed (trellis/12 D64). The backend
+ * first confirms no document or hand-in uses the file, so this can never remove a
+ * real record's file. Best effort: anything left behind is caught by
+ * backend/scripts/clean_upload_leftovers.py.
+ *
+ *   void discardUpload(fileUrl);
+ */
+export async function discardUpload(fileUrl: string): Promise<void> {
+  const blocked = await limit('write');
+  if (blocked) return;
+  try {
+    const { in_use } = await unwrap(
+      api.GET('/api/v1/documents/file-usage', { params: { query: { file_url: fileUrl } } }),
+    );
+    if (!in_use) await deleteStoredFile(fileUrl);
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err;
+    console.error(`[storage] Could not check ${fileUrl} before deleting it:`, err.message);
+  }
+}
+
 function toFailure(err: unknown): { ok: false; message: string } {
   if (err instanceof ApiError) return { ok: false, message: err.message };
   throw err; // redirect() from unwrap, or a real bug

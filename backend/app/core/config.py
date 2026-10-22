@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Set as JSON in .env, e.g. INGESTION_ALLOWED_HOSTS='["utfs.io", ".ufs.sh"]'
     INGESTION_ALLOWED_HOSTS: list[str] = ["utfs.io", ".ufs.sh"]
     INGESTION_MAX_FILE_BYTES: int = 25 * 1024 * 1024
+    # Only for scripts/clean_upload_leftovers.py (ticket 12 D64); the app itself never
+    # calls UploadThing. Same value as UPLOADTHING_TOKEN in frontend/.env.
+    UPLOADTHING_TOKEN: str = ""
 
     # LangSmith tracing of agent runs (optional, dev/demo data only: traces contain
     # prompts, document text and names). Off unless LANGSMITH_TRACING=true.

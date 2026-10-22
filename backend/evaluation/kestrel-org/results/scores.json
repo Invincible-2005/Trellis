@@ -1,0 +1,488 @@
+[
+  {
+    "id": 1,
+    "question": "How many paid leave days do I get during my internship?",
+    "answer_clean": "You earn 1 day of paid leave for each month of your internship, giving you a total of 6 days.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.25,
+        "reason": "The score is 0.25 because while the context contained relevant details such as 'You earn 1 day of paid leave for each month of the internship, so 6 days in total.', it was largely overwhelmed by irrelevant information like 'You get access to the code repositories, staging and the anonymised dataset' and 'Duration | 6 months' which did not pertain to paid leave days."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all relevant nodes are perfectly ranked at the top, with the first and second nodes correctly providing the exact answer by stating 'You earn 1 day of paid leave for each month of the internship, so 6 days in total.', while the irrelevant nodes discussing evaluations, pre-placement offers, project demos, graduation details, and regular employee leave policies are properly ranked lower."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the information provided in the 1st node in the retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context without any contradictions."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output directly and accurately addresses the question about paid leave days during the internship without including any irrelevant information."
+      }
+    }
+  },
+  {
+    "id": 2,
+    "question": "How many earned leave days do I get in 2027, and how many can I carry forward?",
+    "answer_clean": "In 2027, you get **20 earned leave days**, which build up at 1.67 days per month worked. \n\nRegarding carrying them forward:\n* Up to **10 unused earned leave days** can be carried forward to 2028.\n* Anything above 10 unused earned leave days will lapse on 31 December 2027.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.26,
+        "reason": "The score is 0.26 because while the retrieval context includes some relevant details such as 'Earned leave is 20 days per year and builds up at 1.67 days per month worked' and 'Up to 10 unused earned leave days carry forward to 2028', it is heavily diluted by a large amount of irrelevant information addressing policies like sick leave, holidays, and conflict of interest as noted in 'The retrieval context contained the information regarding holidays for 2027 when the user specifically asked about earned leave days and carry forward rules'."
+      },
+      "Context Precision": {
+        "score": 0.83,
+        "reason": "The score is 0.83 because while the first node in retrieval contexts is relevant as \"It provides information on carry forward rules: 'Up to 10 unused earned leave days carry forward to 2028.'\", the second node in retrieval contexts is irrelevant since \"It mentions general policy introduction and application processes, but does not state the number of earned leave days or carry forward rules.\" and should have been ranked lower than the relevant nodes."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the nodes in retrieval context, with sentence one attributed to the 3rd node and sentence two attributed to the 1st node."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions detected."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses all parts of the user's input regarding earned leave days and carry-forward limits for 2027 without any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 3,
+    "question": "Is Good Friday a holiday?",
+    "answer_clean": "Yes, Good Friday (26 March 2027) is listed as a company holiday.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.12,
+        "reason": "The score is 0.12 because while the context mentions '26 March 2027 | Friday | Good Friday' and that 'Good Friday is on 26 March 2027, Friday', the vast majority of the retrieval context is filled with irrelevant details about other holidays like '25 December 2027 | Saturday | Christmas', various leave policies such as 'Casual leave | 6 | Max 2 days in a row; doesn't carry over', and engineering guidelines."
+      },
+      "Context Precision": {
+        "score": 0.92,
+        "reason": "The score is 0.92 because most relevant nodes correctly appear at the top, such as the first node which states '26 March 2027 | Friday | Good Friday' and the second node which lists '26 March 2027 | Friday | Good Friday'. However, the score is not higher because the irrelevant fourth node, which states 'It discusses mentoring interns and learning budget, which is entirely unrelated to Good Friday', and the fifth node, which states 'It discusses deploying to production and on-call rotations, which is unrelated to whether Good Friday is a holiday', are ranked above the relevant sixth node, which details 'optional holidays rules, stating 'Apply for an optional holiday in the HR portal at least 7 days before'.'."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the nodes in retrieval context, specifically with the first sentence attributed to the 1st node and the second sentence attributed to the 3rd and 6th nodes."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions detected. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response is completely relevant, accurate, and directly answers the question asked without any unnecessary information!"
+      }
+    }
+  },
+  {
+    "id": 4,
+    "question": "How many company holidays in 2027 fall on a weekend?",
+    "answer_clean": "In 2027, there are 3 company holidays that fall on a weekend:\n\n- **15 August 2027** (Independence Day) – Sunday\n- **2 October 2027** (Gandhi Jayanti) – Saturday\n- **25 December 2027** (Christmas) – Saturday",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.4,
+        "reason": "The score is 0.40 because while the context provides relevant data about holidays such as '25 December 2027 | Saturday | Christmas' and 'Independence Day is on Sunday, 15 August 2027', it is also heavily populated by irrelevant details about leave policies, such as 'Casual leave | 6 | Max 2 days in a row; doesn't carry over' and remote work rules."
+      },
+      "Context Precision": {
+        "score": 0.92,
+        "reason": "The score is 0.92 because the relevant nodes containing weekend holiday information and rules were generally ranked near the top, such as the first node which 'mentions '25 December 2027 | Saturday | Christmas'', the second node which 'lists the specific dates and days, including '15 August 2027 | Sunday | Independence Day' and '2 October 2027 | Saturday | Gandhi Jayanti'', and the fourth node which 'states that 'Holidays that fall on a weekend are not moved to a weekday''. However, the score is not higher because some irrelevant nodes appeared higher than they should have, such as the third node which 'only discusses general leave application rules and does not contain the holiday list or weekend holiday information', ranking above the fourth relevant node."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the holidays and weekend policies in sentence 3 of the expected output is fully supported by node(s) in retrieval context 2 and 4. Fantastic job!"
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions found. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response completely and accurately addresses the input without containing any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 5,
+    "question": "I clicked a link in a suspicious email and typed my password. What should I do?",
+    "answer_clean": "According to the information security policy, if you clicked a phishing link or entered your password on a suspicious page, you should take the following steps:\n\n* Report it to the security team within 30 minutes on `#security-alerts` or by calling the IT Helpdesk.\n* Change your password immediately.\n\nReporting quickly is never punished, even if you clicked.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.17,
+        "reason": "The score is 0.17 because the retrieval context largely contains irrelevant details about topics like screen locking, data classification, and device management, such as 'Lock your screen (Ctrl+Cmd+Q) whenever you step away.' However, it does contain a few relevant statements providing guidance on the input, such as 'If you clicked a phishing link or entered your password on a suspicious page, report it to the security team within 30 minutes on #security-alerts or by calling the IT Helpdesk and then change your password.'"
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node in the retrieval contexts is relevant as it directly answers what to do when clicking a phishing link or entering a password: 'report it to the security team within 30 minutes on #security-alerts or by calling the IT Helpdesk. Then change your password. Reporting quickly is never punished...', while all subsequent irrelevant nodes are correctly ranked lower since the second node discusses general password requirements, MFA, and screen locks, but does not address what to do if you type your password into a suspicious email link, the third node discusses security training, phishing simulations, and general security incidents, but does not provide the specific actions to take when credentials are entered into a phishing page, the fourth node contains introductory information and data classification rules, which are irrelevant to the specific incident response procedure, the fifth node covers confidential information handling and general account sharing rules, but does not mention actions for clicking suspicious email links, and the sixth node pertains to lost or stolen devices, customer data handling, and access reviews, which do not address typing a password into a suspicious email."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information in the expected output is fully supported by the 1st node in the retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context with no contradictions detected."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output directly and accurately addresses the user's urgent security concern without including any irrelevant information."
+      }
+    }
+  },
+  {
+    "id": 6,
+    "question": "Can I fly to Pune for a client meeting, and what hotel can I book there?",
+    "answer_clean": "**Flight travel:**\nYou can fly to Pune for a client meeting even if the train journey is shorter, provided you have your manager's approval. All flights must be in **economy class**. Remember that every work trip also requires your manager's prior approval via a travel request in the Kestrel Expense portal before booking.\n\n**Hotel booking:**\nPune is classified as a Metro city under the travel policy, so you can book a hotel up to **₹5,000 per night (including taxes)**.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.16,
+        "reason": "The score is 0.16 because while the context mentions policies like 'Pune office is located at 2nd floor, Baner Road' and 'For Metro cities including Pune, the hotel limit is ₹5,000 per night', a vast majority of the retrieval context is entirely irrelevant, discussing unrelated topics such as 'On WFH days you follow the same core hours...' and intern guides."
+      },
+      "Context Precision": {
+        "score": 0.18,
+        "reason": "The score is 0.18 because the only relevant nodes (the seventh and ninth nodes explaining that 'It specifies that for a train journey longer than 8 hours or a client meeting the same morning, you can book a flight in 'economy class only', and lists Pune under metro cities with a hotel limit of '₹5,000' and daily allowance of '₹1,500'' and stating that 'Every work trip needs your manager's approval before you book anything' and notes that trips 'above ₹40,000 also need the Finance Manager's approval'') are ranked far below multiple irrelevant nodes (such as the first node which is about 'This document is about working from home and other cities, which is irrelevant to booking flights and hotels for a client meeting in Pune.' and the second node which 'This part mentions Pune as an office location, but does not provide travel or hotel booking rules.'). To achieve a higher score, the relevant nodes should have been ranked at the very top."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the information found in node(s) in retrieval context 7 and 9."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context without any contradictions."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses both parts of your travel inquiry without including any unnecessary or off-topic information. Great job keeping it concise and helpful!"
+      }
+    }
+  },
+  {
+    "id": 7,
+    "question": "How many days a week do I need to be in the office, and which days?",
+    "answer_clean": "You need to be in the office **3 days a week**. \n\n**Tuesday, Wednesday, and Thursday are anchor days**, so your three office days should normally be these. (Teams may agree on different days in writing with their Engineering Manager, provided at least 2 of the 3 days are anchor days.)",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.28,
+        "reason": "The score is 0.28 because while the retrieval context successfully includes relevant details such as 'Everyone works from the office 3 days a week' and 'Tuesday, Wednesday and Thursday are anchor days', it is heavily diluted by a significant amount of irrelevant information concerning office locations, desk booking, WFH rules, security, stipends, and leave policies."
+      },
+      "Context Precision": {
+        "score": 0.5,
+        "reason": "The score is 0.50 because the relevant node providing the office attendance policy was ranked second instead of first. While the second node correctly states 'Everyone works from the office 3 days a week' and that 'Tuesday, Wednesday and Thursday are anchor days', the first node discusses office locations and access hours, which is not needed to answer the question about the number of days and which days to be in the office. Additionally, subsequent irrelevant nodes such as the third node about medical or caregiving exceptions, the fourth node focusing on working from home guidelines and working from another city, the fifth node discussing working hours and core hours, and the sixth node specifically for interns were ranked below the relevant node, preventing a lower score."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the information provided in node(s) in retrieval context 2!"
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions found. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses every part of the input without including any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 8,
+    "question": "How many days a week do I have to come to the office?",
+    "answer_clean": "Everyone is required to come to the office **3 days a week**. \n\nKey details from the policy:\n- **Anchor days:** Tuesday, Wednesday, and Thursday are designated as anchor days for team rituals, design reviews, and all-hands, so your three office days should normally be these.\n- **Exceptions:** Teams may agree on different days in writing with their Engineering Manager, provided at least 2 of the 3 days are anchor days.\n- **Attendance tracking:** Attendance is tracked via your ID card, and coming in fewer than 8 days in a calendar month without approved leave will be raised with your manager.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.45,
+        "reason": "The score is 0.45 because while the context does contain relevant statements such as 'Everyone works from the office 3 days a week.' and 'For your first 4 weeks you work from the office 5 days a week...', it also includes a significant amount of irrelevant information about topics like building access hours, desk booking, and internet allowances, as noted by the point that 'The retrieval context contained the information 'Outside access hours the building is locked and your ID card won't work.''."
+      },
+      "Context Precision": {
+        "score": 0.17,
+        "reason": "The score is 0.17 because the only relevant node is ranked sixth, failing to place it above the irrelevant nodes. Specifically, the first node was deemed irrelevant because \"This part discusses general office days as '3 days a week' but does not mention the 5 days a week rule for the first 4 weeks.\", the second node was deemed irrelevant because \"This document introduces the hybrid work policy and office locations, but does not provide the specific number of office days required.\", the third node was deemed irrelevant because \"This section covers exceptions for medical or caregiving needs and is unrelated to the standard office attendance schedule.\", the fourth node was deemed irrelevant because \"This covers core hours and unexcused absences, simply stating that 'Office days and work-from-home rules are in the Hybrid Work Policy' without giving details.\", and the fifth node was deemed irrelevant because \"This part discusses working from home and other cities, which is irrelevant to the initial office attendance requirement.\", all of which should have been ranked lower than the sixth node which actually \"directly provides the expected answer: 'For your first 4 weeks you work from the office 5 days a week... After that you follow the normal hybrid rule of 3 days a week, on the anchor days Tuesday, Wednesday and Thursday.'\"."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the schedule in the expected output is fully supported by node(s) in retrieval context 6."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions detected."
+      },
+      "Answer Relevancy": {
+        "score": 0.88,
+        "reason": "The score is 0.88 because while the output mostly addresses the office attendance policy, it includes irrelevant details about the attendance tracking method instead of directly stating the number of required days."
+      }
+    }
+  },
+  {
+    "id": 9,
+    "question": "How fast must I acknowledge a P1 incident when I'm on call, and what is the on-call allowance?",
+    "answer_clean": "- **P1 Incident Acknowledgement:** You must acknowledge a P1 incident within **15 minutes**.\n- **On-Call Allowance:** You receive **₹3,000 per week** on call, plus **₹1,500 for each night** you are paged between 23:00 and 07:00.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.12,
+        "reason": "The score is 0.12 because while the context includes relevant statements like 'P1 incidents must be acknowledged within 15 minutes.' and 'On-call allowance: ₹3,000 per week on call, plus ₹1,500 for each night you are paged between 23:00 and 07:00.', it is heavily diluted with massive irrelevant details about VPN access, travel limits, leave policies, and office equipment such as 'One noise-cancelling headset when you join' and 'Internet allowance is ₹1,000 per month'."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all relevant nodes containing the required information about P1 incident acknowledgment and on-call allowances are perfectly ranked at the very top."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the acknowledgment time and the on-call allowances is fully supported by node(s) in retrieval context 1 and 2."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions found."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the output directly and comprehensively addresses both parts of the user's input regarding P1 incident acknowledgment and the on-call allowance without any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 10,
+    "question": "What time is the Falcon standup?",
+    "answer_clean": "The Falcon daily standup is at **10:00 IST** for 15 minutes. It is held on Google Meet (with the link pinned in `#falcon-dev`), except on anchor days (Tuesday to Thursday) when the team meets in the Garuda meeting room.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.03,
+        "reason": "The score is 0.03 because while the context mentions 'Daily standup: 10:00 IST', it is overwhelmed by irrelevant details regarding 'design freeze', 'sprints', 'office access hours', and 'confidentiality levels', such as the information 'After design freeze, any screen change needs the Engineering Manager's sign-off'."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node successfully provides the details for the Falcon standup stating 'Daily standup: 10:00 IST, 15 minutes, on Google Meet... Anchor days (Tuesday to Thursday) we stand up in the Garuda meeting room instead.', while all irrelevant nodes are correctly ranked lower, such as the second node which discusses the team charter, goals, and offline-first app requirements, the third node which details roles in the team and the definition of done, the fourth node which covers the hybrid work policy and desk bookings, the fifth node which outlines confidential information and password guidelines, and the sixth node which lists project milestones and out-of-scope items."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the time, duration, and platform in sentence 1 of the expected output is fully supported by the 1st node in the retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context without any contradictions."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output directly and accurately addresses the input without including any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 11,
+    "question": "When does the Falcon beta start and how many drivers are in it?",
+    "answer_clean": "The Falcon beta starts on **18 January 2027** and includes **200 Bharat Freight drivers**.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.1,
+        "reason": "The score is 0.10 because while the context mentions that 'Beta with 200 Bharat Freight drivers starts on 18 January 2027' and 'Bharat Freight delays driver onboarding for beta: Fallback: beta with 50 of our own test drivers in Bengaluru', the vast majority of the retrieval context contains irrelevant details such as 'Daily standup is at 10:00 IST' and 'Design freeze is on 13 November 2026' that do not address the input."
+      },
+      "Context Precision": {
+        "score": 0.25,
+        "reason": "The score is 0.25 because the only relevant node is ranked fourth, failing to prioritize the correct information. The fourth node in the retrieval contexts is relevant because 'This document explicitly states under milestones that the 'Beta with 200 Bharat Freight drivers' starts on '18 January 2027'.' In contrast, the first node in the retrieval contexts is irrelevant because 'This part of the charter discusses daily standups, sprints, and tickets, which is irrelevant to the start date and driver count of the Falcon beta.', the second node in the retrieval contexts is irrelevant because 'This document outlines the project goals and launch customer details ('Bharat Freight'), but does not specify the beta start date.', the third node in the retrieval contexts is irrelevant because 'This section covers team roles and the definition of done, which does not address when the beta starts or how many drivers are in it.', the fifth node in the retrieval contexts is irrelevant because 'This part details project risks, sync conflicts, and customer contact rules, none of which contain the beta date or driver count.', and the sixth node in the retrieval contexts is irrelevant because 'This document outlines QA bug triage and testing standards, which has no information about the Falcon beta start date or driver count.' These irrelevant nodes should have been ranked lower than the relevant node."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the date and driver count in sentence 1 is fully supported by the 4th node in retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context without any contradictions."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately answers all parts of the user's input regarding the Falcon beta start date and driver count without including any irrelevant information. Great job!"
+      }
+    }
+  },
+  {
+    "id": 12,
+    "question": "What does someone need to get promoted?",
+    "answer_clean": "To get promoted, someone needs to meet the following requirements:\n\n* **Performance Ratings:** Be rated 4 or 5 in two annual reviews in a row.\n* **Nomination:** Have a manager nominate them in the HR portal by April 20 with a one-page case.\n* **Design Document (E3 to E4):** For promotions from E3 to E4, provide a design document that the person led.\n* **Team Cap:** Promotions are capped at 15% of a team in one cycle.\n* **Calibration:** The final decision is made in calibration, not by the manager alone.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.4,
+        "reason": "The score is 0.40 because while the context contains relevant statements like 'Promotions Eligible: rated 4 or 5 in two annual reviews in a row' and 'Promotions between levels happen through the annual performance review', it is heavily diluted by irrelevant information about tech stacks, daily standups, and internship logistics such as 'The retrieval context contained the information Backend: Python 3.12 with FastAPI...'"
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node in the retrieval contexts is ranked highest and correctly provides the requirements for promotion such as being 'rated 4 or 5 in two annual reviews in a row', nomination by 20 April with a 'one-page case', the design document for E3 to E4, the cap of '15% of a team', and the calibration decision, while all irrelevant nodes are correctly ranked lower since they only mention general performance reviews, engineering levels, intern evaluations, mentoring, or probation reviews."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all the expected information regarding promotion requirements, such as review ratings, manager nominations, design documents for E3 to E4, and team caps, is fully and accurately supported by the 1st node in retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions found. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses what is needed for a promotion without any irrelevant information."
+      }
+    }
+  },
+  {
+    "id": 13,
+    "question": "How much overtime can I approve for one person?",
+    "answer_clean": "You can approve overtime up to **10 hours per week** per person. \n\nAny overtime above 10 hours a week, or overtime for more than 3 weeks in a row, requires the HR Manager's approval.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.19,
+        "reason": "The score is 0.19 because while the context includes relevant statements such as 'Overtime beyond the normal 9-hour day may be approved by you up to 10 hours per week per person.' to answer the input, it is overwhelmingly diluted by irrelevant information concerning topics like comp-offs, travel requests, and promotions, as noted in the irrelevancy reasons where the context incorrectly focuses on unrelated policies."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node is relevant since \"It directly answers the question by stating that overtime can be approved 'up to 10 hours per week per person' and details when HR Manager's approval is needed.\", while all the irrelevant nodes are appropriately ranked lower, such as the second node which \"It discusses giving strikes and is irrelevant to the question about overtime approval limits.\", the third node which \"It covers hiring and low performance/PIPs, which has nothing to do with overtime limits.\", the fourth node which \"It pertains to promotions eligibility and is completely unrelated to overtime.\", the fifth node which \"It covers 1:1 meetings and general playbook overview, lacking any information about overtime limits.\", and the sixth node which \"It discusses salary bands and performance reviews for interns and new joiners, which is not about overtime.\"."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the 1st node in the retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful and accurate to the retrieval context without any contradictions!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output directly and accurately addresses the input without including any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 14,
+    "question": "What is the notice period for a Staff Engineer?",
+    "answer_clean": "The notice period for a Staff Engineer depends on their employment status:\n\n* **During probation:** **15 days** on both sides.\n* **After probation:** Staff Engineers fall under level E5 (or Engineering Managers and above), which requires a **90-day** notice period. \n\nThe HR Manager may shorten the notice period once the handover is complete, but leave cannot be used to shorten notice unless the manager agrees in writing.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.03,
+        "reason": "The score is 0.03 because while the retrieval context mentions 'Notice period for E5, Engineering Managers and above is 90 days', it fails to explicitly state the notice period for a Staff Engineer as requested in the input."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node correctly provides the notice periods for different levels after probation, stating that levels 'E3, E4' have a notice period of '60 days', and mentions 'Notice period during probation is 15 days', successfully ranking above all irrelevant nodes."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the notice periods for levels E3 and E4 after probation as well as during probation is fully and accurately captured in node 1 in the retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions found. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses the input without including any irrelevant statements. Excellent work!"
+      }
+    }
+  },
+  {
+    "id": 15,
+    "question": "What is the salary band for a Senior Software Engineer?",
+    "answer_clean": "The salary band (annual CTC for FY 2026-27) for a Senior Software Engineer (Level E3) is from **Rs 15 lakh to Rs 24 lakh**.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.07,
+        "reason": "The score is 0.07 because while it mentions 'Level E3 Senior Software Engineer Minimum CTC Rs 15 lakh Maximum CTC Rs 24 lakh', the context is mostly filled with irrelevant details such as discussing 'Associate Software Engineer' and general guidelines like 'The total increment budget for FY 2026-27 is 9% of the salary bill' instead of directly answering the salary band."
+      },
+      "Context Precision": {
+        "score": 0.7,
+        "reason": "The score is 0.70 because while the first node in retrieval contexts is ranked highest and it directly states the salary band for E3 Senior Software Engineer as 'Rs 15 lakh' to 'Rs 24 lakh', the score is not higher because the fifth node in retrieval contexts, which confirms that 'E3' corresponds to 'Senior Software Engineer', providing context on the level title, is ranked too low at rank 5. It should be ranked higher than the irrelevant nodes, such as the second node in retrieval contexts because it discusses intern stipends, rules, and annual increment matrices, which are not relevant to finding the salary band for a Senior Software Engineer, the third node in retrieval contexts because it only provides the document title and metadata about salary bands without giving any actual figures, the fourth node in retrieval contexts because it discusses engineering stacks and promotions, which do not contain the salary band numbers, and the sixth node in retrieval contexts because it covers promotion increments, bonus rules, and the payroll calendar, none of which state the Senior Software Engineer salary band."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information in the expected output is fully supported by the 1st node in retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions detected. Great job!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output directly and completely addresses the input without any irrelevant statements."
+      }
+    }
+  },
+  {
+    "id": 16,
+    "question": "Which invoices need two signatures?",
+    "answer_clean": "Invoices above ₹5,00,000 need two signatures: the Finance Manager and an Admin.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.09,
+        "reason": "The score is 0.09 because the retrieval context is largely irrelevant to the input, as noted in the reasons stating 'Urgent reimbursements above ₹50,000' and 'Standard payment terms are net 30 days' have nothing to do with invoice signatures, despite containing a single relevant statement: 'Invoices above ₹5,00,000 need two signatures: the Finance Manager and an Admin.'"
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first retrieval context node accurately states \"It directly answers the question by stating 'Invoices above ₹5,00,000 need two signatures: the Finance Manager and an Admin.'\", placing the single relevant result at the very top. The remaining irrelevant nodes correctly appear afterward, as the second retrieval context node mentions \"It discusses petty cash, team budgets, and month-end close procedures, which are not relevant to invoice signatures.\", the third retrieval context node mentions \"It details approval limits for general claims and expenses, but does not mention signature requirements for invoices.\", the fourth retrieval context node mentions \"It outlines team roles and definitions of done for the falcon project, which is unrelated to invoices.\", the fifth retrieval context node mentions \"It covers project risks and customer contact rules, containing no information about invoices or signatures.\", and the sixth retrieval context node mentions \"It describes misuse policies for travel and expense claims, which has nothing to do with invoice signatures.\""
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information in the expected output is fully supported by node 1 in the retrieval context, making the recall completely accurate!"
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions detected."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely relevant and directly addresses the question about which invoices need two signatures without any irrelevant information."
+      }
+    }
+  },
+  {
+    "id": 17,
+    "question": "How long is chat history kept in Trellis?",
+    "answer_clean": "Chat history in Trellis is kept for 180 days, after which it is deleted automatically.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.04,
+        "reason": "The score is 0.04 because almost the entire retrieval context is irrelevant, containing unrelated policies such as 'Policy documents shared with the whole organization must be approved by their owner before upload.' and 'Audit log is kept for 2 years.', with only a single statement providing the actual answer: 'Chat history in Trellis is kept for 180 days, then deleted automatically.'"
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node correctly states 'Chat history in Trellis | **180 days**, then deleted automatically', and all irrelevant nodes—specifically the second node discussing 'customer data requests and overrides', the third node covering 'roles and permissions and quarterly access reviews', the fourth node outlining 'engineering manager playbooks and 1:1 meetings', the fifth node covering 'account disabling and security training', and the sixth node pertaining to 'strikes, social media policies, and reporting violations'—are appropriately ranked lower."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all information regarding the deletion timeline in sentence 1 is fully supported by node 1 in the retrieval context. Excellent!"
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context with no contradictions present."
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately answers the question about chat history retention in Trellis without including any irrelevant information."
+      }
+    }
+  },
+  {
+    "id": 18,
+    "question": "What has to be true before QA can sign off a release?",
+    "answer_clean": "According to the QA testing and release standards, QA may sign off a release only when all of the following conditions are met:\n\n1. **Zero open P1 and zero open P2 bugs** in the release.\n2. **No more than 5 open P3 bugs**, and each must have a ticket scheduled for the next sprint.\n3. The **full regression suite has passed** on the release build within the last 24 hours.\n4. **Smoke tests have passed** on at least one real Android device and one real iOS device.\n5. **Release notes have been reviewed**.",
+    "metrics": {
+      "Context Relevancy": {
+        "score": 0.27,
+        "reason": "The score is 0.27 because while the retrieval context includes relevant statements detailing the exact conditions for QA sign-off such as 'Zero open P1 and zero open P2 bugs in the release', it is heavily diluted by a large amount of irrelevant information concerning device lab locations, bug triage schedules, and release timelines such as 'Design freeze is on 13 November 2026' and 'Test data JSON:'."
+      },
+      "Context Precision": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the first node in the retrieval contexts is ranked at the very top and directly answers the input by stating that 'QA may sign off a release only when all of these are true: 1. Zero open P1 and zero open P2 bugs... 2. No more than 5 open P3 bugs... 3. The full regression suite passed... 4. Smoke tests passed... 5. Release notes are reviewed.', while all irrelevant nodes correctly appear further down in the rankings."
+      },
+      "Context Recall": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the information provided in the 1st node in retrieval context."
+      },
+      "Faithfulness": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the output is completely accurate and fully supported by the retrieval context with zero contradictions!"
+      },
+      "Answer Relevancy": {
+        "score": 1.0,
+        "reason": "The score is 1.00 because the response directly and accurately addresses what is required for QA to sign off a release without including any irrelevant information."
+      }
+    }
+  }
+]

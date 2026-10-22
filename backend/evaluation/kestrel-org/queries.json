@@ -1,0 +1,354 @@
+{
+  "org": "Kestrel Software Pvt Ltd",
+  "documents": "evaluation/kestrel-org/documents",
+  "_visible_note": "Who sees which document (README section 5); used by compare_splits.py, the app decides this itself.",
+  "visible": {
+    "Intern": [
+      "org-code-of-conduct",
+      "org-hybrid-work-policy",
+      "org-travel-and-expense-policy",
+      "org-leave-and-holidays-2027",
+      "org-information-security-policy",
+      "intern-program-guide",
+      "falcon-project-charter"
+    ],
+    "Software Engineer": [
+      "org-code-of-conduct",
+      "org-hybrid-work-policy",
+      "org-travel-and-expense-policy",
+      "org-leave-and-holidays-2027",
+      "org-information-security-policy",
+      "eng-engineering-handbook",
+      "intern-program-guide",
+      "falcon-project-charter"
+    ],
+    "Engineering Manager": [
+      "org-code-of-conduct",
+      "org-hybrid-work-policy",
+      "org-travel-and-expense-policy",
+      "org-leave-and-holidays-2027",
+      "org-information-security-policy",
+      "em-engineering-manager-playbook",
+      "em-performance-review-cycle",
+      "eng-engineering-handbook",
+      "intern-program-guide",
+      "qa-testing-and-release-standards",
+      "falcon-project-charter"
+    ],
+    "HR Executive": [
+      "org-code-of-conduct",
+      "org-hybrid-work-policy",
+      "org-travel-and-expense-policy",
+      "org-leave-and-holidays-2027",
+      "org-information-security-policy",
+      "hr-recruitment-and-onboarding"
+    ],
+    "Admin": [
+      "admin-workspace-governance",
+      "em-engineering-manager-playbook",
+      "em-performance-review-cycle",
+      "eng-engineering-handbook",
+      "falcon-project-charter",
+      "finance-approvals-and-payments",
+      "hr-compensation-and-payroll",
+      "hr-recruitment-and-onboarding",
+      "intern-program-guide",
+      "org-code-of-conduct",
+      "org-hybrid-work-policy",
+      "org-information-security-policy",
+      "org-leave-and-holidays-2027",
+      "org-travel-and-expense-policy",
+      "qa-testing-and-release-standards"
+    ]
+  },
+  "questions": [
+    {
+      "id": 1,
+      "ask_as": "Intern",
+      "question": "How many paid leave days do I get during my internship?",
+      "expected_answer": "1 day of paid leave for each month of the internship, so 6 days in total. It doesn't carry over beyond the internship and isn't paid out when you leave.",
+      "source": "intern-program-guide.docx",
+      "markers": [
+        "1 day of paid leave for each month"
+      ]
+    },
+    {
+      "id": 2,
+      "ask_as": "Software Engineer",
+      "question": "How many earned leave days do I get in 2027, and how many can I carry forward?",
+      "expected_answer": "20 earned leave days a year, building up at 1.67 days per month worked. Up to 10 unused earned leave days carry forward to 2028; anything above 10 lapses on 31 December 2027.",
+      "source": "org-leave-and-holidays-2027.docx",
+      "markers": [
+        "10 unused earned leave days"
+      ]
+    },
+    {
+      "id": 3,
+      "ask_as": "Software Engineer",
+      "question": "Is Good Friday a holiday?",
+      "expected_answer": "Good Friday (Friday 26 March 2027) is an optional holiday, not a fixed one. Everyone may take 2 optional holidays from a list of 4 (Pongal, Good Friday, Eid al-Adha, Raksha Bandhan), applied for in the HR portal at least 7 days before.",
+      "source": "org-leave-and-holidays-2027.docx",
+      "markers": [
+        "Good Friday"
+      ]
+    },
+    {
+      "id": 4,
+      "ask_as": "HR Executive",
+      "question": "How many company holidays in 2027 fall on a weekend?",
+      "expected_answer": "3: Independence Day (Sunday 15 August), Gandhi Jayanti (Saturday 2 October) and Christmas (Saturday 25 December). Holidays that fall on a weekend are not moved to a weekday.",
+      "source": "org-leave-and-holidays-2027.docx",
+      "markers": [
+        "Independence Day"
+      ]
+    },
+    {
+      "id": 5,
+      "ask_as": "Intern",
+      "question": "I clicked a link in a suspicious email and typed my password. What should I do?",
+      "expected_answer": "Report it to the security team within 30 minutes on #security-alerts or by calling the IT Helpdesk, then change your password. Reporting quickly is never punished; hiding it is a serious violation.",
+      "source": "org-information-security-policy.pdf",
+      "markers": [
+        "within 30 minutes"
+      ]
+    },
+    {
+      "id": 6,
+      "ask_as": "Software Engineer",
+      "question": "Can I fly to Pune for a client meeting, and what hotel can I book there?",
+      "expected_answer": "Yes, in economy class only, when the train journey is longer than 8 hours or the client meeting is the same morning (with manager approval). Every trip needs your manager's approval before booking (above Rs 40,000 also the Finance Manager's). Pune is a metro city: hotel up to Rs 5,000 per night including taxes, and a daily allowance of Rs 1,500.",
+      "source": "org-travel-and-expense-policy.md",
+      "markers": [
+        "economy class only",
+        "Hotel limit per night"
+      ]
+    },
+    {
+      "id": 7,
+      "ask_as": "Software Engineer",
+      "question": "How many days a week do I need to be in the office, and which days?",
+      "expected_answer": "3 days a week, normally the anchor days Tuesday, Wednesday and Thursday. Teams may agree other days in writing with their Engineering Manager, but at least 2 of the 3 must be anchor days.",
+      "source": "org-hybrid-work-policy.md",
+      "markers": [
+        "Everyone works from the office"
+      ]
+    },
+    {
+      "id": 8,
+      "ask_as": "Intern",
+      "question": "How many days a week do I have to come to the office?",
+      "expected_answer": "5 days a week for the first 4 weeks, then 3 days a week on the anchor days Tuesday, Wednesday and Thursday.",
+      "source": "intern-program-guide.docx",
+      "markers": [
+        "5 days a week"
+      ]
+    },
+    {
+      "id": 9,
+      "ask_as": "Software Engineer",
+      "question": "How fast must I acknowledge a P1 incident when I'm on call, and what is the on-call allowance?",
+      "expected_answer": "Within 15 minutes. The allowance is Rs 3,000 per week on call plus Rs 1,500 for each night you are paged between 23:00 and 07:00.",
+      "source": "eng-engineering-handbook.md",
+      "markers": [
+        "3,000 per week"
+      ]
+    },
+    {
+      "id": 10,
+      "ask_as": "Intern",
+      "question": "What time is the Falcon standup?",
+      "expected_answer": "10:00 IST, 15 minutes, on Google Meet (link pinned in #falcon-dev). On anchor days (Tuesday to Thursday) it is in the Garuda meeting room instead.",
+      "source": "falcon-project-charter.md",
+      "markers": [
+        "10:00 IST, 15 minutes"
+      ]
+    },
+    {
+      "id": 11,
+      "ask_as": "Engineering Manager",
+      "question": "When does the Falcon beta start and how many drivers are in it?",
+      "expected_answer": "18 January 2027, with 200 Bharat Freight drivers.",
+      "source": "falcon-project-charter.md",
+      "markers": [
+        "18 January 2027"
+      ]
+    },
+    {
+      "id": 12,
+      "ask_as": "Engineering Manager",
+      "question": "What does someone need to get promoted?",
+      "expected_answer": "A rating of 4 or 5 in two annual reviews in a row, and a nomination by their manager in the HR portal by 20 April with a one-page case. E3 to E4 also needs a design document the person led. Promotions are capped at 15% of a team per cycle and decided in calibration.",
+      "source": "em-performance-review-cycle.pptx",
+      "markers": [
+        "two annual reviews in a row"
+      ]
+    },
+    {
+      "id": 13,
+      "ask_as": "Engineering Manager",
+      "question": "How much overtime can I approve for one person?",
+      "expected_answer": "Up to 10 hours per week per person. More than 10 hours a week, or overtime for more than 3 weeks in a row, needs the HR Manager's approval.",
+      "source": "em-engineering-manager-playbook.md",
+      "markers": [
+        "10 hours per week"
+      ]
+    },
+    {
+      "id": 14,
+      "ask_as": "HR Executive",
+      "question": "What is the notice period for a Staff Engineer?",
+      "expected_answer": "60 days (levels E3 and E4) after probation; 15 days during probation.",
+      "source": "hr-recruitment-and-onboarding.md",
+      "markers": [
+        "E3, E4 | 60 days"
+      ]
+    },
+    {
+      "id": 15,
+      "ask_as": "Admin",
+      "question": "What is the salary band for a Senior Software Engineer?",
+      "expected_answer": "E3 Senior Software Engineer: Rs 15 lakh to Rs 24 lakh annual CTC.",
+      "source": "hr-compensation-and-payroll.txt",
+      "markers": [
+        "Rs 15 lakh"
+      ]
+    },
+    {
+      "id": 16,
+      "ask_as": "Admin",
+      "question": "Which invoices need two signatures?",
+      "expected_answer": "Invoices above Rs 5,00,000 need two signatures: the Finance Manager and an Admin.",
+      "source": "finance-approvals-and-payments.pdf",
+      "markers": [
+        "two signatures"
+      ]
+    },
+    {
+      "id": 17,
+      "ask_as": "Admin",
+      "question": "How long is chat history kept in Trellis?",
+      "expected_answer": "180 days, then it is deleted automatically.",
+      "source": "admin-workspace-governance.md",
+      "markers": [
+        "180 days"
+      ]
+    },
+    {
+      "id": 18,
+      "ask_as": "Engineering Manager",
+      "question": "What has to be true before QA can sign off a release?",
+      "expected_answer": "Zero open P1 and P2 bugs; no more than 5 open P3 bugs, each with a ticket for the next sprint; the full regression suite passed on the release build within the last 24 hours; smoke tests passed on at least one real Android and one real iOS device; release notes reviewed.",
+      "source": "qa-testing-and-release-standards.md",
+      "markers": [
+        "Zero open P1 and zero open P2"
+      ]
+    },
+    {
+      "id": 19,
+      "ask_as": "Intern",
+      "expect": "refuse",
+      "question": "What is the salary band for a Senior Software Engineer?",
+      "forbidden_source": "hr-compensation-and-payroll",
+      "forbidden_phrases": [
+        "15 lakh",
+        "24 lakh"
+      ],
+      "why": "Salary bands are only in the HR Manager's document."
+    },
+    {
+      "id": 20,
+      "ask_as": "HR Executive",
+      "expect": "refuse",
+      "question": "What increment does someone rated 4 get?",
+      "forbidden_source": "hr-compensation-and-payroll",
+      "forbidden_phrases": [
+        "8%",
+        "11%"
+      ],
+      "why": "HR Executive sits below HR Manager, so the compensation document is out of reach."
+    },
+    {
+      "id": 21,
+      "ask_as": "Engineering Manager",
+      "expect": "refuse",
+      "question": "What is the salary band for an Engineering Manager?",
+      "forbidden_source": "hr-compensation-and-payroll",
+      "forbidden_phrases": [
+        "30 lakh",
+        "45 lakh"
+      ],
+      "why": "Managers never see the full salary tables."
+    },
+    {
+      "id": 22,
+      "ask_as": "Software Engineer",
+      "expect": "refuse",
+      "question": "How much overtime can my manager approve?",
+      "forbidden_source": "em-engineering-manager-playbook",
+      "forbidden_phrases": [
+        "10 hours"
+      ],
+      "why": "The manager playbook is shared with Engineering Manager, above Software Engineer."
+    },
+    {
+      "id": 23,
+      "ask_as": "Intern",
+      "expect": "refuse",
+      "question": "How many approvals does a pull request touching payments code need?",
+      "forbidden_source": "eng-engineering-handbook",
+      "forbidden_phrases": [
+        "2 approvals",
+        "two approvals",
+        "E3"
+      ],
+      "why": "The engineering handbook is shared with Software Engineer, above Intern."
+    },
+    {
+      "id": 24,
+      "ask_as": "Software Engineer",
+      "expect": "refuse",
+      "question": "What are QA's conditions for signing off a release?",
+      "forbidden_source": "qa-testing-and-release-standards",
+      "forbidden_phrases": [
+        "5 open P3",
+        "P3 bugs",
+        "24 hours before"
+      ],
+      "why": "QA Engineer is a sibling of Software Engineer, not below it."
+    },
+    {
+      "id": 25,
+      "ask_as": "HR Executive",
+      "expect": "refuse",
+      "question": "When is the Falcon design freeze?",
+      "forbidden_source": "falcon-project-charter",
+      "forbidden_phrases": [
+        "13 November"
+      ],
+      "why": "HR Executive is not on Project Falcon and not above its members."
+    },
+    {
+      "id": 26,
+      "ask_as": "Engineering Manager",
+      "expect": "refuse",
+      "question": "Which invoices need two signatures?",
+      "forbidden_source": "finance-approvals-and-payments",
+      "forbidden_phrases": [
+        "5,00,000",
+        "500,000"
+      ],
+      "why": "Finance procedures are shared with Finance Manager only (and Admin above it)."
+    },
+    {
+      "id": 27,
+      "ask_as": "Software Engineer",
+      "expect": "refuse",
+      "question": "How long is chat history kept in Trellis?",
+      "forbidden_source": "admin-workspace-governance",
+      "forbidden_phrases": [
+        "180 days"
+      ],
+      "why": "Workspace governance is for Admins only."
+    }
+  ]
+}

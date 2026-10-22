@@ -387,6 +387,15 @@ export const zFeedbackOptionsResponse = z.object({
 });
 
 /**
+ * FileUsageResponse
+ *
+ * Whether an uploaded file is used by a document or task hand-in (D64).
+ */
+export const zFileUsageResponse = z.object({
+    in_use: z.boolean()
+});
+
+/**
  * InvitationStatusEnum
  */
 export const zInvitationStatusEnum = z.enum([

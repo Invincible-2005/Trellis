@@ -103,6 +103,13 @@ For `.pptx`: text is extracted per-slide with slide number prepended as context:
 > the splitter below as today. Slides (B) unchanged. Search returns 4 pieces instead of 6.
 > Reason: evaluation 2026-10-16 (`backend/evaluation/results/`).
 > The 1,000 / 200 rule below is superseded for documents with headings once D58 is built.
+>
+> **Built 2026-10-20 (D58 as revised that day; supersedes the 1,000 / 200 and 500 / 100 rules below):** a new
+> piece at every heading (Markdown `#`, Word heading styles kept as `## `, numbered lines in PDF/txt, one per
+> slide); a section under **400** characters is joined with the next one; a section over 1,000 is split with
+> **~12% overlap (120)**; every piece starts with "Document title > Section" (the document's own first line,
+> or the uploaded title). Word tables are read in place, under their heading. No headings → one long section,
+> i.e. 1,000-character cuts. Search returns 4 pieces. Existing documents: `scripts/reindex_documents.py`.
 
 - **Chunk Size:** 1000 characters
 - **Chunk Overlap:** 200 characters
