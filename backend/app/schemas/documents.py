@@ -80,6 +80,11 @@ class DocumentListResponse(BaseModel):
     documents: List[DocumentResponse]
 
 
+class FileUsageResponse(BaseModel):
+    """Whether an uploaded file is used by a document or task hand-in (D64)."""
+    in_use: bool
+
+
 class TagTarget(BaseModel):
     id: UUID
     name: str

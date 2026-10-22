@@ -1,7 +1,11 @@
 """
 Step 1 of the evaluation: ask the agent the questions in queries.json.
 
-    uv run python evaluation/run_agent.py
+    uv run python evaluation/run_agent.py               # round 1: queries.json, results/
+    uv run python evaluation/run_agent.py kestrel-org   # round 2: kestrel-org/queries.json, kestrel-org/results/
+
+A question set in a folder names its org ("org" in its queries.json), so people
+are looked up only inside that org (both test orgs have an "Admin").
 
 Each question is asked as a real member of the test org who holds the
 question's `ask_as` role, with their real AccessScope, so search only finds
@@ -30,11 +34,14 @@ from sqlalchemy import select  # noqa: E402
 from app.agent.graph import build_graph  # noqa: E402  (needs the path set above)
 from app.agent.state import AgentContext, new_turn_input  # noqa: E402
 from app.core.database import async_session, engine  # noqa: E402
-from app.models import OrgMember, Role, Team, TeamMember, User  # noqa: E402
+from app.models import Organization, OrgMember, Role, Team, TeamMember, User  # noqa: E402
 from app.scope.resolver import resolve_scope  # noqa: E402
 
-QUERIES = EVAL_DIR / "queries.json"
-ANSWERS = EVAL_DIR / "results" / "answers.json"
+QUESTION_SET = sys.argv[1] if len(sys.argv) > 1 else None
+SET_DIR = EVAL_DIR / QUESTION_SET if QUESTION_SET else EVAL_DIR
+RESULTS_DIR = SET_DIR / (sys.argv[2] if len(sys.argv) > 2 else "results")  # e.g. results-sections for a rerun
+QUERIES = SET_DIR / "queries.json"
+ANSWERS = RESULTS_DIR / "answers.json"
 PAUSE_SECONDS = 20  # between questions, to stay under the free Gemini per-minute limit
 
 _CITATION = re.compile(r"\s*\[[0-9a-f]{8}(?:[,\s]+[0-9a-f]{8})*\]")
@@ -46,19 +53,29 @@ def clean_answer(text: str) -> str:
     return _UNVERIFIED_NOTE.sub("", _CITATION.sub("", text)).strip()
 
 
-async def context_for(role_name: str) -> tuple[AgentContext, str]:
+def load_queries() -> tuple[list[dict], str | None]:
+    """The questions, and the org they belong to (None for round 1's plain list)."""
+    data = json.loads(QUERIES.read_text(encoding="utf-8"))
+    if isinstance(data, list):
+        return data, None
+    return data["questions"], data["org"]
+
+
+async def context_for(role_name: str, org_name: str | None) -> tuple[AgentContext, str]:
     """
     The AgentContext of the (first) member who holds `role_name` as their
     org-level role or, if nobody does, as a team role. Team roles count for
     document visibility too, so either way they see what that role sees.
     """
+    in_org = [Organization.name == org_name] if org_name else []
     async with async_session() as db:
         rows = (
             await db.execute(
                 select(User, OrgMember.org_id)
                 .join(OrgMember, OrgMember.user_id == User.id)
                 .join(Role, Role.id == OrgMember.role_id)
-                .where(Role.name == role_name)
+                .join(Organization, Organization.id == OrgMember.org_id)
+                .where(Role.name == role_name, *in_org)
                 .order_by(User.name)
             )
         ).all() or (
@@ -67,12 +84,13 @@ async def context_for(role_name: str) -> tuple[AgentContext, str]:
                 .join(TeamMember, TeamMember.user_id == User.id)
                 .join(Team, Team.id == TeamMember.team_id)
                 .join(Role, Role.id == TeamMember.role_id)
-                .where(Role.name == role_name)
+                .join(Organization, Organization.id == Team.org_id)
+                .where(Role.name == role_name, *in_org)
                 .order_by(User.name)
             )
         ).all()
         if not rows:
-            sys.exit(f"Nobody holds the role {role_name!r}. Check the test org (plans/documents/test-files).")
+            sys.exit(f"Nobody holds the role {role_name!r} in {org_name or 'the test org'}.")
         user, org_id = rows[0]
         scope = await resolve_scope(user.id, org_id, db)
     return AgentContext(scope=scope, audit_id=uuid.uuid4()), user.name
@@ -125,7 +143,7 @@ def save_answers(answers: dict[int, dict]) -> None:
 
 
 async def main() -> None:
-    queries = json.loads(QUERIES.read_text(encoding="utf-8"))
+    queries, org_name = load_queries()
     answers = load_answers()
     graph = build_graph()
     contexts: dict[str, tuple[AgentContext, str]] = {}
@@ -137,14 +155,23 @@ async def main() -> None:
         if n:
             await asyncio.sleep(PAUSE_SECONDS)
         if query["ask_as"] not in contexts:
-            contexts[query["ask_as"]] = await context_for(query["ask_as"])
+            contexts[query["ask_as"]] = await context_for(query["ask_as"], org_name)
         context, user_name = contexts[query["ask_as"]]
 
         print(f"[{query['id']}] {user_name} ({query['ask_as']}): {query['question']}")
-        try:
-            result = await ask(graph, context, query["question"])
-        except Exception as exc:  # e.g. the free daily quota ran out
-            print(f"     failed: {exc}\n     Saved what's done; run again later to continue.")
+        result = None
+        for attempt in range(1, 4):
+            try:
+                result = await ask(graph, context, query["question"])
+                break
+            except Exception as exc:  # e.g. the free daily quota ran out
+                if "PerMinute" in str(exc) and attempt < 3:
+                    print("     per-minute limit, waiting 65 s ...")
+                    await asyncio.sleep(65)
+                    continue
+                print(f"     failed: {str(exc)[:300]}\n     Saved what's done; run again later to continue.")
+                break
+        if result is None:
             break
         answers[query["id"]] = {**query, "asked_as_user": user_name, **result}
         save_answers(answers)

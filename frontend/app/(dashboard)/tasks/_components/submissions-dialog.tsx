@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
+import { discardUpload } from '@/lib/api/actions/documents';
 import { createSubmission, deleteSubmission, loadSubmissions } from '@/lib/api/actions/tasks';
 import type { Submission, Task } from '@/lib/api/queries/tasks';
 import { zHandInForm } from '@/lib/api/schemas/tasks';
@@ -117,6 +118,18 @@ export function SubmissionsDialog({ open, onOpenChange, task }: SubmissionsDialo
     await reload();
   });
 
+  // A file uploaded here but not handed in: delete it from UploadThing so it doesn't
+  // stay there unused (trellis/12 D64). The server checks nothing uses it first.
+  const discardUploaded = () => {
+    if (uploaded) void discardUpload(uploaded.url);
+    setUploaded(null);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) discardUploaded();
+    onOpenChange(next);
+  };
+
   const handleDelete = async () => {
     if (!toDelete) return;
     setIsDeleting(true);
@@ -136,7 +149,7 @@ export function SubmissionsDialog({ open, onOpenChange, task }: SubmissionsDialo
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -213,7 +226,7 @@ export function SubmissionsDialog({ open, onOpenChange, task }: SubmissionsDialo
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setUploaded(null)}
+                    onClick={discardUploaded}
                     disabled={isSubmitting}
                     className="shrink-0 text-xs text-muted-foreground"
                   >

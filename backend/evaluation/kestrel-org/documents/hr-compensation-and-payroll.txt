@@ -1,0 +1,103 @@
+KESTREL SOFTWARE PVT LTD
+COMPENSATION AND PAYROLL GUIDE (RESTRICTED)
+Owner: HR Manager | For: HR Manager only | Version: FY 2026-27, 1 April 2026
+
+This guide holds salary bands, increment rules, bonus rules and the payroll calendar.
+It is Restricted information under the Code of Conduct. Do not share it with
+HR Executives, managers or employees. Managers ask the HR Manager for individual
+figures; they never receive the full tables.
+
+
+1. SALARY BANDS (annual CTC, FY 2026-27)
+----------------------------------------
+
+Level   Title                          Minimum CTC     Maximum CTC
+E1      Associate Software Engineer    Rs 6 lakh       Rs 9 lakh
+E2      Software Engineer              Rs 9 lakh       Rs 15 lakh
+E3      Senior Software Engineer       Rs 15 lakh      Rs 24 lakh
+E4      Staff Engineer                 Rs 24 lakh      Rs 36 lakh
+E5      Principal Engineer             Rs 36 lakh      Rs 50 lakh
+QA1     QA Engineer                    Rs 6 lakh       Rs 12 lakh
+QA2     Senior QA Engineer             Rs 12 lakh      Rs 20 lakh
+M1      Engineering Manager            Rs 30 lakh      Rs 45 lakh
+HR1     HR Executive                   Rs 5 lakh       Rs 8 lakh
+F1      Accounts Executive             Rs 5 lakh       Rs 8 lakh
+
+Interns: fixed stipend of Rs 35,000 per month, no CTC band, no bonus.
+
+Rules:
+- New offers are made at or below the middle of the band. Offers above the
+  middle need the Admin's approval.
+- Nobody may be paid above the band maximum. Someone at the maximum gets their
+  increment as a one-time payment instead of a salary raise.
+
+
+2. ANNUAL INCREMENT MATRIX
+--------------------------
+
+Increments are decided once a year after the April performance review and take
+effect from 1 April (paid with arrears in the May salary).
+
+Review rating   Increment range
+5 (Outstanding)        12% to 15%
+4 (Exceeds)             8% to 11%
+3 (Meets)               5% to 7%
+2 (Partly meets)        0% to 3%
+1 (Below)               0%, PIP discussion
+
+Promotion increment: a promoted person gets an extra 10% on top of their rating
+increment, and at least the minimum of the new band.
+
+The total increment budget for FY 2026-27 is 9% of the salary bill. The HR
+Manager checks every team's proposals against this before letters go out.
+
+
+3. ANNUAL PERFORMANCE BONUS
+---------------------------
+
+- Up to 10% of annual CTC, based on company results and the individual rating.
+- Paid once a year in the June salary.
+- Only people who joined before 1 October of the review year are eligible.
+- People serving notice on the payout date are not eligible.
+
+
+4. PAYROLL CALENDAR
+-------------------
+
+- Payroll inputs (new joiners, exits, leave without pay, allowances, approved
+  expense claims) close on the 20th of every month.
+- Salary is credited on the LAST WORKING DAY of the month.
+- Payslips are published in the HR portal on the 1st of the next month.
+- If the last working day is a bank holiday, salary is credited one working day
+  earlier.
+- Form 16 is issued by 15 June every year.
+
+
+5. ALLOWANCES PAID THROUGH PAYROLL
+----------------------------------
+
+Allowance                     Amount
+Internet (WFH)                Rs 1,000 per month (everyone, including interns)
+On-call                       Rs 3,000 per week + Rs 1,500 per paged night
+Night shift (rare)            Rs 500 per night
+Relocation (new joiners)      Up to Rs 50,000, once, with bills
+
+On-call claims must be approved by the Engineering Manager by the 20th to reach
+that month's payroll.
+
+
+6. SALARY ADVANCES AND LOANS
+----------------------------
+
+- Salary advance: up to 1 month's net salary, recovered over at most 6 months,
+  only after probation. Approved by the HR Manager.
+- Only one advance can be open at a time.
+- No loans are given to interns or people serving notice.
+
+
+7. FULL AND FINAL SETTLEMENT
+----------------------------
+
+Paid within 45 days of the last working day. It includes unpaid salary, leave
+encashment of up to 15 unused earned leave days, and recovery of any unreturned
+equipment or open advance.

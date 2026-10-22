@@ -20,9 +20,14 @@ Consistency invariant:
     is either ready with all its chunks, or failed with none, so retrieval
     can never see chunks of a failed or half-ingested document.
 
-Chunking decisions  (Ticket 11):
-    Standard docs  (.pdf, .docx, .txt, .md) : 1000 chars / 200 overlap
-    Presentations  (.pptx)                   : 500 chars  / 100 overlap
+Chunking  (Ticket 12 D58, built 2026-10-20; replaces ticket 11's 1000/200 cuts):
+    One piece per section: a new piece starts at every heading (Markdown "#",
+    Word heading styles, numbered lines like "3. Office days" in PDF/txt, one
+    per slide). A section under 400 characters is joined with the next one; a
+    section over 1,000 is split with ~12% overlap. Each piece starts with
+    "Document title > Section" so its embedding knows what it belongs to. A file
+    without headings is one long section, i.e. plain 1,000-character cuts.
+    Chosen by the Kestrel offline comparison (answer ranked 1st 16/18 vs 12/18).
 
 Embedding  (Ticket 12 D14):
     gemini-embedding-001 → 1024-dim vectors, via app/services/embeddings.py
@@ -32,6 +37,7 @@ Embedding  (Ticket 12 D14):
 import io
 import asyncio
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
@@ -53,19 +59,19 @@ class IngestionError(Exception):
     """Expected failure. Its message is admin-safe and stored in documents.error_message."""
 
 
-# ─── Splitter instances — created once at module load, reused per call ────────
+# ─── Section pieces (D58) — sizes in characters ───────────────────────────────
 
-_STANDARD_SPLITTER = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
+MIN_PIECE = 400     # a smaller section is joined with the next one
+MAX_PIECE = 1000    # a bigger section is split
+
+_LONG_SECTION_SPLITTER = RecursiveCharacterTextSplitter(
+    chunk_size=MAX_PIECE,
+    chunk_overlap=120,  # ~12%, only between parts of one long section
     separators=["\n\n", "\n", ".", " ", ""],
 )
 
-_PPTX_SPLITTER = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=100,
-    separators=["\n\n", "\n", " • ", ". ", " ", ""],
-)
+# "3. Office days" in PDF/txt (no full stop or colon after it, so not a sentence)
+_NUMBERED_HEADING = re.compile(r"^\s*\d{1,2}\.\s+[A-Za-z][^.:]{0,60}$")
 
 
 # ─── Step 1: Fetch raw bytes from UploadThing CDN ─────────────────────────────
@@ -156,7 +162,8 @@ def _extract_text(raw_bytes: bytes, file_type: str) -> str:
 
     .pptx  → Each slide becomes "[Slide N] <text>" preserving search context.
     .pdf   → pymupdf — fastest, handles multi-column layouts.
-    .docx  → python-docx — paragraphs, then table rows.
+    .docx  → python-docx — paragraphs and table rows in document order; a heading
+             paragraph keeps a "## " marker so it can start a section.
     .txt / .md → UTF-8 decode, no transformation.
     """
     if file_type in ("txt", "md"):
@@ -170,15 +177,22 @@ def _extract_text(raw_bytes: bytes, file_type: str) -> str:
 
     if file_type == "docx":
         from docx import Document as DocxDocument
+        from docx.table import Table
         doc = DocxDocument(io.BytesIO(raw_bytes))
-        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-        # Also extract table rows so tabular policy data is indexed
-        for table in doc.tables:
-            for row in table.rows:
-                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                if cells:
-                    paragraphs.append(" | ".join(cells))
-        return "\n".join(paragraphs)
+        lines: list[str] = []
+        # Tables stay under their heading (they used to be appended at the end, which
+        # cut rows like "Good Friday" off from "Optional holidays").
+        for block in doc.iter_inner_content():
+            if isinstance(block, Table):
+                for row in block.rows:
+                    cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if cells:
+                        lines.append(" | ".join(cells))
+            elif block.text.strip():
+                style = block.style.name if block.style is not None else ""
+                marker = "# " if style == "Title" else "## " if style.startswith("Heading") else ""
+                lines.append(marker + block.text)
+        return "\n".join(lines)
 
     if file_type == "pptx":
         from pptx import Presentation
@@ -200,16 +214,56 @@ def _extract_text(raw_bytes: bytes, file_type: str) -> str:
 
 # ─── Step 3: Chunk text ───────────────────────────────────────────────────────
 
-def _chunk_text(text: str, file_type: str) -> list[str]:
+def _is_heading(line: str, file_type: str) -> bool:
+    if file_type in ("md", "docx"):
+        return line.lstrip().startswith("#")
+    if file_type in ("pdf", "txt"):
+        return bool(_NUMBERED_HEADING.match(line))
+    return False
+
+
+def _sections(text: str, file_type: str) -> list[tuple[str, str]]:
+    """(heading, text) per section; a slide ("[Slide N] ...") is one section."""
+    if file_type == "pptx":
+        return [(block.split("]")[0].strip("["), block) for block in text.split("\n\n") if block.strip()]
+    sections: list[tuple[str, list[str]]] = [("", [])]
+    for line in text.splitlines():
+        if _is_heading(line, file_type):
+            sections.append((line.strip("# ").strip(), [line]))
+        else:
+            sections[-1][1].append(line)
+    return [(heading, "\n".join(lines).strip()) for heading, lines in sections if "\n".join(lines).strip()]
+
+
+def _document_title(text: str, fallback: str) -> str:
+    """The document's own first line (its title) when it is short, else the uploaded title."""
+    first = next((line.strip("# ").strip() for line in text.splitlines() if line.strip()), "")
+    return first if 0 < len(first) <= 100 else fallback
+
+
+def _chunk_text(text: str, file_type: str, title: str) -> list[str]:
     """
-    Splits extracted text into overlapping chunks.
-    PPTX uses smaller chunks (500/100) because slide bullets are already short;
-    larger chunks would merge unrelated slides into one embedding.
+    Cut extracted text into section pieces (D58, see the module docstring).
+
+        _chunk_text("# Leave policy\n## Sick leave\n10 days ...", "md", "leave.md")
+        → ["Leave policy > Sick leave\n## Sick leave\n10 days ..."]   (once joined/split)
     """
-    splitter = _PPTX_SPLITTER if file_type == "pptx" else _STANDARD_SPLITTER
-    chunks = splitter.split_text(text)
-    # Drop empty chunks that can result from sparse slides or blank pages
-    return [c for c in chunks if c.strip()]
+    title = _document_title(text, title)
+    joined: list[tuple[str, str]] = []
+    for heading, body in _sections(text, file_type):
+        if joined and len(joined[-1][1]) < MIN_PIECE and len(joined[-1][1]) + len(body) <= MAX_PIECE:
+            last_heading, last_body = joined[-1]
+            joined[-1] = (" · ".join(h for h in (last_heading, heading) if h), last_body + "\n\n" + body)
+        else:
+            joined.append((heading, body))
+
+    pieces = []
+    for heading, body in joined:
+        label = f"{title} > {heading}" if heading and heading != title else title
+        for part in (_LONG_SECTION_SPLITTER.split_text(body) if len(body) > MAX_PIECE else [body]):
+            if part.strip():
+                pieces.append(f"{label}\n{part}")
+    return pieces
 
 
 # ─── Step 4: Embed — see app/services/embeddings.py (embed_documents) ─────────
@@ -315,7 +369,7 @@ async def run_ingestion(document_id: uuid.UUID) -> None:
                 raise IngestionError("No extractable text — the file may be image-only or corrupt.")
 
             # Step 3 — Chunk
-            chunks = _chunk_text(text, document.file_type)
+            chunks = _chunk_text(text, document.file_type, document.title)
             if not chunks:
                 raise IngestionError("No extractable text — the file may be image-only or corrupt.")
             logger.info("[ingestion] %d chunks produced for %s", len(chunks), document_id)

@@ -17,6 +17,7 @@ from app.schemas.documents import (
     DocumentListResponse,
     DocumentResponse,
     DocumentTagOptions,
+    FileUsageResponse,
     UpdateDocumentRequest,
 )
 from app.scope.resolver import AccessScope
@@ -73,6 +74,23 @@ async def get_tag_options(
 ) -> DocumentTagOptions:
     """Where the caller may tag a new document: org, roles and teams (D23). Fills the upload dialog's picker."""
     return await documents.tag_options(db, scope)
+
+
+# Also before "/{document_id}".
+@router.get(
+    "/file-usage",
+    response_model=FileUsageResponse,
+    responses=error_responses(400, 401, 409, 503),
+)
+async def get_file_usage(
+    file_url: str,
+    db: AsyncSession = Depends(get_db),
+) -> FileUsageResponse:
+    """
+    Is this uploaded file used by a document or task hand-in (any org)? The upload
+    dialogs ask before deleting a file they uploaded but never saved (D64).
+    """
+    return await documents.file_usage(db, file_url)
 
 
 @router.get(

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { discardUpload } from "@/lib/api/actions/documents";
 import type { DocumentTagOptions } from "@/lib/api/queries/documents";
 import { zUploadDocumentForm } from "@/lib/api/schemas/documents";
 import { UploadDropzone } from "@/lib/uploadthing";
@@ -90,9 +91,29 @@ export function DocUploadDropzone({
     form.reset(emptyForm());
   };
 
+  // The uploaded file isn't saved as a document yet: delete it from UploadThing so it
+  // doesn't stay there unused (trellis/12 D64). The server checks nothing uses it first.
+  const discardUnsaved = () => {
+    const url = form.getValues("file_url");
+    if (url) void discardUpload(url);
+  };
+
+  const close = () => {
+    resetForm();
+    onOpenChange(false);
+  };
+
+  // Closing the dialog (Cancel, X, Esc, clicking outside) before Save discards the file.
   const handleDialogChange = (isOpen: boolean) => {
-    if (!isOpen) resetForm();
-    onOpenChange(isOpen);
+    if (isOpen) return onOpenChange(true);
+    discardUnsaved();
+    close();
+  };
+
+  // Back to step 1 to pick another file: the one already uploaded isn't needed.
+  const handleBack = () => {
+    discardUnsaved();
+    resetForm();
   };
 
   const handleScopeChange = (
@@ -136,7 +157,7 @@ export function DocUploadDropzone({
       role_id: values.scope_type === "role" ? values.role_id : undefined,
       team_id: values.scope_type === "team" ? values.team_id : undefined,
     });
-    handleDialogChange(false);
+    close(); // saved: the file belongs to the new document now
   });
 
   return (
@@ -237,7 +258,7 @@ export function DocUploadDropzone({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setStep(1)}
+                onClick={handleBack}
                 className="flex items-center gap-1.5"
               >
                 <ArrowLeft className="h-4 w-4" />

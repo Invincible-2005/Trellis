@@ -262,6 +262,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/file-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get File Usage
+         * @description Is this uploaded file used by a document or task hand-in (any org)? The upload
+         *     dialogs ask before deleting a file they uploaded but never saved (D64).
+         */
+        get: operations["get_file_usage_api_v1_documents_file_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}": {
         parameters: {
             query?: never;
@@ -1477,6 +1498,14 @@ export interface components {
              * @default []
              */
             commend_people: components["schemas"]["FeedbackPerson"][];
+        };
+        /**
+         * FileUsageResponse
+         * @description Whether an uploaded file is used by a document or task hand-in (D64).
+         */
+        FileUsageResponse: {
+            /** In Use */
+            in_use: boolean;
         };
         /**
          * GivenFeedbackResponse
@@ -3411,6 +3440,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_file_usage_api_v1_documents_file_usage_get: {
+        parameters: {
+            query: {
+                file_url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUsageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Service Unavailable */

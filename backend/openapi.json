@@ -1532,6 +1532,94 @@
         ]
       }
     },
+    "/api/v1/documents/file-usage": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get File Usage",
+        "description": "Is this uploaded file used by a document or task hand-in (any org)? The upload\ndialogs ask before deleting a file they uploaded but never saved (D64).",
+        "operationId": "get_file_usage_api_v1_documents_file_usage_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}": {
       "get": {
         "tags": [
@@ -6838,6 +6926,20 @@
         ],
         "title": "FeedbackTeamOption",
         "description": "One team in the Give form: who you may strike and who you may commend there."
+      },
+      "FileUsageResponse": {
+        "properties": {
+          "in_use": {
+            "type": "boolean",
+            "title": "In Use"
+          }
+        },
+        "type": "object",
+        "required": [
+          "in_use"
+        ],
+        "title": "FileUsageResponse",
+        "description": "Whether an uploaded file is used by a document or task hand-in (D64)."
       },
       "GivenFeedbackResponse": {
         "properties": {
